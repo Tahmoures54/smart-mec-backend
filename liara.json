@@ -1,0 +1,10 @@
+{
+  "platform": "node",
+  "build": {
+    "command": "npm run build"
+  },
+  "start": {
+    "command": "npm start"
+  },
+  "output": ".next"
+}

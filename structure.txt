@@ -1,0 +1,62 @@
+smart-mec-backend:
+|   drizzle.config.json
+|   eslint.config.mjs
+|   liara.json
+|   next.config.ts
+|   package.json
+|   postcss.config.mjs
+|   structure.txt
+|   tsconfig.json
+|   .env
+|   
++---public
+|       cars.json
+|       
+\---src
+    |   middleware.ts
+    |   
+    +---app
+    |   |   globals.css
+    |   |   layout.tsx
+    |   |   page.tsx
+    |   |   
+    |   \---api
+    |       +---account
+    |       |   |   route.ts
+    |       |   |   
+    |       |   \---credits
+    |       |           route.ts
+    |       |           
+    |       +---diagnose
+    |       |       route.ts
+    |       |       
+    |       +---health
+    |       |       route.ts
+    |       |       
+    |       \---purchase
+    |           |   route.ts
+    |           |   
+    |           \---verify
+    |                   route.ts
+    |                   
+    +---data
+    |       cars.json
+    |       
+    +---db
+    |       index.ts
+    |       schema.ts
+    |       
+    +---lib
+    |       auth.ts
+    |       error-handler.ts
+    |       rate-limiter.ts
+    |       sms.ts
+    |       validation.ts
+    |       
+    +---types
+    |       index.ts
+    |       
+    \---utils
+            backup.ts
+            logger.ts
+            
