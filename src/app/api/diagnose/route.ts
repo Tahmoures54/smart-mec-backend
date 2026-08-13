@@ -1,6 +1,6 @@
-﻿// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // AI Diagnose Route - Smart-MEC
-// نسخه هماهنگ با بسته‌های جدید و محدودیت مصرف طلایی
+// سال ساخت توسط کاربر؛ پشتیبانی خودرو سفارشی
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,8 +8,17 @@ import { db } from '@/db';
 import { diagnostics, users, goldenUsage } from '@/db/schema';
 import { eq, desc, sql, and, gt } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
-import { validateCarId, validateDescription } from '@/lib/validation';
-import { handleError, InsufficientCreditsError, BadRequestError } from '@/lib/error-handler';
+import {
+  validateCarId,
+  validateDescription,
+  validateYear,
+  validateCustomCarName,
+} from '@/lib/validation';
+import {
+  handleError,
+  InsufficientCreditsError,
+  BadRequestError,
+} from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
 import { logger } from '@/utils/logger';
 import carsData from '@/data/cars.json';
@@ -54,26 +63,31 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request) as User;
+    const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
 
     RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
     const body = await request.json();
     const carId = validateCarId(body.carId);
+    const year = validateYear(body.year);
     const description = validateDescription(body.description);
+    const customCarName = validateCustomCarName(body.carName);
 
     const now = new Date();
-    const isGoldenActive = user.isGolden && user.goldenExpiresAt && new Date(user.goldenExpiresAt) > now;
+    const isGoldenActive =
+      user.isGolden &&
+      user.goldenExpiresAt &&
+      new Date(user.goldenExpiresAt) > now;
 
-    // ─── بررسی محدودیت مصرف برای کاربران طلایی ───
+    // ─── محدودیت مصرف ───
     if (isGoldenActive) {
-      const monthlyLimit = user.monthlyLimit ?? 200; 
-      const currentMonth = now.toISOString().slice(0, 7); // "2026-07"
+      const monthlyLimit = user.monthlyLimit ?? 200;
+      const currentMonth = now.toISOString().slice(0, 7);
 
       const usage = await db.query.goldenUsage.findFirst({
-        where: (gu, { eq, and }) =>
-          and(eq(gu.userId, user.id), eq(gu.yearMonth, currentMonth)),
+        where: (gu, { eq: eqOp, and: andOp }) =>
+          andOp(eqOp(gu.userId, user.id), eqOp(gu.yearMonth, currentMonth)),
       });
 
       const used = usage?.count ?? 0;
@@ -90,28 +104,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const carsList: Car[] = carsData as Car[];
-    const car = carsList.find((c) => c.id.toString() === carId);
-    if (!car) {
-      logger.warn('Invalid car ID requested', { userId: user.id, carId });
-      throw new BadRequestError('خودروی انتخاب شده در سیستم نامعتبر است.');
+    // ─── مشخصات خودرو ───
+    let carDetails: string;
+
+    if (carId === 'custom') {
+      if (!customCarName) {
+        throw new BadRequestError('برای خودرو خارج از لیست، نام خودرو الزامی است.');
+      }
+      carDetails = `نام خودرو (واردشده توسط کاربر): ${customCarName}\nسال ساخت: ${year}`;
+    } else {
+      const carsList: Car[] = carsData as Car[];
+      const car = carsList.find((c) => c.id.toString() === carId);
+      if (!car) {
+        logger.warn('Invalid car ID requested', { userId: user.id, carId });
+        throw new BadRequestError('خودروی انتخاب شده در سیستم نامعتبر است.');
+      }
+
+      const issues = Array.isArray(car.commonIssues)
+        ? car.commonIssues.join('، ')
+        : car.commonIssues ?? 'نامشخص';
+
+      carDetails = `برند: ${car.brand}\nمدل: ${car.model}\nسال ساخت (اعلام کاربر): ${year}\nموتور: ${car.engine}\nگیربکس: ${car.gearbox ?? 'نامشخص'}\nمشکلات شایع: ${issues}`;
     }
 
-    const carDetails = `برند: ${car.brand}\nمدل: ${car.model}\nسال: ${car.year}\nموتور: ${car.engine}\nگیربکس: ${car.gearbox ?? 'نامشخص'}\nمشکلات شایع: ${car.commonIssues ?? 'نامشخص'}`;
-
     const apiKey = process.env.DEEPSEEK_API_KEY;
-    const apiEndpoint = process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1';
+    const apiEndpoint =
+      process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1';
     const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
     if (!apiKey) throw new Error('تنظیمات هوش مصنوعی در سرور ناقص است.');
 
-    logger.info('Diagnose requested', { userId: user.id, carId, ip });
+    logger.info('Diagnose requested', { userId: user.id, carId, year, ip });
     let resultText = '';
 
     try {
-      const systemPrompt = isGoldenActive ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE;
+      const systemPrompt = isGoldenActive
+        ? SYSTEM_PROMPT_PREMIUM
+        : SYSTEM_PROMPT_FREE;
 
-      const AI_TIMEOUT = parseInt(process.env.AI_TIMEOUT_MS || '25000', 10);
+      const AI_TIMEOUT = parseInt(process.env.AI_TIMEOUT_MS || '35000', 10);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
@@ -119,13 +150,16 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: `[مشخصات خودرو]\n${carDetails}\n\n[شرح خرابی کاربر]\n${description}` },
+            {
+              role: 'user',
+              content: `[مشخصات خودرو]\n${carDetails}\n\n[شرح خرابی کاربر]\n${description}`,
+            },
           ],
           temperature: 0.7,
         }),
@@ -135,25 +169,34 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error('هوش مصنوعی در حال حاضر پاسخگو نیست. لطفاً چند دقیقه دیگر تلاش کنید.');
+        throw new Error(
+          'هوش مصنوعی در حال حاضر پاسخگو نیست. لطفاً چند دقیقه دیگر تلاش کنید.'
+        );
       }
 
       const data = await response.json();
-      resultText = data.choices[0].message.content;
+      resultText = data.choices?.[0]?.message?.content;
+      if (!resultText) {
+        throw new Error('پاسخ نامعتبر از سرویس هوش مصنوعی');
+      }
     } catch (err: any) {
       logger.error('AI API error', { error: err.message, userId: user.id });
       if (err.name === 'AbortError') {
-        throw new Error('زمان پاسخگویی هوش مصنوعی طولانی شد. لطفاً دوباره تلاش کنید.');
+        throw new Error(
+          'زمان پاسخگویی هوش مصنوعی طولانی شد. لطفاً دوباره تلاش کنید.'
+        );
       }
-      throw new Error(err.message || 'خطا در برقراری ارتباط با سرویس هوش مصنوعی');
+      throw new Error(
+        err.message || 'خطا در برقراری ارتباط با سرویس هوش مصنوعی'
+      );
     }
 
-    // ─── کاهش اعتبار / ثبت مصرف (فقط پس از موفقیت AI) ───
+    // ─── کسر اعتبار / ثبت مصرف (فقط پس از موفقیت AI) ───
     if (isGoldenActive) {
       const currentMonth = now.toISOString().slice(0, 7);
       const existing = await db.query.goldenUsage.findFirst({
-        where: (gu, { eq, and }) =>
-          and(eq(gu.userId, user.id), eq(gu.yearMonth, currentMonth)),
+        where: (gu, { eq: eqOp, and: andOp }) =>
+          andOp(eqOp(gu.userId, user.id), eqOp(gu.yearMonth, currentMonth)),
       });
 
       if (existing) {
@@ -177,29 +220,40 @@ export async function POST(request: NextRequest) {
         .returning();
 
       if (updateResult.length === 0) {
-        logger.warn('Atomic deduction failed (insufficient credits)', { userId: user.id });
-        throw new InsufficientCreditsError('موجودی شما پیش از کسر اعتبار به اتمام رسیده است.');
+        logger.warn('Atomic deduction failed (insufficient credits)', {
+          userId: user.id,
+        });
+        throw new InsufficientCreditsError(
+          'موجودی شما پیش از کسر اعتبار به اتمام رسیده است.'
+        );
       }
     }
 
-    const insertedDiags = await db
+    const storedCarId =
+      carId === 'custom'
+        ? `custom:${customCarName}:${year}`
+        : `${carId}:${year}`;
+
+    const insertedDiags = (await db
       .insert(diagnostics)
       .values({
         userId: user.id,
-        carId,
+        carId: storedCarId,
         description,
         result: resultText,
       })
-      .returning() as any[];
+      .returning()) as any[];
 
-    logger.info('Diagnose successful', { userId: user.id, diagnosticId: insertedDiags[0].id });
+    logger.info('Diagnose successful', {
+      userId: user.id,
+      diagnosticId: insertedDiags[0].id,
+    });
 
     return NextResponse.json({
       success: true,
       data: { result: resultText },
       diagnosticId: insertedDiags[0].id,
     });
-
   } catch (error) {
     return handleError(error);
   }

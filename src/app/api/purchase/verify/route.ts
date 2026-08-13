@@ -1,16 +1,20 @@
-﻿// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // Purchase Verify Route - Smart-MEC
-// نسخه هماهنگ با ذخیره‌سازی monthlyLimit
+// تطبیق صحیح authority + دیپ‌لینک اپ
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { purchases, users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { PRODUCTS, ProductId } from '@/types';
 import { logger } from '@/utils/logger';
 
-const renderHTML = (title: string, message: string, isSuccess: boolean) => `
+const renderHTML = (
+  title: string,
+  message: string,
+  isSuccess: boolean
+) => `
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -33,10 +37,12 @@ const renderHTML = (title: string, message: string, isSuccess: boolean) => `
         <div class="icon ${isSuccess ? 'success' : 'error'}">${isSuccess ? '✓' : '✗'}</div>
         <h1>${title}</h1>
         <p>${message}</p>
-        <a href="smartmec://" class="btn" onclick="window.close()">بازگشت به اپلیکیشن</a>
+        <a href="${isSuccess ? 'smartmec://success' : 'smartmec://failed'}" class="btn">بازگشت به اپلیکیشن</a>
     </div>
     <script>
-        setTimeout(() => { window.close(); }, 5000);
+        setTimeout(function() {
+          window.location.href = '${isSuccess ? 'smartmec://success' : 'smartmec://failed'}';
+        }, 1500);
     </script>
 </body>
 </html>
@@ -45,9 +51,16 @@ const renderHTML = (title: string, message: string, isSuccess: boolean) => `
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const refId = url.searchParams.get('refid') || url.searchParams.get('Authority');
+    const refId =
+      url.searchParams.get('refid') ||
+      url.searchParams.get('refId') ||
+      url.searchParams.get('Authority');
     const productId = url.searchParams.get('productId') as ProductId;
-    const mockCode = url.searchParams.get('code');
+    // PayPing code / mock authority
+    const code =
+      url.searchParams.get('code') ||
+      url.searchParams.get('authority') ||
+      url.searchParams.get('Authority');
 
     if (!productId || !(productId in PRODUCTS)) {
       return new NextResponse(
@@ -59,27 +72,43 @@ export async function GET(request: NextRequest) {
     const product = PRODUCTS[productId];
     const paypingToken = process.env.PAYPING_TOKEN;
 
-    let purchase;
-    if (mockCode) {
+    // ─── پیدا کردن تراکنش با authority مشخص (نه آخرین pending عمومی!) ───
+    let purchase = null as Awaited<
+      ReturnType<typeof db.query.purchases.findFirst>
+    >;
+
+    if (code) {
       purchase = await db.query.purchases.findFirst({
-        where: eq(purchases.authority, mockCode),
+        where: and(
+          eq(purchases.authority, code),
+          eq(purchases.status, 'pending')
+        ),
       });
-    } else {
+    }
+
+    // fallback: اگر code نبود ولی refId داریم، آخرین pending همان محصول (فقط mock)
+    if (!purchase && code?.startsWith('MOCK_')) {
       purchase = await db.query.purchases.findFirst({
-        where: eq(purchases.status, 'pending'),
-        orderBy: (p, { desc }) => [desc(p.createdAt)],
+        where: and(
+          eq(purchases.authority, code),
+          eq(purchases.status, 'pending')
+        ),
       });
     }
 
     if (!purchase || purchase.status !== 'pending') {
       return new NextResponse(
-        renderHTML('تراکنش منقضی', 'این تراکنش قبلاً پردازش شده یا یافت نشد.', false),
+        renderHTML(
+          'تراکنش منقضی',
+          'این تراکنش قبلاً پردازش شده یا یافت نشد.',
+          false
+        ),
         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
     }
 
-    // تایید پرداخت (در صورت وجود توکن پی‌پینگ)
-    if (paypingToken && refId && refId !== 'MOCK_REF') {
+    // تأیید پرداخت با درگاه
+    if (paypingToken && refId && refId !== 'MOCK_REF' && !String(code).startsWith('MOCK_')) {
       const verifyRes = await fetch(`https://api.payping.ir/v2/pay/verify`, {
         method: 'POST',
         headers: {
@@ -94,10 +123,14 @@ export async function GET(request: NextRequest) {
       if (!verifyRes.ok || verifyData.status !== 200) {
         await db
           .update(purchases)
-          .set({ status: 'failed', refId })
+          .set({ status: 'failed', refId: refId || null, updatedAt: new Date().toISOString() })
           .where(eq(purchases.id, purchase.id));
         return new NextResponse(
-          renderHTML('پرداخت ناموفق', 'تراکنش توسط درگاه بانکی تایید نشد.', false),
+          renderHTML(
+            'پرداخت ناموفق',
+            'تراکنش توسط درگاه بانکی تایید نشد.',
+            false
+          ),
           { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
         );
       }
@@ -113,14 +146,12 @@ export async function GET(request: NextRequest) {
       })
       .where(eq(purchases.id, purchase.id));
 
-    // دریافت کاربر
     const user = await db.query.users.findFirst({
       where: eq(users.id, purchase.userId),
     });
 
     if (user) {
       if (product.goldenDays) {
-        // ---- مدیریت اشتراک طلایی ----
         const now = Date.now();
         let baseDate = user.goldenExpiresAt
           ? new Date(user.goldenExpiresAt).getTime()
@@ -136,22 +167,24 @@ export async function GET(request: NextRequest) {
           .set({
             isGolden: true,
             goldenExpiresAt: newExpiryDate,
-            monthlyLimit: product.monthlyLimit ?? user.monthlyLimit, // ← ذخیره سقف مصرف
+            monthlyLimit: product.monthlyLimit ?? user.monthlyLimit,
+            updatedAt: new Date().toISOString(),
           })
           .where(eq(users.id, user.id));
-
       } else if (product.credits) {
-        // ---- افزایش اعتبار ----
         await db
           .update(users)
           .set({
             credits: user.credits + (product.credits || 0),
+            updatedAt: new Date().toISOString(),
           })
           .where(eq(users.id, user.id));
       }
     }
 
-    logger.info(`✅ Payment Success: User ${purchase.userId} bought ${product.name}`);
+    logger.info(
+      `✅ Payment Success: User ${purchase.userId} bought ${product.name}`
+    );
 
     return new NextResponse(
       renderHTML(
@@ -161,7 +194,6 @@ export async function GET(request: NextRequest) {
       ),
       { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
     );
-
   } catch (error) {
     logger.error('Verify Route Error:', error);
     return new NextResponse(
