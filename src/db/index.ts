@@ -1,38 +1,30 @@
 // ═══════════════════════════════════════════════════════════
 // Database Connection - Smart-MEC
+// libSQL / Turso (Vercel-compatible) + local file fallback
 // ═══════════════════════════════════════════════════════════
 
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/libsql';
+import { createClient } from '@libsql/client';
 import * as schema from './schema';
-import fs from 'fs';
-import path from 'path';
 import { logger } from '@/utils/logger';
 
-const rawDbUrl = (process.env.DATABASE_URL || 'file:./app.db').replace(/['"]/g, '');
-const dbPath = rawDbUrl.replace('file:', '');
+const url =
+  process.env.TURSO_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  'file:./app.db';
 
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
+const authToken = process.env.TURSO_AUTH_TOKEN;
+
+const client = createClient({
+  url: url.replace(/^['"]|['"]$/g, ''),
+  ...(authToken ? { authToken } : {}),
+});
+
+export const db = drizzle(client, { schema });
+
+async function ensureTables() {
   try {
-    fs.mkdirSync(dbDir, { recursive: true });
-    logger.info(`📁 Database directory created at ${dbDir}`);
-  } catch (error) {
-    logger.error(`❌ Failed to create database directory at ${dbDir}`, error);
-  }
-}
-
-const sqlite = new Database(dbPath, { timeout: 5000 });
-
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('foreign_keys = ON');
-sqlite.pragma('synchronous = NORMAL');
-
-export const db = drizzle(sqlite, { schema });
-
-function ensureTables() {
-  try {
-    sqlite.exec(`
+    await client.executeMultiple(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone TEXT UNIQUE NOT NULL,
@@ -100,9 +92,11 @@ function ensureTables() {
     `);
 
     try {
-      sqlite.exec(`ALTER TABLE users ADD COLUMN monthly_limit INTEGER DEFAULT 200;`);
-    } catch (e) {
-      // already exists
+      await client.execute(
+        `ALTER TABLE users ADD COLUMN monthly_limit INTEGER DEFAULT 200;`
+      );
+    } catch {
+      // column already exists
     }
 
     logger.info('✅ Database tables verified and ready.');
@@ -115,7 +109,20 @@ const isBuilding =
   process.env.npm_lifecycle_event === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
+let tablesReady: Promise<void> | null = null;
+
+/** فراخوانی قبل از اولین کوئری در runtime (نه در بیلد) */
+export function ensureDbReady(): Promise<void> {
+  if (isBuilding) return Promise.resolve();
+  if (!tablesReady) {
+    tablesReady = ensureTables();
+  }
+  return tablesReady;
+}
+
+// در سرور واقعی جدول‌ها را بساز
 if (!isBuilding) {
-  ensureTables();
-  logger.info('✅ SQLite Database connected with WAL mode enabled.');
+  ensureDbReady().then(() => {
+    logger.info(`✅ libSQL connected (${url.startsWith('libsql') || url.startsWith('https') ? 'Turso remote' : 'local file'})`);
+  });
 }

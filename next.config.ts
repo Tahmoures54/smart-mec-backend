@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
-  'https://smart-mec.ir,https://www.smart-mec.ir,https://smart-mec.liara.run,http://localhost:3000'
+  'https://smart-mec.ir,https://www.smart-mec.ir,http://localhost:3000'
 )
   .split(',')
   .map((o) => o.trim())
@@ -10,9 +10,8 @@ const allowedOrigins = (
 
 const nextConfig: NextConfig = {
   async headers() {
-    // برای اپ موبایل CORS معمولاً لازم نیست؛ برای وب و تست محلی از لیست env استفاده می‌کنیم
     const originHeader =
-      allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins[0];
+      allowedOrigins.length >= 1 ? allowedOrigins[0] : '*';
 
     return [
       {
