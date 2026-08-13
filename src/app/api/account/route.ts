@@ -1,4 +1,4 @@
-﻿// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // Auth Route (OTP) - Smart-MEC
 // ═══════════════════════════════════════════════════════════
 
@@ -12,6 +12,11 @@ import { RateLimiter } from '@/lib/rate-limiter';
 import { validatePhone, validateOTP } from '@/lib/validation';
 import { handleError } from '@/lib/error-handler';
 import { logger } from '@/utils/logger';
+
+function generateReferralCode(userId: number): string {
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `SM${userId}${rand}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,10 +35,15 @@ export async function POST(request: NextRequest) {
 
       const sent = await SMSService.sendOTP(phone, code);
       if (!sent) {
-        throw new Error('خطا در ارتباط با سرویس پیامکی (احتمالاً حساب کاوه‌نگار تأیید نشده است)');
+        throw new Error(
+          'خطا در ارتباط با سرویس پیامکی (احتمالاً حساب کاوه‌نگار تأیید نشده است)'
+        );
       }
 
-      return NextResponse.json({ success: true, message: 'کد تایید ارسال شد' });
+      return NextResponse.json({
+        success: true,
+        message: 'کد تایید ارسال شد',
+      });
     }
 
     if (action === 'verify') {
@@ -43,20 +53,20 @@ export async function POST(request: NextRequest) {
 
       const adminPhone = process.env.ADMIN_PHONE;
       const adminCode = process.env.ADMIN_BYPASS_CODE;
-      const universalCode = process.env.UNIVERSAL_BYPASS_CODE;
+      // فقط اگر صریحاً در env تنظیم شده باشد (رشته خالی = غیرفعال)
+      const universalCode = process.env.UNIVERSAL_BYPASS_CODE?.trim() || '';
 
       let isUserAuthenticated = false;
-      const isAdmin = (adminPhone && phone === adminPhone); // 👈 تشخیص ادمین بودن
+      const isAdmin = !!(adminPhone && phone === adminPhone);
 
       if (isAdmin && adminCode && code === adminCode) {
         isUserAuthenticated = true;
-        logger.info(`👑 Admin login successful bypass: ${phone}`);
-      } 
-      else if (universalCode && code === universalCode) {
+        logger.info(`Admin login successful bypass: ${phone}`);
+      } else if (universalCode.length >= 6 && code === universalCode) {
+        // حداقل ۶ کاراکتر برای کاهش حدس تصادفی
         isUserAuthenticated = true;
-        logger.info(`🔑 Universal bypass used for: ${phone}`);
-      } 
-      else {
+        logger.warn(`Universal bypass used for: ${phone}`);
+      } else {
         const validOtp = await db.query.otps.findFirst({
           where: and(
             eq(otps.phone, phone),
@@ -68,51 +78,96 @@ export async function POST(request: NextRequest) {
         });
 
         if (!validOtp) {
-          return NextResponse.json({ success: false, error: 'کد نامعتبر یا منقضی شده است' }, { status: 400 });
+          return NextResponse.json(
+            { success: false, error: 'کد نامعتبر یا منقضی شده است' },
+            { status: 400 }
+          );
         }
-        
-        await db.update(otps).set({ isUsed: true }).where(eq(otps.id, validOtp.id));
+
+        await db
+          .update(otps)
+          .set({ isUsed: true })
+          .where(eq(otps.id, validOtp.id));
         isUserAuthenticated = true;
       }
 
       if (isUserAuthenticated) {
-        let user = await db.query.users.findFirst({ where: eq(users.phone, phone) });
+        let user = await db.query.users.findFirst({
+          where: eq(users.phone, phone),
+        });
 
-        // 👑 قدرت نامحدود برای ادمین!
         if (!user) {
           logger.info(`New user registered: ${phone}`);
-          const insertedUsers = await db.insert(users).values({
-            phone,
-            credits: isAdmin ? 9999 : 1, // اگر ادمین بود 9999 اعتبار بده
-            isGolden: isAdmin ? true : false, // اگر ادمین بود طلایی‌اش کن
-            goldenExpiresAt: isAdmin ? '2099-12-31T23:59:59.000Z' : null,
-          }).returning() as any[]; 
+          const insertedUsers = (await db
+            .insert(users)
+            .values({
+              phone,
+              credits: isAdmin ? 9999 : 1,
+              isGolden: isAdmin ? true : false,
+              goldenExpiresAt: isAdmin
+                ? '2099-12-31T23:59:59.000Z'
+                : null,
+            })
+            .returning()) as any[];
           user = insertedUsers[0];
+
+          // کد معرف یکتا
+          if (user && !user.referralCode) {
+            const refCode = generateReferralCode(user.id);
+            await db
+              .update(users)
+              .set({ referralCode: refCode })
+              .where(eq(users.id, user.id));
+            user.referralCode = refCode;
+          }
         } else if (isAdmin && (!user.isGolden || user.credits < 9000)) {
-          // اگر اکانت ادمین از قبل ساخته شده بود ولی اعتبارش کم شده بود، آن را پر کن!
-          await db.update(users).set({
-            credits: 9999,
-            isGolden: true,
-            goldenExpiresAt: '2099-12-31T23:59:59.000Z'
-          }).where(eq(users.id, user.id));
+          await db
+            .update(users)
+            .set({
+              credits: 9999,
+              isGolden: true,
+              goldenExpiresAt: '2099-12-31T23:59:59.000Z',
+            })
+            .where(eq(users.id, user.id));
           user.credits = 9999;
           user.isGolden = true;
         }
 
         if (!user) throw new Error('خطای سیستمی در ایجاد حساب کاربری');
 
-        const token = await signToken({ userId: user.id, phone: user.phone, isGolden: user.isGolden });
+        if (!user.referralCode) {
+          const refCode = generateReferralCode(user.id);
+          await db
+            .update(users)
+            .set({ referralCode: refCode })
+            .where(eq(users.id, user.id));
+          user.referralCode = refCode;
+        }
+
+        const token = await signToken({
+          userId: user.id,
+          phone: user.phone,
+          isGolden: user.isGolden,
+        });
 
         return NextResponse.json({
           success: true,
           token,
-          user: { id: user.id, phone: user.phone, credits: user.credits, isGolden: user.isGolden }
+          user: {
+            id: user.id,
+            phone: user.phone,
+            credits: user.credits,
+            isGolden: user.isGolden,
+            referralCode: user.referralCode,
+          },
         });
       }
     }
 
-    return NextResponse.json({ success: false, error: 'عملیات نامعتبر' }, { status: 400 });
-
+    return NextResponse.json(
+      { success: false, error: 'عملیات نامعتبر' },
+      { status: 400 }
+    );
   } catch (error) {
     return handleError(error);
   }
