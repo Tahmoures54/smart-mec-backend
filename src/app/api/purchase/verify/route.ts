@@ -1,12 +1,12 @@
 // ═══════════════════════════════════════════════════════════
 // Purchase Verify Route - Smart-MEC
-// تطبیق صحیح authority + دیپ‌لینک اپ
+// + کمیسیون رفرال بعد از پرداخت موفق
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { purchases, users } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { PRODUCTS, ProductId } from '@/types';
 import { logger } from '@/utils/logger';
 
@@ -48,6 +48,39 @@ const renderHTML = (
 </html>
 `;
 
+/** واریز کمیسیون به حساب معرف */
+async function creditReferrerCommission(
+  buyerUserId: number,
+  purchaseAmount: number
+) {
+  try {
+    const buyer = await db.query.users.findFirst({
+      where: eq(users.id, buyerUserId),
+    });
+    if (!buyer?.referredBy) return;
+
+    const percentage = parseInt(process.env.REFERRAL_PERCENTAGE || '10', 10);
+    if (!percentage || percentage <= 0) return;
+
+    const commission = Math.floor((purchaseAmount * percentage) / 100);
+    if (commission <= 0) return;
+
+    await db
+      .update(users)
+      .set({
+        earnings: sql`${users.earnings} + ${commission}`,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(users.id, buyer.referredBy));
+
+    logger.info(
+      `Referral commission: +${commission} Toman to user ${buyer.referredBy} from buyer ${buyerUserId}`
+    );
+  } catch (err) {
+    logger.error('Failed to credit referral commission', err);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -56,7 +89,6 @@ export async function GET(request: NextRequest) {
       url.searchParams.get('refId') ||
       url.searchParams.get('Authority');
     const productId = url.searchParams.get('productId') as ProductId;
-    // PayPing code / mock authority
     const code =
       url.searchParams.get('code') ||
       url.searchParams.get('authority') ||
@@ -72,7 +104,6 @@ export async function GET(request: NextRequest) {
     const product = PRODUCTS[productId];
     const paypingToken = process.env.PAYPING_TOKEN;
 
-    // ─── پیدا کردن تراکنش با authority مشخص (نه آخرین pending عمومی!) ───
     let purchase = null as Awaited<
       ReturnType<typeof db.query.purchases.findFirst>
     >;
@@ -86,7 +117,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // fallback: اگر code نبود ولی refId داریم، آخرین pending همان محصول (فقط mock)
     if (!purchase && code?.startsWith('MOCK_')) {
       purchase = await db.query.purchases.findFirst({
         where: and(
@@ -107,8 +137,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // تأیید پرداخت با درگاه
-    if (paypingToken && refId && refId !== 'MOCK_REF' && !String(code).startsWith('MOCK_')) {
+    if (
+      paypingToken &&
+      refId &&
+      refId !== 'MOCK_REF' &&
+      !String(code).startsWith('MOCK_')
+    ) {
       const verifyRes = await fetch(`https://api.payping.ir/v2/pay/verify`, {
         method: 'POST',
         headers: {
@@ -123,7 +157,11 @@ export async function GET(request: NextRequest) {
       if (!verifyRes.ok || verifyData.status !== 200) {
         await db
           .update(purchases)
-          .set({ status: 'failed', refId: refId || null, updatedAt: new Date().toISOString() })
+          .set({
+            status: 'failed',
+            refId: refId || null,
+            updatedAt: new Date().toISOString(),
+          })
           .where(eq(purchases.id, purchase.id));
         return new NextResponse(
           renderHTML(
@@ -136,7 +174,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // بروزرسانی وضعیت خرید
     await db
       .update(purchases)
       .set({
@@ -180,6 +217,9 @@ export async function GET(request: NextRequest) {
           })
           .where(eq(users.id, user.id));
       }
+
+      // کمیسیون رفرال
+      await creditReferrerCommission(user.id, purchase.amount);
     }
 
     logger.info(

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Auth Route (OTP) - Smart-MEC
+// Auth Route (OTP) - Smart-MEC + Referral
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,11 +18,21 @@ function generateReferralCode(userId: number): string {
   return `SM${userId}${rand}`;
 }
 
+/** نرمال‌سازی کد معرف ورودی کاربر */
+function normalizeReferralCode(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const code = raw.trim().toUpperCase().replace(/\s+/g, '');
+  if (code.length < 4 || code.length > 32) return null;
+  if (!/^[A-Z0-9_-]+$/.test(code)) return null;
+  return code;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ip = RateLimiter.getIP(request);
     const body = await request.json();
-    const { action, phone: rawPhone, code: rawCode } = body;
+    const { action, phone: rawPhone, code: rawCode, referralCode: rawReferral } =
+      body;
 
     if (action === 'send') {
       RateLimiter.check(ip, 'send_otp', 3, 5 * 60 * 1000);
@@ -50,10 +60,10 @@ export async function POST(request: NextRequest) {
       RateLimiter.check(ip, 'verify_otp', 5, 5 * 60 * 1000);
       const phone = validatePhone(rawPhone);
       const code = validateOTP(rawCode);
+      const inputReferral = normalizeReferralCode(rawReferral);
 
       const adminPhone = process.env.ADMIN_PHONE;
       const adminCode = process.env.ADMIN_BYPASS_CODE;
-      // فقط اگر صریحاً در env تنظیم شده باشد (رشته خالی = غیرفعال)
       const universalCode = process.env.UNIVERSAL_BYPASS_CODE?.trim() || '';
 
       let isUserAuthenticated = false;
@@ -63,7 +73,6 @@ export async function POST(request: NextRequest) {
         isUserAuthenticated = true;
         logger.info(`Admin login successful bypass: ${phone}`);
       } else if (universalCode.length >= 6 && code === universalCode) {
-        // حداقل ۶ کاراکتر برای کاهش حدس تصادفی
         isUserAuthenticated = true;
         logger.warn(`Universal bypass used for: ${phone}`);
       } else {
@@ -96,22 +105,41 @@ export async function POST(request: NextRequest) {
           where: eq(users.phone, phone),
         });
 
+        // پیدا کردن معرف (فقط برای کاربر جدید)
+        let referrerId: number | null = null;
+        if (!user && inputReferral) {
+          const referrer = await db.query.users.findFirst({
+            where: eq(users.referralCode, inputReferral),
+          });
+          if (referrer && referrer.phone !== phone) {
+            referrerId = referrer.id;
+          } else if (!referrer) {
+            logger.info(`Invalid referral code attempted: ${inputReferral}`);
+          }
+        }
+
         if (!user) {
-          logger.info(`New user registered: ${phone}`);
+          logger.info(`New user registered: ${phone}`, {
+            referredBy: referrerId,
+          });
+
+          // کاربر معرفی‌شده ۱ اعتبار رایگان بیشتر می‌گیرد
+          const welcomeCredits = isAdmin ? 9999 : referrerId ? 2 : 1;
+
           const insertedUsers = (await db
             .insert(users)
             .values({
               phone,
-              credits: isAdmin ? 9999 : 1,
+              credits: welcomeCredits,
               isGolden: isAdmin ? true : false,
               goldenExpiresAt: isAdmin
                 ? '2099-12-31T23:59:59.000Z'
                 : null,
+              referredBy: referrerId,
             })
             .returning()) as any[];
           user = insertedUsers[0];
 
-          // کد معرف یکتا
           if (user && !user.referralCode) {
             const refCode = generateReferralCode(user.id);
             await db
@@ -159,6 +187,8 @@ export async function POST(request: NextRequest) {
             credits: user.credits,
             isGolden: user.isGolden,
             referralCode: user.referralCode,
+            earnings: user.earnings ?? 0,
+            referredBy: user.referredBy ?? null,
           },
         });
       }
