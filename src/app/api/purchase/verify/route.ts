@@ -2,14 +2,12 @@
 // Purchase Verify Route - Smart-MEC
 // + کمیسیون رفرال بعد از پرداخت موفق
 // ═══════════════════════════════════════════════════════════
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { purchases, users } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { PRODUCTS, ProductId } from '@/types';
 import { logger } from '@/utils/logger';
-
 const renderHTML = (
   title: string,
   message: string,
@@ -47,7 +45,6 @@ const renderHTML = (
 </body>
 </html>
 `;
-
 /** واریز کمیسیون به حساب معرف */
 async function creditReferrerCommission(
   buyerUserId: number,
@@ -58,13 +55,10 @@ async function creditReferrerCommission(
       where: eq(users.id, buyerUserId),
     });
     if (!buyer?.referredBy) return;
-
     const percentage = parseInt(process.env.REFERRAL_PERCENTAGE || '10', 10);
     if (!percentage || percentage <= 0) return;
-
     const commission = Math.floor((purchaseAmount * percentage) / 100);
     if (commission <= 0) return;
-
     await db
       .update(users)
       .set({
@@ -72,7 +66,6 @@ async function creditReferrerCommission(
         updatedAt: new Date().toISOString(),
       })
       .where(eq(users.id, buyer.referredBy));
-
     logger.info(
       `Referral commission: +${commission} Toman to user ${buyer.referredBy} from buyer ${buyerUserId}`
     );
@@ -80,7 +73,6 @@ async function creditReferrerCommission(
     logger.error('Failed to credit referral commission', err);
   }
 }
-
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -93,21 +85,17 @@ export async function GET(request: NextRequest) {
       url.searchParams.get('code') ||
       url.searchParams.get('authority') ||
       url.searchParams.get('Authority');
-
     if (!productId || !(productId in PRODUCTS)) {
       return new NextResponse(
         renderHTML('محصول نامعتبر', 'اطلاعات محصول ارسالی معتبر نیست.', false),
         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
     }
-
     const product = PRODUCTS[productId];
     const paypingToken = process.env.PAYPING_TOKEN;
-
-    let purchase = null as Awaited<
+    let purchase: Awaited<
       ReturnType<typeof db.query.purchases.findFirst>
-    >;
-
+    > | null = null;
     if (code) {
       purchase = await db.query.purchases.findFirst({
         where: and(
@@ -116,7 +104,6 @@ export async function GET(request: NextRequest) {
         ),
       });
     }
-
     if (!purchase && code?.startsWith('MOCK_')) {
       purchase = await db.query.purchases.findFirst({
         where: and(
@@ -125,7 +112,6 @@ export async function GET(request: NextRequest) {
         ),
       });
     }
-
     if (!purchase || purchase.status !== 'pending') {
       return new NextResponse(
         renderHTML(
@@ -136,7 +122,6 @@ export async function GET(request: NextRequest) {
         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
     }
-
     if (
       paypingToken &&
       refId &&
@@ -151,9 +136,7 @@ export async function GET(request: NextRequest) {
         },
         body: JSON.stringify({ refId, amount: purchase.amount }),
       });
-
       const verifyData = await verifyRes.json();
-
       if (!verifyRes.ok || verifyData.status !== 200) {
         await db
           .update(purchases)
@@ -173,7 +156,6 @@ export async function GET(request: NextRequest) {
         );
       }
     }
-
     await db
       .update(purchases)
       .set({
@@ -182,11 +164,9 @@ export async function GET(request: NextRequest) {
         updatedAt: new Date().toISOString(),
       })
       .where(eq(purchases.id, purchase.id));
-
     const user = await db.query.users.findFirst({
       where: eq(users.id, purchase.userId),
     });
-
     if (user) {
       if (product.goldenDays) {
         const now = Date.now();
@@ -194,11 +174,9 @@ export async function GET(request: NextRequest) {
           ? new Date(user.goldenExpiresAt).getTime()
           : now;
         if (baseDate < now) baseDate = now;
-
         const newExpiryDate = new Date(
           baseDate + product.goldenDays * 24 * 60 * 60 * 1000
         ).toISOString();
-
         await db
           .update(users)
           .set({
@@ -217,15 +195,12 @@ export async function GET(request: NextRequest) {
           })
           .where(eq(users.id, user.id));
       }
-
       // کمیسیون رفرال
       await creditReferrerCommission(user.id, purchase.amount);
     }
-
     logger.info(
       `✅ Payment Success: User ${purchase.userId} bought ${product.name}`
     );
-
     return new NextResponse(
       renderHTML(
         'پرداخت موفق',
