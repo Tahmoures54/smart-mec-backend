@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // تعداد معرفی برای هر کاربر
       const enriched = await Promise.all(
         list.map(async (u) => {
           const cnt = await db
@@ -89,27 +88,35 @@ export async function GET(request: NextRequest) {
 
     if (section === 'withdrawals') {
       const status = url.searchParams.get('status') || 'pending';
-      const list = await db
-        .select({
-          id: withdrawals.id,
-          userId: withdrawals.userId,
-          amount: withdrawals.amount,
-          cardNumber: withdrawals.cardNumber,
-          fullName: withdrawals.fullName,
-          status: withdrawals.status,
-          adminNote: withdrawals.adminNote,
-          createdAt: withdrawals.createdAt,
-          updatedAt: withdrawals.updatedAt,
-          phone: users.phone,
-          referralCode: users.referralCode,
-        })
-        .from(withdrawals)
-        .leftJoin(users, eq(withdrawals.userId, users.id))
-        .where(
-          status === 'all' ? undefined : eq(withdrawals.status, status)
-        )
-        .orderBy(desc(withdrawals.createdAt))
-        .limit(100);
+      const baseSelect = {
+        id: withdrawals.id,
+        userId: withdrawals.userId,
+        amount: withdrawals.amount,
+        cardNumber: withdrawals.cardNumber,
+        fullName: withdrawals.fullName,
+        status: withdrawals.status,
+        adminNote: withdrawals.adminNote,
+        createdAt: withdrawals.createdAt,
+        updatedAt: withdrawals.updatedAt,
+        phone: users.phone,
+        referralCode: users.referralCode,
+      };
+
+      const list =
+        status === 'all'
+          ? await db
+              .select(baseSelect)
+              .from(withdrawals)
+              .leftJoin(users, eq(withdrawals.userId, users.id))
+              .orderBy(desc(withdrawals.createdAt))
+              .limit(100)
+          : await db
+              .select(baseSelect)
+              .from(withdrawals)
+              .leftJoin(users, eq(withdrawals.userId, users.id))
+              .where(eq(withdrawals.status, status))
+              .orderBy(desc(withdrawals.createdAt))
+              .limit(100);
 
       return NextResponse.json({ success: true, data: list });
     }
@@ -145,7 +152,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action } = body;
 
-    // ─── تأیید / رد برداشت ───
     if (action === 'resolve_withdrawal') {
       const { withdrawalId, status, adminNote } = body;
       if (!['paid', 'rejected'].includes(status)) {
@@ -160,7 +166,6 @@ export async function POST(request: NextRequest) {
       }
 
       if (status === 'rejected') {
-        // برگرداندن مبلغ به earnings
         await db
           .update(users)
           .set({
@@ -183,7 +188,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'وضعیت بروزرسانی شد' });
     }
 
-    // ─── تنظیم اعتبار / طلایی ───
     if (action === 'adjust_user') {
       const { userId, credits, isGolden, goldenDays, earnings } = body;
       const u = await db.query.users.findFirst({
