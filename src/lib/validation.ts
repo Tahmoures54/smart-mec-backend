@@ -22,13 +22,7 @@ export function validatePhone(phone: string): string {
     throw new ValidationError('شماره موبایل الزامی است', 'phone');
   }
 
-  // حذف فاصله‌ها و کاراکترهای اضافی
   const cleaned = phone.replace(/[\s\-()]/g, '');
-
-  // فرمت‌های قبول‌شده:
-  // 09123456789
-  // 989123456789
-  // +989123456789
   const iranMobileRegex = /^(\+98|98|0)?9\d{9}$/;
 
   if (!iranMobileRegex.test(cleaned)) {
@@ -38,7 +32,6 @@ export function validatePhone(phone: string): string {
     );
   }
 
-  // نرمال‌سازی به فرمت 09xxxxxxxxx
   let normalized = cleaned;
   if (normalized.startsWith('+98')) {
     normalized = '0' + normalized.slice(3);
@@ -59,7 +52,6 @@ export function validateOTP(code: string): string {
 
   const cleaned = code.replace(/\s/g, '');
 
-  // کد OTP باید دقیقاً 4 یا 5 رقم باشد
   if (!/^\d{4,6}$/.test(cleaned)) {
     throw new ValidationError('کد تأیید باید 4 تا 6 رقم باشد', 'code');
   }
@@ -104,10 +96,59 @@ export function validateCarId(carId: string): string {
 
   const trimmed = carId.trim();
 
+  // اجازه custom برای خودروهای خارج از لیست
+  if (trimmed === 'custom') {
+    return trimmed;
+  }
+
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
     throw new ValidationError('شناسه خودرو نامعتبر است', 'carId');
   }
 
+  return trimmed;
+}
+
+/**
+ * اعتبارسنجی سال ساخت (شمسی یا میلادی)
+ * شمسی: 1340–1410 | میلادی: 1960–2030
+ */
+export function validateYear(year: string | number | undefined | null): string {
+  if (year === undefined || year === null || year === '') {
+    throw new ValidationError('سال ساخت خودرو الزامی است', 'year');
+  }
+
+  const cleaned = String(year).trim().replace(/[^0-9]/g, '');
+  const num = parseInt(cleaned, 10);
+
+  if (!Number.isFinite(num)) {
+    throw new ValidationError('سال ساخت نامعتبر است', 'year');
+  }
+
+  const isShamsi = num >= 1340 && num <= 1410;
+  const isGregorian = num >= 1960 && num <= 2030;
+
+  if (!isShamsi && !isGregorian) {
+    throw new ValidationError(
+      'سال ساخت باید بین ۱۳۴۰ تا ۱۴۱۰ (شمسی) یا ۱۹۶۰ تا ۲۰۳۰ (میلادی) باشد',
+      'year'
+    );
+  }
+
+  return String(num);
+}
+
+/**
+ * اعتبارسنجی نام خودرو سفارشی
+ */
+export function validateCustomCarName(name: string | undefined | null): string | null {
+  if (!name) return null;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) {
+    throw new ValidationError('نام خودرو باید حداقل ۲ کاراکتر باشد', 'carName');
+  }
+  if (trimmed.length > 100) {
+    throw new ValidationError('نام خودرو بیش از حد طولانی است', 'carName');
+  }
   return trimmed;
 }
 
@@ -136,7 +177,7 @@ export function validateAuthority(authority: string): string {
 
   const trimmed = authority.trim();
 
-  if (trimmed.length < 10) {
+  if (trimmed.length < 6) {
     throw new ValidationError('کد رهگیری پرداخت نامعتبر است', 'authority');
   }
 
@@ -153,7 +194,6 @@ export function validateToken(token: string): string {
 
   const trimmed = token.trim();
 
-  // JWT همیشه سه قسمت دارد که با نقطه جدا شده‌اند
   if (!/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(trimmed)) {
     throw new ValidationError('فرمت توکن نامعتبر است', 'token');
   }
