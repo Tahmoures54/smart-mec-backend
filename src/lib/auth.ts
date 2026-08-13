@@ -4,7 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { jwtVerify, SignJWT } from 'jose';
-import { db } from '@/db';
+import { db, ensureDbReady } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { UnauthorizedError, ForbiddenError } from './error-handler';
@@ -46,6 +46,8 @@ export function getTokenFromRequest(req: NextRequest): string | null {
 }
 
 export async function getUserFromRequest(req: NextRequest): Promise<User> {
+  await ensureDbReady();
+
   const token = getTokenFromRequest(req);
   if (!token) {
     throw new UnauthorizedError('توکن احراز هویت یافت نشد');
@@ -64,7 +66,6 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
   return user as User;
 }
 
-/** شماره ادمین از env — پیش‌فرض همان شماره مالک */
 export function getAdminPhone(): string {
   return (process.env.ADMIN_PHONE || '09160684552').replace(/\s/g, '');
 }
@@ -73,13 +74,12 @@ export function isAdminPhone(phone: string): boolean {
   return phone === getAdminPhone();
 }
 
-/** کاربر ادمین از JWT */
 export async function requireAdmin(req: NextRequest): Promise<User> {
-  // توکن سیستمی
+  await ensureDbReady();
+
   const token = getTokenFromRequest(req);
   const systemToken = process.env.ADMIN_SYSTEM_TOKEN;
   if (token && systemToken && token === systemToken) {
-    // کاربر مجازی ادمین
     return {
       id: 0,
       phone: getAdminPhone(),
