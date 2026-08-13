@@ -7,7 +7,7 @@ import { jwtVerify, SignJWT } from 'jose';
 import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { UnauthorizedError } from './error-handler';
+import { UnauthorizedError, ForbiddenError } from './error-handler';
 import { JWTPayload, User } from '@/types';
 
 const getJwtSecretKey = () => {
@@ -18,34 +18,25 @@ const getJwtSecretKey = () => {
   return new TextEncoder().encode(secret);
 };
 
-/**
- * تولید توکن JWT برای کاربر
- */
 export async function signToken(payload: JWTPayload): Promise<string> {
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('30d') // انقضای 30 روزه
+    .setExpirationTime('30d')
     .sign(getJwtSecretKey());
-  
+
   return token;
 }
 
-/**
- * بررسی و استخراج اطلاعات از توکن
- */
 export async function verifyToken(token: string): Promise<JWTPayload> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecretKey());
     return payload as unknown as JWTPayload;
-  } catch (error) {
+  } catch {
     throw new UnauthorizedError('توکن نامعتبر یا منقضی شده است');
   }
 }
 
-/**
- * دریافت توکن از هدر درخواست
- */
 export function getTokenFromRequest(req: NextRequest): string | null {
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -54,20 +45,14 @@ export function getTokenFromRequest(req: NextRequest): string | null {
   return null;
 }
 
-/**
- * دریافت کامل شیء کاربر از دیتابیس بر اساس توکن درخواست
- */
 export async function getUserFromRequest(req: NextRequest): Promise<User> {
-  // ۱. استخراج توکن
   const token = getTokenFromRequest(req);
   if (!token) {
     throw new UnauthorizedError('توکن احراز هویت یافت نشد');
   }
 
-  // ۲. صحت‌سنجی توکن
   const payload = await verifyToken(token);
 
-  // ۳. واکشی کاربر از دیتابیس
   const user = await db.query.users.findFirst({
     where: eq(users.id, payload.userId),
   });
@@ -79,12 +64,40 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
   return user as User;
 }
 
-/**
- * بررسی دسترسی ادمین (از طریق سیستم توکن یا شماره موبایل)
- */
+/** شماره ادمین از env — پیش‌فرض همان شماره مالک */
+export function getAdminPhone(): string {
+  return (process.env.ADMIN_PHONE || '09160684552').replace(/\s/g, '');
+}
+
+export function isAdminPhone(phone: string): boolean {
+  return phone === getAdminPhone();
+}
+
+/** کاربر ادمین از JWT */
+export async function requireAdmin(req: NextRequest): Promise<User> {
+  // توکن سیستمی
+  const token = getTokenFromRequest(req);
+  const systemToken = process.env.ADMIN_SYSTEM_TOKEN;
+  if (token && systemToken && token === systemToken) {
+    // کاربر مجازی ادمین
+    return {
+      id: 0,
+      phone: getAdminPhone(),
+      credits: 9999,
+      isGolden: true,
+      createdAt: new Date().toISOString(),
+    } as User;
+  }
+
+  const user = await getUserFromRequest(req);
+  if (!isAdminPhone(user.phone)) {
+    throw new ForbiddenError('دسترسی ادمین مجاز نیست');
+  }
+  return user;
+}
+
 export function isAdminRequest(req: NextRequest): boolean {
   const token = getTokenFromRequest(req);
   const systemToken = process.env.ADMIN_SYSTEM_TOKEN;
-  
   return token !== null && systemToken !== undefined && token === systemToken;
 }

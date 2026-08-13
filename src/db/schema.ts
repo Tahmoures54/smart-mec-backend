@@ -1,4 +1,4 @@
-﻿import { sqliteTable, integer, text, AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, integer, text, AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const users = sqliteTable('users', {
@@ -7,7 +7,7 @@ export const users = sqliteTable('users', {
   credits: integer('credits').default(0).notNull(),
   isGolden: integer('is_golden', { mode: 'boolean' }).default(false).notNull(),
   goldenExpiresAt: text('golden_expires_at'),
-  monthlyLimit: integer('monthly_limit').default(200), // 👈 سقف مصرف
+  monthlyLimit: integer('monthly_limit').default(200),
   referralCode: text('referral_code').unique(),
   referredBy: integer('referred_by').references((): AnySQLiteColumn => users.id),
   earnings: integer('earnings').default(0).notNull(),
@@ -15,11 +15,10 @@ export const users = sqliteTable('users', {
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
-// 👈 جدول مصرف کاربران طلایی
 export const goldenUsage = sqliteTable('golden_usage', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').references(() => users.id).notNull(),
-  yearMonth: text('year_month').notNull(), // فرمت: YYYY-MM
+  yearMonth: text('year_month').notNull(),
   count: integer('count').default(0).notNull(),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
@@ -51,6 +50,20 @@ export const purchases = sqliteTable('purchases', {
   status: text('status').default('pending').notNull(),
   authority: text('authority').unique(),
   refId: text('ref_id'),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+/** درخواست برداشت دستی درآمد رفرال */
+export const withdrawals = sqliteTable('withdrawals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  amount: integer('amount').notNull(),
+  /** شماره کارت یا شبا */
+  cardNumber: text('card_number').notNull(),
+  fullName: text('full_name').notNull(),
+  status: text('status').default('pending').notNull(), // pending | paid | rejected
+  adminNote: text('admin_note'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
