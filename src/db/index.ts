@@ -1,102 +1,114 @@
 // ═══════════════════════════════════════════════════════════
 // Database Connection - Smart-MEC
-// libSQL / Turso (Vercel-compatible) + local file fallback
+// Neon PostgreSQL (Vercel-compatible)
 // ═══════════════════════════════════════════════════════════
 
-import { drizzle } from 'drizzle-orm/libsql';
-import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 import { logger } from '@/utils/logger';
 
-const url =
-  process.env.TURSO_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  'file:./app.db';
+const databaseUrl = process.env.DATABASE_URL;
 
-const authToken = process.env.TURSO_AUTH_TOKEN;
+if (!databaseUrl) {
+  throw new Error('❌ DATABASE_URL is not set in environment variables');
+}
 
-const client = createClient({
-  url: url.replace(/^['"]|['"]$/g, ''),
-  ...(authToken ? { authToken } : {}),
-});
+// ایجاد کلاینت Neon
+const sql = neon(databaseUrl);
 
-export const db = drizzle(client, { schema });
+// اتصال Drizzle به Neon
+export const db = drizzle(sql, { schema });
 
 async function ensureTables() {
   try {
-    await client.executeMultiple(`
+    // ساخت جدول کاربران
+    await sql`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         phone TEXT UNIQUE NOT NULL,
         credits INTEGER DEFAULT 0 NOT NULL,
-        is_golden INTEGER DEFAULT 0 NOT NULL,
+        is_golden BOOLEAN DEFAULT false NOT NULL,
         golden_expires_at TEXT,
         monthly_limit INTEGER DEFAULT 200,
         referral_code TEXT UNIQUE,
         referred_by INTEGER REFERENCES users(id),
         earnings INTEGER DEFAULT 0 NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+    `;
 
+    // ساخت جدول استفاده اکانت طلایی
+    await sql`
       CREATE TABLE IF NOT EXISTS golden_usage (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) NOT NULL,
         year_month TEXT NOT NULL,
         count INTEGER DEFAULT 0 NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+    `;
 
+    // ساخت جدول رمزهای یکبار مصرف (OTP)
+    await sql`
       CREATE TABLE IF NOT EXISTS otps (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         phone TEXT NOT NULL,
         code TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
-        is_used INTEGER DEFAULT 0 NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        is_used BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+    `;
 
+    // ساخت جدول عیب‌یابی‌ها
+    await sql`
       CREATE TABLE IF NOT EXISTS diagnostics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) NOT NULL,
         car_id TEXT NOT NULL,
         description TEXT NOT NULL,
         result TEXT NOT NULL,
         audio_url TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+    `;
 
+    // ساخت جدول خریدها
+    await sql`
       CREATE TABLE IF NOT EXISTS purchases (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) NOT NULL,
         product_id TEXT NOT NULL,
         amount INTEGER NOT NULL,
         status TEXT DEFAULT 'pending' NOT NULL,
         authority TEXT UNIQUE,
         ref_id TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+    `;
 
+    // ساخت جدول درخواست برداشت
+    await sql`
       CREATE TABLE IF NOT EXISTS withdrawals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) NOT NULL,
         amount INTEGER NOT NULL,
         card_number TEXT NOT NULL,
         full_name TEXT NOT NULL,
         status TEXT DEFAULT 'pending' NOT NULL,
         admin_note TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `);
+    `;
 
     try {
-      await client.execute(
-        `ALTER TABLE users ADD COLUMN monthly_limit INTEGER DEFAULT 200;`
-      );
+      await sql`ALTER TABLE users ADD COLUMN monthly_limit INTEGER DEFAULT 200;`;
     } catch {
-      // column already exists
+      // ستون از قبل وجود دارد
     }
 
     logger.info('✅ Database tables verified and ready.');
@@ -123,6 +135,6 @@ export function ensureDbReady(): Promise<void> {
 // در سرور واقعی جدول‌ها را بساز
 if (!isBuilding) {
   ensureDbReady().then(() => {
-    logger.info(`✅ libSQL connected (${url.startsWith('libsql') || url.startsWith('https') ? 'Turso remote' : 'local file'})`);
+    logger.info('✅ Neon PostgreSQL connected successfully.');
   });
 }
