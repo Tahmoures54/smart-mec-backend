@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
           .update(users)
           .set({
             earnings: sql`${users.earnings} + ${w.amount}`,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(), // اصلاح شد
           })
           .where(eq(users.id, w.userId));
       }
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
         .set({
           status,
           adminNote: adminNote || null,
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(), // اصلاح شد
         })
         .where(eq(withdrawals.id, w.id));
 
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
       if (!u) throw new NotFoundError('کاربر یافت نشد');
 
       const patch: Record<string, any> = {
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(), // اصلاح شد
       };
       if (typeof credits === 'number') patch.credits = credits;
       if (typeof earnings === 'number') patch.earnings = earnings;
