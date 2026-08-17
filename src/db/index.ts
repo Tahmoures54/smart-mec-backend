@@ -1,31 +1,57 @@
-// ═══════════════════════════════════════════════════════════
-// Database Connection - Smart-MEC
-// Neon PostgreSQL (Vercel-compatible)
-// ═══════════════════════════════════════════════════════════
-
 import { drizzle } from 'drizzle-orm/neon-http';
+import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 import { logger } from '@/utils/logger';
 
-// در زمان بیلد، ورسل متغیرها را تزریق نمی‌کند. 
-// برای جلوگیری از کرش کردن بیلد، اگر متغیر نبود، یک استرینگ خالی می‌دهیم.
-const databaseUrl = process.env.DATABASE_URL || '';
+const isBuilding =
+  process.env.npm_lifecycle_event === 'build' ||
+  process.env.NEXT_PHASE === 'phase-production-build';
 
-// ایجاد کلاینت Neon
-const sql = neon(databaseUrl);
+type Database = NeonHttpDatabase<typeof schema>;
 
-// اتصال Drizzle به Neon
-export const db = drizzle(sql, { schema });
+// Lazy instances — تا در زمان build هیچ اتصالی برقرار نشود
+let sqlClient: ReturnType<typeof neon> | null = null;
+let dbInstance: Database | null = null;
+
+function getSql() {
+  if (!process.env.DATABASE_URL) {
+    if (isBuilding) {
+      throw new Error('DATABASE_URL is not set. Skipping DB init at build time.');
+    }
+    throw new Error('❌ DATABASE_URL is not set in environment variables');
+  }
+
+  if (!sqlClient) {
+    sqlClient = neon(process.env.DATABASE_URL);
+  }
+
+  return sqlClient;
+}
+
+function getDb(): Database {
+  if (!dbInstance) {
+    dbInstance = drizzle(getSql(), { schema }) as Database;
+  }
+  return dbInstance;
+}
+
+// Proxy تا در زمان build و هنگام import ماژول، neon صدا زده نشود
+export const db = new Proxy({} as Database, {
+  get(_, prop) {
+    const realDb = getDb();
+    const value = (realDb as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(realDb);
+    }
+    return value;
+  },
+});
 
 async function ensureTables() {
   try {
-    // بررسی وجود متغیر محیطی در زمان اجرا
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL is missing');
-    }
+    const sql = getSql();
 
-    // ساخت جدول کاربران
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -42,7 +68,6 @@ async function ensureTables() {
       );
     `;
 
-    // ساخت جدول استفاده اکانت طلایی
     await sql`
       CREATE TABLE IF NOT EXISTS golden_usage (
         id SERIAL PRIMARY KEY,
@@ -53,7 +78,6 @@ async function ensureTables() {
       );
     `;
 
-    // ساخت جدول رمزهای یکبار مصرف (OTP)
     await sql`
       CREATE TABLE IF NOT EXISTS otps (
         id SERIAL PRIMARY KEY,
@@ -65,7 +89,6 @@ async function ensureTables() {
       );
     `;
 
-    // ساخت جدول عیب‌یابی‌ها
     await sql`
       CREATE TABLE IF NOT EXISTS diagnostics (
         id SERIAL PRIMARY KEY,
@@ -78,7 +101,6 @@ async function ensureTables() {
       );
     `;
 
-    // ساخت جدول خریدها
     await sql`
       CREATE TABLE IF NOT EXISTS purchases (
         id SERIAL PRIMARY KEY,
@@ -93,7 +115,6 @@ async function ensureTables() {
       );
     `;
 
-    // ساخت جدول درخواست برداشت
     await sql`
       CREATE TABLE IF NOT EXISTS withdrawals (
         id SERIAL PRIMARY KEY,
@@ -111,7 +132,7 @@ async function ensureTables() {
     try {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_limit INTEGER DEFAULT 200;`;
     } catch {
-      // ستون از قبل وجود دارد
+      // column already exists
     }
 
     logger.info('✅ Database tables verified and ready.');
@@ -120,32 +141,25 @@ async function ensureTables() {
   }
 }
 
-const isBuilding =
-  process.env.npm_lifecycle_event === 'build' ||
-  process.env.NEXT_PHASE === 'phase-production-build';
-
 let tablesReady: Promise<void> | null = null;
 
-/** فراخوانی قبل از اولین کوئری در runtime (نه در بیلد) */
 export function ensureDbReady(): Promise<void> {
-  // ارور اصلی را اینجا در زمان اجرا پرتاب می‌کنیم تا ورسل بیلد را متوقف نکند
-  if (!process.env.DATABASE_URL && !isBuilding) {
-    throw new Error('❌ DATABASE_URL is not set in environment variables');
+  if (isBuilding) {
+    return Promise.resolve();
   }
-  
-  if (isBuilding) return Promise.resolve();
-  
+
+  if (!process.env.DATABASE_URL) {
+    return Promise.reject(new Error('❌ DATABASE_URL is not set in environment variables'));
+  }
+
   if (!tablesReady) {
     tablesReady = ensureTables();
   }
   return tablesReady;
 }
 
-// در سرور واقعی جدول‌ها را بساز
 if (!isBuilding) {
-  ensureDbReady().then(() => {
-    logger.info('✅ Neon PostgreSQL connected successfully.');
-  }).catch((err) => {
-    logger.error('❌ Database connection failed:', err.message);
-  });
+  ensureDbReady()
+    .then(() => logger.info('✅ Neon PostgreSQL connected successfully.'))
+    .catch((err) => logger.error('❌ Database connection failed:', err.message));
 }
