@@ -1,62 +1,62 @@
-import { sqliteTable, integer, text, AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
+import { pgTable, serial, text, integer, boolean, timestamp, AnyPgColumn } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
   phone: text('phone').unique().notNull(),
   credits: integer('credits').default(0).notNull(),
-  isGolden: integer('is_golden', { mode: 'boolean' }).default(false).notNull(),
+  isGolden: boolean('is_golden').default(false).notNull(),
   goldenExpiresAt: text('golden_expires_at'),
   monthlyLimit: integer('monthly_limit').default(200),
   referralCode: text('referral_code').unique(),
-  referredBy: integer('referred_by').references((): AnySQLiteColumn => users.id),
+  referredBy: integer('referred_by').references((): AnyPgColumn => users.id),
   earnings: integer('earnings').default(0).notNull(),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
-  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const goldenUsage = sqliteTable('golden_usage', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const goldenUsage = pgTable('golden_usage', {
+  id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id).notNull(),
   yearMonth: text('year_month').notNull(),
   count: integer('count').default(0).notNull(),
-  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const otps = sqliteTable('otps', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const otps = pgTable('otps', {
+  id: serial('id').primaryKey(),
   phone: text('phone').notNull(),
   code: text('code').notNull(),
   expiresAt: integer('expires_at').notNull(),
-  isUsed: integer('is_used', { mode: 'boolean' }).default(false).notNull(),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  isUsed: boolean('is_used').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const diagnostics = sqliteTable('diagnostics', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const diagnostics = pgTable('diagnostics', {
+  id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id).notNull(),
   carId: text('car_id').notNull(),
   description: text('description').notNull(),
   result: text('result').notNull(),
   audioUrl: text('audio_url'),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const purchases = sqliteTable('purchases', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const purchases = pgTable('purchases', {
+  id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id).notNull(),
   productId: text('product_id').notNull(),
   amount: integer('amount').notNull(),
   status: text('status').default('pending').notNull(),
   authority: text('authority').unique(),
   refId: text('ref_id'),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
-  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 /** درخواست برداشت دستی درآمد رفرال */
-export const withdrawals = sqliteTable('withdrawals', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const withdrawals = pgTable('withdrawals', {
+  id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id).notNull(),
   amount: integer('amount').notNull(),
   /** شماره کارت یا شبا */
@@ -64,6 +64,6 @@ export const withdrawals = sqliteTable('withdrawals', {
   fullName: text('full_name').notNull(),
   status: text('status').default('pending').notNull(), // pending | paid | rejected
   adminNote: text('admin_note'),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
-  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
