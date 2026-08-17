@@ -179,14 +179,15 @@ export async function GET(request: NextRequest) {
         if (baseDate < now) baseDate = now;
         const newExpiryDate = new Date(
           baseDate + product.goldenDays * 24 * 60 * 60 * 1000
-        );
+        ).toISOString(); // این فیلد استرینگ می‌پذیرد
+        
         await db
           .update(users)
           .set({
             isGolden: true,
             goldenExpiresAt: newExpiryDate,
             monthlyLimit: product.monthlyLimit ?? user.monthlyLimit,
-            updatedAt: new Date(),
+            updatedAt: new Date(), // این فیلد Date می‌پذیرد
           })
           .where(eq(users.id, user.id));
       } else if (product.credits) {
