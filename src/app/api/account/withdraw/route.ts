@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       .update(users)
       .set({
         earnings: newEarnings,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(), // اصلاح شد
       })
       .where(eq(users.id, user.id));
 
