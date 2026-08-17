@@ -63,7 +63,13 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
     throw new UnauthorizedError('کاربر یافت نشد');
   }
 
-  return user as User;
+  // تبدیل اشیاء Date به استرینگ برای تطابق با تایپ User
+  return {
+    ...user,
+    createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : null,
+    updatedAt: user.updatedAt ? new Date(user.updatedAt).toISOString() : null,
+    goldenExpiresAt: user.goldenExpiresAt ? new Date(user.goldenExpiresAt).toISOString() : null,
+  } as User;
 }
 
 export function getAdminPhone(): string {
