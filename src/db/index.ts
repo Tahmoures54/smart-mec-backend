@@ -8,11 +8,9 @@ import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 import { logger } from '@/utils/logger';
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error('❌ DATABASE_URL is not set in environment variables');
-}
+// در زمان بیلد، ورسل متغیرها را تزریق نمی‌کند. 
+// برای جلوگیری از کرش کردن بیلد، اگر متغیر نبود، یک استرینگ خالی می‌دهیم.
+const databaseUrl = process.env.DATABASE_URL || '';
 
 // ایجاد کلاینت Neon
 const sql = neon(databaseUrl);
@@ -22,6 +20,11 @@ export const db = drizzle(sql, { schema });
 
 async function ensureTables() {
   try {
+    // بررسی وجود متغیر محیطی در زمان اجرا
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is missing');
+    }
+
     // ساخت جدول کاربران
     await sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -106,7 +109,7 @@ async function ensureTables() {
     `;
 
     try {
-      await sql`ALTER TABLE users ADD COLUMN monthly_limit INTEGER DEFAULT 200;`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_limit INTEGER DEFAULT 200;`;
     } catch {
       // ستون از قبل وجود دارد
     }
@@ -125,7 +128,13 @@ let tablesReady: Promise<void> | null = null;
 
 /** فراخوانی قبل از اولین کوئری در runtime (نه در بیلد) */
 export function ensureDbReady(): Promise<void> {
+  // ارور اصلی را اینجا در زمان اجرا پرتاب می‌کنیم تا ورسل بیلد را متوقف نکند
+  if (!process.env.DATABASE_URL && !isBuilding) {
+    throw new Error('❌ DATABASE_URL is not set in environment variables');
+  }
+  
   if (isBuilding) return Promise.resolve();
+  
   if (!tablesReady) {
     tablesReady = ensureTables();
   }
@@ -136,5 +145,7 @@ export function ensureDbReady(): Promise<void> {
 if (!isBuilding) {
   ensureDbReady().then(() => {
     logger.info('✅ Neon PostgreSQL connected successfully.');
+  }).catch((err) => {
+    logger.error('❌ Database connection failed:', err.message);
   });
 }
