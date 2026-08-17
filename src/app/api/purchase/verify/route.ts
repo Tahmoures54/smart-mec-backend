@@ -8,6 +8,7 @@ import { purchases, users } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { PRODUCTS, ProductId } from '@/types';
 import { logger } from '@/utils/logger';
+
 const renderHTML = (
   title: string,
   message: string,
@@ -45,6 +46,7 @@ const renderHTML = (
 </body>
 </html>
 `;
+
 /** واریز کمیسیون به حساب معرف */
 async function creditReferrerCommission(
   buyerUserId: number,
@@ -63,7 +65,7 @@ async function creditReferrerCommission(
       .update(users)
       .set({
         earnings: sql`${users.earnings} + ${commission}`,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(),
       })
       .where(eq(users.id, buyer.referredBy));
     logger.info(
@@ -73,6 +75,7 @@ async function creditReferrerCommission(
     logger.error('Failed to credit referral commission', err);
   }
 }
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -143,7 +146,7 @@ export async function GET(request: NextRequest) {
           .set({
             status: 'failed',
             refId: refId || null,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
           })
           .where(eq(purchases.id, purchase.id));
         return new NextResponse(
@@ -161,7 +164,7 @@ export async function GET(request: NextRequest) {
       .set({
         status: 'completed',
         refId: refId || 'MOCK_REF',
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(),
       })
       .where(eq(purchases.id, purchase.id));
     const user = await db.query.users.findFirst({
@@ -176,14 +179,14 @@ export async function GET(request: NextRequest) {
         if (baseDate < now) baseDate = now;
         const newExpiryDate = new Date(
           baseDate + product.goldenDays * 24 * 60 * 60 * 1000
-        ).toISOString();
+        );
         await db
           .update(users)
           .set({
             isGolden: true,
             goldenExpiresAt: newExpiryDate,
             monthlyLimit: product.monthlyLimit ?? user.monthlyLimit,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
           })
           .where(eq(users.id, user.id));
       } else if (product.credits) {
@@ -191,7 +194,7 @@ export async function GET(request: NextRequest) {
           .update(users)
           .set({
             credits: user.credits + (product.credits || 0),
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
           })
           .where(eq(users.id, user.id));
       }
