@@ -13,7 +13,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.9.4",
+    "@neondatabase/serverless": "^1.1.0",
     "dotenv": "17.3.1",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
