@@ -1,5 +1,13 @@
-import { pgTable, serial, text, integer, boolean, timestamp, AnyPgColumn } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  boolean,
+  timestamp,
+  bigint,
+  AnyPgColumn,
+} from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -27,7 +35,8 @@ export const otps = pgTable('otps', {
   id: serial('id').primaryKey(),
   phone: text('phone').notNull(),
   code: text('code').notNull(),
-  expiresAt: integer('expires_at').notNull(),
+  // 🔧 تغییر از integer به bigint
+  expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
   isUsed: boolean('is_used').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -54,15 +63,13 @@ export const purchases = pgTable('purchases', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-/** درخواست برداشت دستی درآمد رفرال */
 export const withdrawals = pgTable('withdrawals', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id).notNull(),
   amount: integer('amount').notNull(),
-  /** شماره کارت یا شبا */
   cardNumber: text('card_number').notNull(),
   fullName: text('full_name').notNull(),
-  status: text('status').default('pending').notNull(), // pending | paid | rejected
+  status: text('status').default('pending').notNull(),
   adminNote: text('admin_note'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
