@@ -81,7 +81,6 @@ async function ensureTables() {
         id SERIAL PRIMARY KEY,
         phone TEXT NOT NULL,
         code TEXT NOT NULL,
-        -- 🔧 تغییر از INTEGER به BIGINT
         expires_at BIGINT NOT NULL,
         is_used BOOLEAN DEFAULT false NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -128,11 +127,14 @@ async function ensureTables() {
       );
     `;
 
-    // 🔧 اگر جدول otps از قبل ساخته شده و ستون آن INTEGER است، به BIGINT تبدیل می‌شود
+    // 🔧 اگر جدول otps از قبل با ستون INTEGER ساخته شده، به BIGINT تبدیل می‌شود
     try {
       await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
     } catch (alterError) {
-      logger.warn('Could not alter otps.expires_at type (maybe already BIGINT)', alterError);
+      logger.warn(
+        'Could not alter otps.expires_at type (maybe already BIGINT)',
+        alterError
+      );
     }
 
     try {
@@ -144,6 +146,8 @@ async function ensureTables() {
     logger.info('✅ Database tables verified and ready.');
   } catch (error) {
     logger.error('❌ Failed to ensure database tables:', error);
+    // ✅ دوباره پرتاب می‌کنیم تا در route قابل مدیریت باشد
+    throw error;
   }
 }
 
@@ -155,7 +159,9 @@ export function ensureDbReady(): Promise<void> {
   }
 
   if (!process.env.DATABASE_URL) {
-    return Promise.reject(new Error('❌ DATABASE_URL is not set in environment variables'));
+    return Promise.reject(
+      new Error('❌ DATABASE_URL is not set in environment variables')
+    );
   }
 
   if (!tablesReady) {
