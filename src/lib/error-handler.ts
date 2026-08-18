@@ -49,9 +49,6 @@ export class RateLimitError extends AppError {
   }
 }
 
-/**
- * جلوگیری از لاگ شدن شماره موبایل و کد OTP
- */
 function sanitizeLogText(text: string): string {
   return text
     .replace(/09\d{9}/g, '[PHONE_REDACTED]')
@@ -63,6 +60,11 @@ function sanitizeLogData(data: Record<string, unknown>): Record<string, unknown>
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === 'string') {
       result[key] = sanitizeLogText(value);
+    } else if (value instanceof Error) {
+      result[key] = {
+        message: sanitizeLogText(value.message),
+        cause: value.cause ? sanitizeLogData({ cause: value.cause }) : undefined,
+      };
     } else {
       result[key] = value;
     }
@@ -70,11 +72,7 @@ function sanitizeLogData(data: Record<string, unknown>): Record<string, unknown>
   return result;
 }
 
-/**
- * مدیریت متمرکز خطاها و تبدیل به پاسخ JSON
- */
 export function handleError(error: unknown): NextResponse {
-  // ValidationError
   if (error instanceof ValidationError) {
     logger.warn(
       'Validation error',
@@ -91,7 +89,6 @@ export function handleError(error: unknown): NextResponse {
     );
   }
 
-  // AppError
   if (error instanceof AppError) {
     const level = error.statusCode >= 500 ? 'error' : 'warn';
     logger[level](
@@ -113,13 +110,13 @@ export function handleError(error: unknown): NextResponse {
     );
   }
 
-  // Error استاندارد جاوااسکریپت
   if (error instanceof Error) {
     logger.error(
       'Unexpected error',
       sanitizeLogData({
         message: error.message,
         stack: error.stack,
+        cause: error.cause,
       })
     );
 
@@ -138,7 +135,6 @@ export function handleError(error: unknown): NextResponse {
     );
   }
 
-  // خطای ناشناخته
   logger.error('Unknown error', error);
   return NextResponse.json(
     {
@@ -150,9 +146,6 @@ export function handleError(error: unknown): NextResponse {
   );
 }
 
-/**
- * Wrapper برای route handlers
- */
 export function withErrorHandler<T extends any[], R>(
   handler: (...args: T) => Promise<R>
 ) {
