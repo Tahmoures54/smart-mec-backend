@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, ensureDbReady } from '@/db';
 import { users, otps } from '@/db/schema';
 import { eq, and, desc, gt } from 'drizzle-orm';
 import { signToken } from '@/lib/auth';
@@ -18,7 +18,6 @@ function generateReferralCode(userId: number): string {
   return `SM${userId}${rand}`;
 }
 
-/** نرمال‌سازی کد معرف ورودی کاربر */
 function normalizeReferralCode(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const code = raw.trim().toUpperCase().replace(/\s+/g, '');
@@ -29,6 +28,9 @@ function normalizeReferralCode(raw: unknown): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    // ✅ اطمینان از آماده بودن دیتابیس و اعمال ALTER قبل از هر کوئری
+    await ensureDbReady();
+
     const ip = RateLimiter.getIP(request);
     const body = await request.json();
     const { action, phone: rawPhone, code: rawCode, referralCode: rawReferral } =
@@ -105,7 +107,6 @@ export async function POST(request: NextRequest) {
           where: eq(users.phone, phone),
         });
 
-        // پیدا کردن معرف (فقط برای کاربر جدید)
         let referrerId: number | null = null;
         if (!user && inputReferral) {
           const referrer = await db.query.users.findFirst({
@@ -123,7 +124,6 @@ export async function POST(request: NextRequest) {
             referredBy: referrerId,
           });
 
-          // کاربر معرفی‌شده ۱ اعتبار رایگان بیشتر می‌گیرد
           const welcomeCredits = isAdmin ? 9999 : referrerId ? 2 : 1;
 
           const insertedUsers = (await db
