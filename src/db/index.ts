@@ -10,7 +10,6 @@ const isBuilding =
 
 type Database = NeonHttpDatabase<typeof schema>;
 
-// Lazy instances — تا در زمان build هیچ اتصالی برقرار نشود
 let sqlClient: ReturnType<typeof neon> | null = null;
 let dbInstance: Database | null = null;
 
@@ -36,7 +35,6 @@ function getDb(): Database {
   return dbInstance;
 }
 
-// Proxy تا در زمان build و هنگام import ماژول، neon صدا زده نشود
 export const db = new Proxy({} as Database, {
   get(_, prop) {
     const realDb = getDb();
@@ -83,7 +81,8 @@ async function ensureTables() {
         id SERIAL PRIMARY KEY,
         phone TEXT NOT NULL,
         code TEXT NOT NULL,
-        expires_at INTEGER NOT NULL,
+        -- 🔧 تغییر از INTEGER به BIGINT
+        expires_at BIGINT NOT NULL,
         is_used BOOLEAN DEFAULT false NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
@@ -128,6 +127,13 @@ async function ensureTables() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
     `;
+
+    // 🔧 اگر جدول otps از قبل ساخته شده و ستون آن INTEGER است، به BIGINT تبدیل می‌شود
+    try {
+      await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
+    } catch (alterError) {
+      logger.warn('Could not alter otps.expires_at type (maybe already BIGINT)', alterError);
+    }
 
     try {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_limit INTEGER DEFAULT 200;`;
