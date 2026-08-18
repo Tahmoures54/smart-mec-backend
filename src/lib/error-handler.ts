@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════════════
-// Error Handler - Smart-MEC
-// ═══════════════════════════════════════════════════════════
-
 import { NextResponse } from 'next/server';
 import { ValidationError } from './validation';
 import { logger } from '@/utils/logger';
@@ -54,12 +50,36 @@ export class RateLimitError extends AppError {
 }
 
 /**
+ * جلوگیری از لاگ شدن شماره موبایل و کد OTP
+ */
+function sanitizeLogText(text: string): string {
+  return text
+    .replace(/09\d{9}/g, '[PHONE_REDACTED]')
+    .replace(/params:\s*[^\n]*/g, 'params: [REDACTED]');
+}
+
+function sanitizeLogData(data: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === 'string') {
+      result[key] = sanitizeLogText(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
  * مدیریت متمرکز خطاها و تبدیل به پاسخ JSON
  */
 export function handleError(error: unknown): NextResponse {
   // ValidationError
   if (error instanceof ValidationError) {
-    logger.warn('Validation error', { error: error.message, field: error.field });
+    logger.warn(
+      'Validation error',
+      sanitizeLogData({ error: error.message, field: error.field })
+    );
     return NextResponse.json(
       {
         success: false,
@@ -71,14 +91,17 @@ export function handleError(error: unknown): NextResponse {
     );
   }
 
-  // AppError (شامل UnauthorizedError، ForbiddenError و...)
+  // AppError
   if (error instanceof AppError) {
     const level = error.statusCode >= 500 ? 'error' : 'warn';
-    logger[level]('Application error', {
-      message: error.message,
-      code: error.code,
-      statusCode: error.statusCode,
-    });
+    logger[level](
+      'Application error',
+      sanitizeLogData({
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+      })
+    );
 
     return NextResponse.json(
       {
@@ -92,12 +115,14 @@ export function handleError(error: unknown): NextResponse {
 
   // Error استاندارد جاوااسکریپت
   if (error instanceof Error) {
-    logger.error('Unexpected error', {
-      message: error.message,
-      stack: error.stack,
-    });
+    logger.error(
+      'Unexpected error',
+      sanitizeLogData({
+        message: error.message,
+        stack: error.stack,
+      })
+    );
 
-    // در حالت production جزئیات خطا را نشان نده
     const message =
       process.env.NODE_ENV === 'production'
         ? 'خطای داخلی سرور'
@@ -114,7 +139,7 @@ export function handleError(error: unknown): NextResponse {
   }
 
   // خطای ناشناخته
-  logger.error('Unknown error', { error });
+  logger.error('Unknown error', error);
   return NextResponse.json(
     {
       success: false,
@@ -126,7 +151,7 @@ export function handleError(error: unknown): NextResponse {
 }
 
 /**
- * Wrapper برای route handlers که خودکار خطاها را مدیریت می‌کند
+ * Wrapper برای route handlers
  */
 export function withErrorHandler<T extends any[], R>(
   handler: (...args: T) => Promise<R>
