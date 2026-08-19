@@ -23,6 +23,9 @@ import { logger } from '@/utils/logger';
 import carsData from '@/data/cars.json';
 import { Car, User } from '@/types';
 
+// ⏱️ حداکثر زمان اجرای تابع روی Vercel (ثانیه)
+export const maxDuration = 60;
+
 const SYSTEM_PROMPT_FREE = `تو یک مکانیک بسیار دلسوز، کهنه‌کار و کارشناس خبره خودروهای داخلی و مونتاژی هستی. نام تو «مکانیک هوشمند» است.
 وظیفه: بر اساس مشخصات فنی خودرو و شرح حال کاربر، با لحنی گرم، صمیمی و مثل یک رفیق، عیب‌یابی کن.
 قوانین دقیق:
@@ -104,7 +107,6 @@ export async function POST(request: NextRequest) {
         ),
       });
 
-      // ۲ سوال رایگان در هر ماه
       if (!existingFree || existingFree.freeCount < 2) {
         freeAvailable = true;
       }
@@ -150,8 +152,8 @@ export async function POST(request: NextRequest) {
     logger.info('Diagnose requested', { userId: user.id, carId, year, ip });
     let resultText = '';
 
-    const AI_TIMEOUT = parseInt(process.env.AI_TIMEOUT_MS || '60000', 10);
-    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS || '3000', 10);
+    const AI_TIMEOUT = parseInt(process.env.AI_TIMEOUT_MS || '55000', 10);
+    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS || '4000', 10);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
@@ -198,15 +200,15 @@ export async function POST(request: NextRequest) {
         throw new Error('پاسخ نامعتبر از سرویس هوش مصنوعی');
       }
 
+      // 🔧 اگر پاسخ به دلیل محدودیت توکن ناقص بود، به جای throw یک یادداشت اضافه می‌کنیم
       if (finishReason === 'length') {
         logger.warn('AI response was truncated due to max_tokens', {
           userId: user.id,
           finishReason,
           maxTokens: MAX_TOKENS,
         });
-        throw new Error(
-          'پاسخ هوش مصنوعی ناقص بود. لطفاً دوباره تلاش کنید.'
-        );
+        resultText +=
+          '\n\n⚠️ پاسخ به‌دلیل محدودیت توکن ناقص ماند. لطفاً در صورت نیاز دوباره تلاش کنید.';
       }
 
       logger.info('AI response received successfully', {
@@ -234,7 +236,6 @@ export async function POST(request: NextRequest) {
     let remainingCredits = null;
 
     if (isGoldenActive) {
-      // کاربر طلایی: افزایش شمارنده ماهانه
       const monthlyLimit = user.monthlyLimit ?? 200;
 
       const incremented = await db
@@ -274,7 +275,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } else if (freeAvailable) {
-      // کاربر عادی با سهمیه رایگان: افزایش شمارنده سوالات رایگان
       const existingFree = await db.query.monthlyFreeUsage.findFirst({
         where: and(
           eq(monthlyFreeUsage.userId, user.id),
@@ -301,13 +301,12 @@ export async function POST(request: NextRequest) {
             and(
               eq(monthlyFreeUsage.userId, user.id),
               eq(monthlyFreeUsage.yearMonth, currentMonth),
-              lt(monthlyFreeUsage.freeCount, 2) // حداکثر ۲
+              lt(monthlyFreeUsage.freeCount, 2)
             )
           )
           .returning();
 
         if (updated.length === 0) {
-          // در شرایط رقابتی ممکن است fail شود؛ باید خطا بدهیم
           throw new BadRequestError(
             'سهمیه رایگان این ماه شما به پایان رسیده است.'
           );
@@ -319,7 +318,6 @@ export async function POST(request: NextRequest) {
 
       remainingCredits = user.credits; // بدون کسر اعتبار
     } else {
-      // کاربر عادی بدون سهمیه رایگان: کسر اعتبار
       const updateResult = await db
         .update(users)
         .set({ credits: sql`${users.credits} - 1` })
@@ -337,7 +335,6 @@ export async function POST(request: NextRequest) {
       remainingCredits = user.credits - 1;
     }
 
-    // ─── ذخیره نتیجه ───
     const storedCarId =
       carId === 'custom'
         ? `custom:${customCarName}:${year}`
