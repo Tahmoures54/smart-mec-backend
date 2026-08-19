@@ -1,17 +1,16 @@
-// ═══════════════════════════════════════════════════════════
-// User Profile / Credits / Referral Stats - Smart-MEC
-// ═══════════════════════════════════════════════════════════
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { users } from '@/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { users, monthlyFreeUsage } from '@/db/schema';
+import { eq, and, sql } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
 import { handleError } from '@/lib/error-handler';
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
+
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
 
     // تعداد کاربرانی که با کد این کاربر ثبت‌نام کرده‌اند
     const countResult = await db
@@ -29,6 +28,18 @@ export async function GET(request: NextRequest) {
       10
     );
 
+    // سهمیه رایگان ماهانه
+    const freeUsage = await db.query.monthlyFreeUsage.findFirst({
+      where: and(
+        eq(monthlyFreeUsage.userId, user.id),
+        eq(monthlyFreeUsage.yearMonth, currentMonth)
+      ),
+    });
+
+    const monthlyFreeLimit = 2;
+    const usedFree = freeUsage?.freeCount ?? 0;
+    const remainingFree = Math.max(0, monthlyFreeLimit - usedFree);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -42,6 +53,9 @@ export async function GET(request: NextRequest) {
         referredCount,
         referralPercentage,
         minWithdrawal,
+        monthlyFreeLimit,
+        usedFree,
+        remainingFree,
       },
     });
   } catch (error) {
