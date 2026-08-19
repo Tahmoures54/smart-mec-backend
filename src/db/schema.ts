@@ -31,6 +31,14 @@ export const goldenUsage = pgTable('golden_usage', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const monthlyFreeUsage = pgTable('monthly_free_usage', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  yearMonth: text('year_month').notNull(),
+  freeCount: integer('free_count').default(0).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const otps = pgTable('otps', {
   id: serial('id').primaryKey(),
   phone: text('phone').notNull(),
