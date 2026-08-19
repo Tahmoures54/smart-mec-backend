@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { diagnostics, users, goldenUsage } from '@/db/schema';
+import { diagnostics, users, goldenUsage, monthlyFreeUsage } from '@/db/schema';
 import { eq, desc, sql, and, gt, lt } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
 import {
@@ -93,53 +93,31 @@ export async function POST(request: NextRequest) {
 
     const currentMonth = now.toISOString().slice(0, 7);
 
-    if (isGoldenActive) {
-      const monthlyLimit = user.monthlyLimit ?? 200;
+    // ─── بررسی سهمیه رایگان ماهانه (فقط برای کاربران غیرطلایی) ───
+    let freeAvailable = false;
 
-      const incremented = await db
-        .update(goldenUsage)
-        .set({
-          count: sql`${goldenUsage.count} + 1`,
-          updatedAt: now,
-        })
-        .where(
-          and(
-            eq(goldenUsage.userId, user.id),
-            eq(goldenUsage.yearMonth, currentMonth),
-            lt(goldenUsage.count, monthlyLimit)
-          )
-        )
-        .returning();
+    if (!isGoldenActive) {
+      const existingFree = await db.query.monthlyFreeUsage.findFirst({
+        where: and(
+          eq(monthlyFreeUsage.userId, user.id),
+          eq(monthlyFreeUsage.yearMonth, currentMonth)
+        ),
+      });
 
-      if (incremented.length === 0) {
-        const existingUsage = await db.query.goldenUsage.findFirst({
-          where: and(
-            eq(goldenUsage.userId, user.id),
-            eq(goldenUsage.yearMonth, currentMonth)
-          ),
-        });
-
-        if (!existingUsage) {
-          await db.insert(goldenUsage).values({
-            userId: user.id,
-            yearMonth: currentMonth,
-            count: 1,
-            updatedAt: now,
-          });
-        } else {
-          throw new BadRequestError(
-            `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است. لطفاً ماه آینده مجدداً تلاش کنید.`
-          );
-        }
-      }
-    } else {
-      if (user.credits <= 0) {
-        throw new InsufficientCreditsError(
-          'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
-        );
+      // ۲ سوال رایگان در هر ماه
+      if (!existingFree || existingFree.freeCount < 2) {
+        freeAvailable = true;
       }
     }
 
+    // اگر کاربر عادی نه سهمیه رایگان دارد نه اعتبار، خطا بده
+    if (!isGoldenActive && !freeAvailable && user.credits <= 0) {
+      throw new InsufficientCreditsError(
+        'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
+      );
+    }
+
+    // ─── مشخصات خودرو ───
     let carDetails: string;
 
     if (carId === 'custom') {
@@ -251,7 +229,97 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
     }
 
-    if (!isGoldenActive) {
+    // ─── مدیریت مصرف پس از موفقیت AI ───
+    let remainingFree = null;
+    let remainingCredits = null;
+
+    if (isGoldenActive) {
+      // کاربر طلایی: افزایش شمارنده ماهانه
+      const monthlyLimit = user.monthlyLimit ?? 200;
+
+      const incremented = await db
+        .update(goldenUsage)
+        .set({
+          count: sql`${goldenUsage.count} + 1`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(goldenUsage.userId, user.id),
+            eq(goldenUsage.yearMonth, currentMonth),
+            lt(goldenUsage.count, monthlyLimit)
+          )
+        )
+        .returning();
+
+      if (incremented.length === 0) {
+        const existingUsage = await db.query.goldenUsage.findFirst({
+          where: and(
+            eq(goldenUsage.userId, user.id),
+            eq(goldenUsage.yearMonth, currentMonth)
+          ),
+        });
+
+        if (!existingUsage) {
+          await db.insert(goldenUsage).values({
+            userId: user.id,
+            yearMonth: currentMonth,
+            count: 1,
+            updatedAt: now,
+          });
+        } else {
+          throw new BadRequestError(
+            `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است. لطفاً ماه آینده مجدداً تلاش کنید.`
+          );
+        }
+      }
+    } else if (freeAvailable) {
+      // کاربر عادی با سهمیه رایگان: افزایش شمارنده سوالات رایگان
+      const existingFree = await db.query.monthlyFreeUsage.findFirst({
+        where: and(
+          eq(monthlyFreeUsage.userId, user.id),
+          eq(monthlyFreeUsage.yearMonth, currentMonth)
+        ),
+      });
+
+      if (!existingFree) {
+        await db.insert(monthlyFreeUsage).values({
+          userId: user.id,
+          yearMonth: currentMonth,
+          freeCount: 1,
+          updatedAt: now,
+        });
+        remainingFree = 1; // 2 - 1
+      } else {
+        const updated = await db
+          .update(monthlyFreeUsage)
+          .set({
+            freeCount: sql`${monthlyFreeUsage.freeCount} + 1`,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(monthlyFreeUsage.userId, user.id),
+              eq(monthlyFreeUsage.yearMonth, currentMonth),
+              lt(monthlyFreeUsage.freeCount, 2) // حداکثر ۲
+            )
+          )
+          .returning();
+
+        if (updated.length === 0) {
+          // در شرایط رقابتی ممکن است fail شود؛ باید خطا بدهیم
+          throw new BadRequestError(
+            'سهمیه رایگان این ماه شما به پایان رسیده است.'
+          );
+        }
+
+        const newCount = existingFree.freeCount + 1;
+        remainingFree = 2 - newCount;
+      }
+
+      remainingCredits = user.credits; // بدون کسر اعتبار
+    } else {
+      // کاربر عادی بدون سهمیه رایگان: کسر اعتبار
       const updateResult = await db
         .update(users)
         .set({ credits: sql`${users.credits} - 1` })
@@ -266,8 +334,10 @@ export async function POST(request: NextRequest) {
           'موجودی شما پیش از کسر اعتبار به اتمام رسیده است.'
         );
       }
+      remainingCredits = user.credits - 1;
     }
 
+    // ─── ذخیره نتیجه ───
     const storedCarId =
       carId === 'custom'
         ? `custom:${customCarName}:${year}`
@@ -290,13 +360,16 @@ export async function POST(request: NextRequest) {
     logger.info('Diagnose successful', {
       userId: user.id,
       diagnosticId: insertedDiags[0].id,
+      usedFree: freeAvailable,
+      remainingFreeQuestions: isGoldenActive ? null : remainingFree,
     });
 
     return NextResponse.json({
       success: true,
       data: { result: resultText },
       diagnosticId: insertedDiags[0].id,
-      remainingCredits: !isGoldenActive ? user.credits - 1 : null,
+      remainingCredits: !isGoldenActive ? remainingCredits : null,
+      remainingFreeQuestions: !isGoldenActive ? remainingFree : null,
     });
   } catch (error) {
     return handleError(error);
