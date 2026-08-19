@@ -32,8 +32,10 @@ const SYSTEM_PROMPT_FREE = `تو یک مکانیک بسیار دلسوز، که�
 ۴. برآورد هزینه: به هیچ وجه قیمت دقیق ریالی نده! فقط از عبارات "جزئی و کم‌هزینه"، "متوسط و قابل قبول" یا "سنگین و پرهزینه" استفاده کن.
 ۵. جلوگیری از کلاهبرداری: حتماً با تیتر «⚠️ کلاه سرت نره!» یک هشدار ملموس بده. (مثلاً: اگر گفتند کامپیوتر سوخته، بگو اول سیم‌کشی رو با دیاگ چک کن).
 ۶. سلب مسئولیت: در انتها بگو «🚨 رفیق، این تحلیل هوش مصنوعی فقط یه راهنمایی اولیه است و جای بازدید حضوری مکانیک متخصص رو نمی‌گیره.»
-۷. تبلیغ نسخه طلایی: در آخرین خط حتماً بنویس: «💎 با تهیه اشتراک طلایی اپلیکیشن، می‌تونی نامحدود راجع به ماشینت ازم سوال بپرسی!»
-۸. فرمت و طول متن: از عناوین Markdown (مانند ##) استفاده کن و پاسخ را در حدود ۴۰۰ کلمه، پارسی سلیس و روان جمع‌بندی کن.`;
+۷. توصیه‌های عمومی: بعد از بررسی علل، یک بخش کوتاه با عنوان «🛠️ توصیه‌های عمومی» اضافه کن و ۲ تا ۳ توصیه ساده و مرتبط با مشکل کاربر (مثل بررسی دوره‌ای روغن، فشار باد لاستیک، یا چک کردن باتری) ارائه بده.
+۸. تبلیغ نسخه طلایی: بعد از توصیه‌های عمومی، این جمله را بنویس: «💎 با تهیه اشتراک طلایی اپلیکیشن، می‌تونی نامحدود راجع به ماشینت ازم سوال بپرسی!»
+۹. معرفی به دیگران: در آخرین خط، بعد از تبلیغ نسخه طلایی، حتماً این متن را با لحن رفاقتی بنویس: «🤝 راستی رفیق، ما یه استارتاپ نوپا هستیم و حسابی به معرفی تو نیاز داریم. اگه از این تحلیل راضی بودی، ما رو به دوستات معرفی کن. با سیستم رفرال ما می‌تونی کسب درآمد کنی؛ کمک کن رفیق!»
+۱۰. فرمت و طول متن: از عناوین Markdown (مانند ##) استفاده کن و پاسخ را در حدود ۴۰۰ کلمه، پارسی سلیس و روان جمع‌بندی کن.`;
 
 const SYSTEM_PROMPT_PREMIUM = SYSTEM_PROMPT_FREE.replace(
   '«💎 با تهیه اشتراک طلایی اپلیکیشن، می‌تونی نامحدود راجع به ماشینت ازم سوال بپرسی!»',
@@ -47,7 +49,6 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     if (url.searchParams.get('history') === 'true') {
-      // توسعه: صفحه‌بندی تاریخچه برای جلوگیری از فشار روی دیتابیس
       const limit = Math.min(Number(url.searchParams.get('limit') || '20'), 50);
       const offset = Number(url.searchParams.get('offset') || '0');
 
@@ -57,11 +58,11 @@ export async function GET(request: NextRequest) {
         limit: limit,
         offset: offset,
       });
-      
+
       return NextResponse.json({
         success: true,
         data: history,
-        pagination: { limit, offset }
+        pagination: { limit, offset },
       });
     }
 
@@ -76,7 +77,6 @@ export async function POST(request: NextRequest) {
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
 
-    // ۵ درخواست در ۱۰ دقیقه
     RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
     const body = await request.json();
@@ -93,29 +93,25 @@ export async function POST(request: NextRequest) {
 
     const currentMonth = now.toISOString().slice(0, 7);
 
-    // ─── محدودیت مصرف ───
     if (isGoldenActive) {
       const monthlyLimit = user.monthlyLimit ?? 200;
-      
-      // توسعه: آپدیت اتمیک برای جلوگیری از دور زدن سقف ماهانه در درخواست‌های همزمان
+
       const incremented = await db
         .update(goldenUsage)
-        .set({ 
-          count: sql`${goldenUsage.count} + 1`, 
-          updatedAt: now 
+        .set({
+          count: sql`${goldenUsage.count} + 1`,
+          updatedAt: now,
         })
         .where(
           and(
             eq(goldenUsage.userId, user.id),
             eq(goldenUsage.yearMonth, currentMonth),
-            lt(goldenUsage.count, monthlyLimit) // فقط اگر به سقف نرسیده باشد آپدیت کن
+            lt(goldenUsage.count, monthlyLimit)
           )
         )
         .returning();
 
-      // اگر آپدیت انجام نشود یعنی رکوردی وجود ندارد یا سقف پر شده
       if (incremented.length === 0) {
-        // بررسی می‌کنیم که آیا اصلا رکوردی برای این ماه وجود دارد یا خیر
         const existingUsage = await db.query.goldenUsage.findFirst({
           where: and(
             eq(goldenUsage.userId, user.id),
@@ -124,7 +120,6 @@ export async function POST(request: NextRequest) {
         });
 
         if (!existingUsage) {
-          // اولین درخواست ماه: رکورد جدید می‌سازیم
           await db.insert(goldenUsage).values({
             userId: user.id,
             yearMonth: currentMonth,
@@ -132,7 +127,6 @@ export async function POST(request: NextRequest) {
             updatedAt: now,
           });
         } else {
-          // رکورد وجود داشت اما آپدیت نشد، یعنی به سقب رسیده است
           throw new BadRequestError(
             `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است. لطفاً ماه آینده مجدداً تلاش کنید.`
           );
@@ -146,7 +140,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ─── مشخصات خودرو ───
     let carDetails: string;
 
     if (carId === 'custom') {
@@ -179,8 +172,9 @@ export async function POST(request: NextRequest) {
     logger.info('Diagnose requested', { userId: user.id, carId, year, ip });
     let resultText = '';
 
-    // توسعه: مدیریت بهتر Timeout با try...finally
-    const AI_TIMEOUT = parseInt(process.env.AI_TIMEOUT_MS || '35000', 10);
+    const AI_TIMEOUT = parseInt(process.env.AI_TIMEOUT_MS || '60000', 10);
+    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS || '3000', 10);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
@@ -205,10 +199,8 @@ export async function POST(request: NextRequest) {
             },
           ],
           temperature: 0.7,
-          // توسعه: محدودیت توکن برای جلوگیری از هزینه اضافی
-          max_tokens: 800,
-          // توسعه: شناسایی کاربر برای رهگیری در سرویس هوش مصنوعی
-          user: `user_${user.id}` 
+          max_tokens: MAX_TOKENS,
+          user: `user_${user.id}`,
         }),
         signal: controller.signal,
       });
@@ -220,15 +212,33 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await response.json();
-      resultText = data.choices?.[0]?.message?.content;
-      
+      const choice = data.choices?.[0];
+      const finishReason = choice?.finish_reason;
+      resultText = choice?.message?.content;
+
       if (!resultText) {
         throw new Error('پاسخ نامعتبر از سرویس هوش مصنوعی');
       }
+
+      if (finishReason === 'length') {
+        logger.warn('AI response was truncated due to max_tokens', {
+          userId: user.id,
+          finishReason,
+          maxTokens: MAX_TOKENS,
+        });
+        throw new Error(
+          'پاسخ هوش مصنوعی ناقص بود. لطفاً دوباره تلاش کنید.'
+        );
+      }
+
+      logger.info('AI response received successfully', {
+        userId: user.id,
+        finishReason,
+        responseLength: resultText.length,
+      });
     } catch (err: any) {
       logger.error('AI API error', { error: err.message, userId: user.id });
-      
-      // بازگرداندن اعتبار در صورت خطای هوش مصنوعی (چون کسر اعتبار هنوز انجام نشده است، نیازی نیست)
+
       if (err.name === 'AbortError') {
         throw new Error(
           'زمان پاسخگویی هوش مصنوعی طولانی شد. لطفاً دوباره تلاش کنید.'
@@ -238,11 +248,9 @@ export async function POST(request: NextRequest) {
         err.message || 'خطا در برقراری ارتباط با سرویس هوش مصنوعی'
       );
     } finally {
-      // تضمین پاک کردن تایمر در هر شرایطی
       clearTimeout(timeoutId);
     }
 
-    // ─── کسر اعتبار (فقط برای کاربران عادی پس از موفقیت AI) ───
     if (!isGoldenActive) {
       const updateResult = await db
         .update(users)
@@ -265,7 +273,6 @@ export async function POST(request: NextRequest) {
         ? `custom:${customCarName}:${year}`
         : `${carId}:${year}`;
 
-    // ذخیره عیب‌یابی در دیتابیس
     const insertedDiags = await db
       .insert(diagnostics)
       .values({
@@ -289,8 +296,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: { result: resultText },
       diagnosticId: insertedDiags[0].id,
-      // توسعه: اطلاع‌رسانی اعتبار باقی‌مانده به اپلیکیشن
-      remainingCredits: !isGoldenActive ? user.credits - 1 : null 
+      remainingCredits: !isGoldenActive ? user.credits - 1 : null,
     });
   } catch (error) {
     return handleError(error);
