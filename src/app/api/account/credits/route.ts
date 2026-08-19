@@ -1,3 +1,7 @@
+// ═══════════════════════════════════════════════════════════
+// User Profile / Credits / Referral Stats - Smart-MEC
+// ═══════════════════════════════════════════════════════════
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { users, monthlyFreeUsage } from '@/db/schema';
