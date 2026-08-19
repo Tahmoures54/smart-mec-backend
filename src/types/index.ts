@@ -24,6 +24,14 @@ export interface GoldenUsage {
   updatedAt: string;
 }
 
+export interface MonthlyFreeUsage {
+  id: number;
+  userId: number;
+  yearMonth: string;
+  freeCount: number;
+  updatedAt: string;
+}
+
 export interface Diagnostic {
   id: number;
   userId: number;
