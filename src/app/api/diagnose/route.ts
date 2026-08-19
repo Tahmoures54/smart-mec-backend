@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
               content: `[مشخصات خودرو]\n${carDetails}\n\n[شرح خرابی کاربر]\n${description}`,
             },
           ],
-          temperature: 0.5, // کاهش دما برای پاسخ‌های دقیق‌تر مکانیکی
+          temperature: 0.5,
           max_tokens: MAX_TOKENS,
           user: `user_${user.id}`,
         }),
@@ -234,15 +234,13 @@ export async function POST(request: NextRequest) {
     // ─── مدیریت مصرف اتمیک (Atomic) و ذخیره در دیتابیس با Transaction ───
     let remainingFree: number | null = null;
     let remainingCredits: number | null = null;
-    let diagnosticId: number;
+    let diagnosticId: number | undefined; // ✅ تغییر تایپ برای رفع خطای TypeScript
 
     try {
       await db.transaction(async (tx) => {
         if (isGoldenActive) {
-          // ۱. مدیریت کاربر طلایی
           const monthlyLimit = user.monthlyLimit ?? 200;
 
-          // تلاش برای افزایش آمار به صورت اتمیک
           const incremented = await tx
             .update(goldenUsage)
             .set({
@@ -253,13 +251,12 @@ export async function POST(request: NextRequest) {
               and(
                 eq(goldenUsage.userId, user.id),
                 eq(goldenUsage.yearMonth, currentMonth),
-                lt(goldenUsage.count, monthlyLimit) // شرط اتمیک برای جلوگیری از عبور از سقف
+                lt(goldenUsage.count, monthlyLimit)
               )
             )
             .returning();
 
           if (incremented.length === 0) {
-            // اگر آپدیت اتمیک صفر شد، یعنی رکوردی نیست یا سقف پر شده
             const existingUsage = await tx.query.goldenUsage.findFirst({
               where: and(
                 eq(goldenUsage.userId, user.id),
@@ -268,7 +265,6 @@ export async function POST(request: NextRequest) {
             });
 
             if (!existingUsage) {
-              // رکوردی اصلاً وجود ندارد، پس اولین درخواست ماه است
               await tx.insert(goldenUsage).values({
                 userId: user.id,
                 yearMonth: currentMonth,
@@ -276,14 +272,12 @@ export async function POST(request: NextRequest) {
                 updatedAt: now,
               });
             } else {
-              // رکورد وجود دارد اما آپدیت نشود یعنی سقف تمام شده
               throw new BadRequestError(
                 `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است.`
               );
             }
           }
         } else if (freeAvailable) {
-          // ۲. مدیریت سهمیه رایگان (اتمیک)
           const updated = await tx
             .update(monthlyFreeUsage)
             .set({
@@ -294,13 +288,12 @@ export async function POST(request: NextRequest) {
               and(
                 eq(monthlyFreeUsage.userId, user.id),
                 eq(monthlyFreeUsage.yearMonth, currentMonth),
-                lt(monthlyFreeUsage.freeCount, 2) // شرط اتمیک
+                lt(monthlyFreeUsage.freeCount, 2)
               )
             )
             .returning();
 
           if (updated.length === 0) {
-            // اگر آپدیت صفر شد، یا رکوردی نیست یا در کسری از ثانیه سهمیه توسط درخواست دیگری پر شده
             const existingFree = await tx.query.monthlyFreeUsage.findFirst({
               where: and(
                 eq(monthlyFreeUsage.userId, user.id),
@@ -309,7 +302,6 @@ export async function POST(request: NextRequest) {
             });
 
             if (!existingFree) {
-              // رکوردی نبوده، اولین درخواست رایگان ماه
               await tx.insert(monthlyFreeUsage).values({
                 userId: user.id,
                 yearMonth: currentMonth,
@@ -318,7 +310,6 @@ export async function POST(request: NextRequest) {
               });
               remainingFree = 1;
             } else {
-              // سهمیه در لحظه پر شده، تلاش برای کسر اعتبار پولی به جای آن
               const creditUpdate = await tx
                 .update(users)
                 .set({ credits: sql`${users.credits} - 1` })
@@ -336,7 +327,6 @@ export async function POST(request: NextRequest) {
             remainingFree = 2 - updated[0].freeCount;
           }
         } else {
-          // ۳. مدیریت کسر اعتبار پولی (اتمیک)
           const updateResult = await tx
             .update(users)
             .set({ credits: sql`${users.credits} - 1` })
@@ -351,7 +341,6 @@ export async function POST(request: NextRequest) {
           remainingCredits = updateResult[0].credits;
         }
 
-        // ذخیره نتیجه عیب‌یابی در دیتابیس (در همان تراکنش)
         const storedCarId =
           carId === 'custom'
             ? `custom:${customCarName}:${year}`
@@ -378,7 +367,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         error: txError,
       });
-      throw txError; // ارسال خطا به هندلر اصلی برای نمایش به کاربر
+      throw txError;
     }
 
     logger.info('Diagnose successful', {
