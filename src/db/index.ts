@@ -77,6 +77,16 @@ async function ensureTables() {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS monthly_free_usage (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) NOT NULL,
+        year_month TEXT NOT NULL,
+        free_count INTEGER DEFAULT 0 NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS otps (
         id SERIAL PRIMARY KEY,
         phone TEXT NOT NULL,
