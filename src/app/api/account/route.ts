@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
           const welcomeCredits = isAdmin ? 9999 : referrerId ? 2 : 1;
 
-          const insertedUsers = (await db
+          const insertedUsers = await db
             .insert(users)
             .values({
               phone,
@@ -137,10 +137,16 @@ export async function POST(request: NextRequest) {
                 : null,
               referredBy: referrerId,
             })
-            .returning()) as any[];
+            .returning();
+
           user = insertedUsers[0];
 
-          if (user && !user.referralCode) {
+          // ✅ بررسی وجود کاربر جدید برای رفع خطای TypeScript
+          if (!user) {
+            throw new Error('خطا در ایجاد حساب کاربری');
+          }
+
+          if (!user.referralCode) {
             const refCode = generateReferralCode(user.id);
             await db
               .update(users)
@@ -158,7 +164,7 @@ export async function POST(request: NextRequest) {
 
             logger.info('Referral reward granted', {
               referrerId,
-              newUserId: user.id,
+              newUserId: user.id, // ✅ حالا TypeScript مطمئن است user وجود دارد
             });
           }
         } else if (isAdmin && (!user.isGolden || user.credits < 9000)) {
