@@ -9,6 +9,16 @@ const allowedOrigins = (
   .filter(Boolean);
 
 const nextConfig: NextConfig = {
+  // ✅ اضافه کردن Rewrite برای پشتیبانی از نسخه‌بندی v1
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: '/api/:path*',
+      },
+    ];
+  },
+
   async headers() {
     const originHeader =
       allowedOrigins.length >= 1 ? allowedOrigins[0] : '*';
