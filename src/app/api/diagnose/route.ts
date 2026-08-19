@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// AI Diagnose Route - Smart-MEC (Developed Version)
+// AI Diagnose Route - Smart-MEC (Optimized & Transactional Version)
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -37,8 +37,8 @@ const SYSTEM_PROMPT_FREE = `تو یک مکانیک بسیار دلسوز، که�
 ۶. سلب مسئولیت: در انتها بگو «🚨 رفیق، این تحلیل هوش مصنوعی فقط یه راهنمایی اولیه است و جای بازدید حضوری مکانیک متخصص رو نمی‌گیره.»
 ۷. توصیه‌های عمومی: بعد از بررسی علل، یک بخش کوتاه با عنوان «🛠️ توصیه‌های عمومی» اضافه کن و ۲ تا ۳ توصیه ساده و مرتبط با مشکل کاربر (مثل بررسی دوره‌ای روغن، فشار باد لاستیک، یا چک کردن باتری) ارائه بده.
 ۸. تبلیغ نسخه طلایی: بعد از توصیه‌های عمومی، این جمله را بنویس: «💎 با تهیه اشتراک طلایی اپلیکیشن، می‌تونی نامحدود راجع به ماشینت ازم سوال بپرسی!»
-۹. معرفی به دیگران: در آخرین خط، بعد از تبلیغ نسخه طلایی، حتماً این متن را با لحن رفاقتی بنویس: «🤝 راستی رفیق، ما یه استارتاپ نوپا هستیم و حسابی به معرفی تو نیاز داریم. اگه از این تحلیل راضی بودی، ما رو به دوستات معرفی کن. با سیستم رفرال ما می‌تونی کسب درآمد کنی؛ کمک کن رفیق!»
-۱۰. فرمت و طول متن: از عناوین Markdown (مانند ##) استفاده کن و پاسخ را در حدود ۴۰۰ کلمه، پارسی سلیس و روان جمع‌بندی کن.`;
+۹. معرفی و حمایت در واتساپ: در آخرین خط، یک دعوت به حمایت با واتس‌اپ اضافه کن. با لحن رفاقتی بنویس: «🤝 راستی رفیق، ما یه استارتاپ نوپا هستیم و حسابی به حمایتت نیاز داریم. اگه از این تحلیل خشنود بودی، ممنون می‌شیم لینک ما رو تو پروفایل واتس‌اپت (بایو) بذاری تا دوستات هم ما رو بشناسن. حتی یه دکمه ساده تو پروفایلت هم به دل ما خوش می‌چسبه!»
+۱۰. فرمت و طول متن: از عناوین Markdown (مانند ##) استفاده کن و پاسخ را در حدود ۴۰۰ کلمه، فارسی سلیس و روان جمع‌بندی کن.`;
 
 const SYSTEM_PROMPT_PREMIUM = SYSTEM_PROMPT_FREE.replace(
   '«💎 با تهیه اشتراک طلایی اپلیکیشن، می‌تونی نامحدود راجع به ماشینت ازم سوال بپرسی!»',
@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
 
+    // محدودیت نرخ درخواست برای جلوگیری از اسپم
     RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
     const body = await request.json();
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     const currentMonth = now.toISOString().slice(0, 7);
 
-    // ─── بررسی سهمیه رایگان ماهانه (فقط برای کاربران غیرطلایی) ───
+    // ─── بررسی اولیه سهمیه رایگان ماهانه (فقط برای بررسی نیازمندی به اعتبار) ───
     let freeAvailable = false;
 
     if (!isGoldenActive) {
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // اگر کاربر عادی نه سهمیه رایگان دارد نه اعتبار، خطا بده
+    // اگر کاربر عادی نه سهمیه رایگان دارد نه اعتبار، قبل از ارسال به AI خطا بده
     if (!isGoldenActive && !freeAvailable && user.credits <= 0) {
       throw new InsufficientCreditsError(
         'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
               content: `[مشخصات خودرو]\n${carDetails}\n\n[شرح خرابی کاربر]\n${description}`,
             },
           ],
-          temperature: 0.7,
+          temperature: 0.5, // کاهش دما برای پاسخ‌های دقیق‌تر مکانیکی
           max_tokens: MAX_TOKENS,
           user: `user_${user.id}`,
         }),
@@ -200,7 +201,6 @@ export async function POST(request: NextRequest) {
         throw new Error('پاسخ نامعتبر از سرویس هوش مصنوعی');
       }
 
-      // 🔧 اگر پاسخ به دلیل محدودیت توکن ناقص بود، به جای throw یک یادداشت اضافه می‌کنیم
       if (finishReason === 'length') {
         logger.warn('AI response was truncated due to max_tokens', {
           userId: user.id,
@@ -231,132 +231,159 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
     }
 
-    // ─── مدیریت مصرف پس از موفقیت AI ───
-    let remainingFree = null;
-    let remainingCredits = null;
+    // ─── مدیریت مصرف اتمیک (Atomic) و ذخیره در دیتابیس با Transaction ───
+    let remainingFree: number | null = null;
+    let remainingCredits: number | null = null;
+    let diagnosticId: number;
 
-    if (isGoldenActive) {
-      const monthlyLimit = user.monthlyLimit ?? 200;
+    try {
+      await db.transaction(async (tx) => {
+        if (isGoldenActive) {
+          // ۱. مدیریت کاربر طلایی
+          const monthlyLimit = user.monthlyLimit ?? 200;
 
-      const incremented = await db
-        .update(goldenUsage)
-        .set({
-          count: sql`${goldenUsage.count} + 1`,
-          updatedAt: now,
-        })
-        .where(
-          and(
-            eq(goldenUsage.userId, user.id),
-            eq(goldenUsage.yearMonth, currentMonth),
-            lt(goldenUsage.count, monthlyLimit)
-          )
-        )
-        .returning();
-
-      if (incremented.length === 0) {
-        const existingUsage = await db.query.goldenUsage.findFirst({
-          where: and(
-            eq(goldenUsage.userId, user.id),
-            eq(goldenUsage.yearMonth, currentMonth)
-          ),
-        });
-
-        if (!existingUsage) {
-          await db.insert(goldenUsage).values({
-            userId: user.id,
-            yearMonth: currentMonth,
-            count: 1,
-            updatedAt: now,
-          });
-        } else {
-          throw new BadRequestError(
-            `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است. لطفاً ماه آینده مجدداً تلاش کنید.`
-          );
-        }
-      }
-    } else if (freeAvailable) {
-      const existingFree = await db.query.monthlyFreeUsage.findFirst({
-        where: and(
-          eq(monthlyFreeUsage.userId, user.id),
-          eq(monthlyFreeUsage.yearMonth, currentMonth)
-        ),
-      });
-
-      if (!existingFree) {
-        await db.insert(monthlyFreeUsage).values({
-          userId: user.id,
-          yearMonth: currentMonth,
-          freeCount: 1,
-          updatedAt: now,
-        });
-        remainingFree = 1; // 2 - 1
-      } else {
-        const updated = await db
-          .update(monthlyFreeUsage)
-          .set({
-            freeCount: sql`${monthlyFreeUsage.freeCount} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(monthlyFreeUsage.userId, user.id),
-              eq(monthlyFreeUsage.yearMonth, currentMonth),
-              lt(monthlyFreeUsage.freeCount, 2)
+          // تلاش برای افزایش آمار به صورت اتمیک
+          const incremented = await tx
+            .update(goldenUsage)
+            .set({
+              count: sql`${goldenUsage.count} + 1`,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(goldenUsage.userId, user.id),
+                eq(goldenUsage.yearMonth, currentMonth),
+                lt(goldenUsage.count, monthlyLimit) // شرط اتمیک برای جلوگیری از عبور از سقف
+              )
             )
-          )
-          .returning();
+            .returning();
 
-        if (updated.length === 0) {
-          throw new BadRequestError(
-            'سهمیه رایگان این ماه شما به پایان رسیده است.'
-          );
+          if (incremented.length === 0) {
+            // اگر آپدیت اتمیک صفر شد، یعنی رکوردی نیست یا سقف پر شده
+            const existingUsage = await tx.query.goldenUsage.findFirst({
+              where: and(
+                eq(goldenUsage.userId, user.id),
+                eq(goldenUsage.yearMonth, currentMonth)
+              ),
+            });
+
+            if (!existingUsage) {
+              // رکوردی اصلاً وجود ندارد، پس اولین درخواست ماه است
+              await tx.insert(goldenUsage).values({
+                userId: user.id,
+                yearMonth: currentMonth,
+                count: 1,
+                updatedAt: now,
+              });
+            } else {
+              // رکورد وجود دارد اما آپدیت نشود یعنی سقف تمام شده
+              throw new BadRequestError(
+                `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است.`
+              );
+            }
+          }
+        } else if (freeAvailable) {
+          // ۲. مدیریت سهمیه رایگان (اتمیک)
+          const updated = await tx
+            .update(monthlyFreeUsage)
+            .set({
+              freeCount: sql`${monthlyFreeUsage.freeCount} + 1`,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(monthlyFreeUsage.userId, user.id),
+                eq(monthlyFreeUsage.yearMonth, currentMonth),
+                lt(monthlyFreeUsage.freeCount, 2) // شرط اتمیک
+              )
+            )
+            .returning();
+
+          if (updated.length === 0) {
+            // اگر آپدیت صفر شد، یا رکوردی نیست یا در کسری از ثانیه سهمیه توسط درخواست دیگری پر شده
+            const existingFree = await tx.query.monthlyFreeUsage.findFirst({
+              where: and(
+                eq(monthlyFreeUsage.userId, user.id),
+                eq(monthlyFreeUsage.yearMonth, currentMonth)
+              ),
+            });
+
+            if (!existingFree) {
+              // رکوردی نبوده، اولین درخواست رایگان ماه
+              await tx.insert(monthlyFreeUsage).values({
+                userId: user.id,
+                yearMonth: currentMonth,
+                freeCount: 1,
+                updatedAt: now,
+              });
+              remainingFree = 1;
+            } else {
+              // سهمیه در لحظه پر شده، تلاش برای کسر اعتبار پولی به جای آن
+              const creditUpdate = await tx
+                .update(users)
+                .set({ credits: sql`${users.credits} - 1` })
+                .where(and(eq(users.id, user.id), gt(users.credits, 0)))
+                .returning();
+
+              if (creditUpdate.length === 0) {
+                throw new InsufficientCreditsError(
+                  'سهمیه رایگان این ماه شما به پایان رسیده و اعتبار کافی ندارید.'
+                );
+              }
+              remainingCredits = creditUpdate[0].credits;
+            }
+          } else {
+            remainingFree = 2 - updated[0].freeCount;
+          }
+        } else {
+          // ۳. مدیریت کسر اعتبار پولی (اتمیک)
+          const updateResult = await tx
+            .update(users)
+            .set({ credits: sql`${users.credits} - 1` })
+            .where(and(eq(users.id, user.id), gt(users.credits, 0)))
+            .returning();
+
+          if (updateResult.length === 0) {
+            throw new InsufficientCreditsError(
+              'موجودی شما پیش از کسر اعتبار به اتمام رسیده است.'
+            );
+          }
+          remainingCredits = updateResult[0].credits;
         }
 
-        const newCount = existingFree.freeCount + 1;
-        remainingFree = 2 - newCount;
-      }
+        // ذخیره نتیجه عیب‌یابی در دیتابیس (در همان تراکنش)
+        const storedCarId =
+          carId === 'custom'
+            ? `custom:${customCarName}:${year}`
+            : `${carId}:${year}`;
 
-      remainingCredits = user.credits; // بدون کسر اعتبار
-    } else {
-      const updateResult = await db
-        .update(users)
-        .set({ credits: sql`${users.credits} - 1` })
-        .where(and(eq(users.id, user.id), gt(users.credits, 0)))
-        .returning();
+        const insertedDiags = await tx
+          .insert(diagnostics)
+          .values({
+            userId: user.id,
+            carId: storedCarId,
+            description,
+            result: resultText,
+          })
+          .returning({ id: diagnostics.id });
 
-      if (updateResult.length === 0) {
-        logger.warn('Atomic deduction failed (insufficient credits)', {
-          userId: user.id,
-        });
-        throw new InsufficientCreditsError(
-          'موجودی شما پیش از کسر اعتبار به اتمام رسیده است.'
-        );
-      }
-      remainingCredits = user.credits - 1;
-    }
+        if (insertedDiags.length === 0) {
+          throw new Error('خطا در ذخیره نتیجه عیب‌یابی در دیتابیس');
+        }
 
-    const storedCarId =
-      carId === 'custom'
-        ? `custom:${customCarName}:${year}`
-        : `${carId}:${year}`;
-
-    const insertedDiags = await db
-      .insert(diagnostics)
-      .values({
+        diagnosticId = insertedDiags[0].id;
+      });
+    } catch (txError) {
+      logger.error('Transaction failed during diagnose save', {
         userId: user.id,
-        carId: storedCarId,
-        description,
-        result: resultText,
-      })
-      .returning({ id: diagnostics.id });
-
-    if (insertedDiags.length === 0) {
-      throw new Error('خطا در ذخیره نتیجه عیب‌یابی در دیتابیس');
+        error: txError,
+      });
+      throw txError; // ارسال خطا به هندلر اصلی برای نمایش به کاربر
     }
 
     logger.info('Diagnose successful', {
       userId: user.id,
-      diagnosticId: insertedDiags[0].id,
+      diagnosticId,
       usedFree: freeAvailable,
       remainingFreeQuestions: isGoldenActive ? null : remainingFree,
     });
@@ -364,7 +391,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: { result: resultText },
-      diagnosticId: insertedDiags[0].id,
+      diagnosticId,
       remainingCredits: !isGoldenActive ? remainingCredits : null,
       remainingFreeQuestions: !isGoldenActive ? remainingFree : null,
     });
