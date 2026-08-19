@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { users, otps } from '@/db/schema';
-import { eq, and, desc, gt } from 'drizzle-orm';
+import { eq, and, desc, gt, sql } from 'drizzle-orm';
 import { signToken } from '@/lib/auth';
 import { SMSService } from '@/lib/sms';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -147,6 +147,19 @@ export async function POST(request: NextRequest) {
               .set({ referralCode: refCode })
               .where(eq(users.id, user.id));
             user.referralCode = refCode;
+          }
+
+          // 🎁 پاداش رفرال: ۱ اعتبار هدیه به معرف
+          if (referrerId && !isAdmin) {
+            await db
+              .update(users)
+              .set({ credits: sql`${users.credits} + 1` })
+              .where(eq(users.id, referrerId));
+
+            logger.info('Referral reward granted', {
+              referrerId,
+              newUserId: user.id,
+            });
           }
         } else if (isAdmin && (!user.isGolden || user.credits < 9000)) {
           await db
