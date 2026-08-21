@@ -7,11 +7,9 @@ import { logger } from '@/utils/logger';
 export class SMSService {
   private static apiKey = process.env.KAVENEGAR_API_KEY;
   private static template = process.env.KAVENEGAR_TEMPLATE || 'verify';
-  private static adminPhone = process.env.ADMIN_PHONE; // شماره ادمین از env
+  private static adminPhone = process.env.ADMIN_PHONE;
 
   static async sendOTP(phone: string, code: string): Promise<boolean> {
-    
-    // 👑 ترفند درِ مخفی: اگر شماره ادمین بود، وانمود کن پیامک با موفقیت ارسال شد
     if (this.adminPhone && phone === this.adminPhone) {
       logger.info(`👑 [ADMIN BYPASS] No SMS sent. Use your bypass code to login.`);
       return true;
@@ -50,7 +48,8 @@ export class SMSService {
     }
   }
 
+  /** کد ۶ رقمی — هماهنگ با اپ Flutter */
   static generateOTP(): string {
-    return Math.floor(10000 + Math.random() * 90000).toString();
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 }
