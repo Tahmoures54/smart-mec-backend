@@ -23,29 +23,31 @@
 | Free Quota | ۲ عیب‌یابی رایگان در ماه |
 | Referral | کد دعوت + پاداش اعتبار + کمیسیون فروش |
 | Withdraw | درخواست برداشت درآمد رفرال |
-| Admin Panel | داشبورد، کاربران، برداشت‌ها، خریدها |
-| Rate Limit | Upstash Redis (با fallback حافظه محلی) |
+| Analytics | رویدادهای محصول (`/api/events`) |
+| Feedback | امتیاز ۱–۵ روی نتیجه عیب‌یابی |
+| Admin Panel | داشبورد رشد، کاربران، برداشت‌ها، بازخورد |
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# مقادیر واقعی را پر کنید (DATABASE_URL، JWT_SECRET، ...)
+# مقادیر واقعی را پر کنید
 
 npm install
-npm run db:push   # یا db:migrate
+npm run db:push   # یا اولین deploy — ensureTables خودش می‌سازد
 npm run dev
 ```
 
+قبل از لانچ حتماً [`PRODUCTION_CHECKLIST.md`](./PRODUCTION_CHECKLIST.md) را کامل کنید.
+
 ### Rate Limiter (Upstash)
 
-1. در [console.upstash.com](https://console.upstash.com) یک Redis بسازید.
-2. از بخش **REST API** مقادیر زیر را کپی کنید:
+1. [console.upstash.com](https://console.upstash.com) → Redis
+2. REST API:
    - `UPSTASH_REDIS_REST_URL`
    - `UPSTASH_REDIS_REST_TOKEN`
-3. در `.env` قرار دهید.
 
-اگر این دو متغیر خالی باشند، سیستم به‌صورت خودکار از **in-memory** استفاده می‌کند (فقط مناسب local).
+بدون این دو، fallback به حافظه محلی است (فقط local).
 
 ## API Overview
 
@@ -57,25 +59,29 @@ npm run dev
 | GET | `/api/account/withdraw` | ✅ | لیست درخواست‌ها |
 | POST | `/api/diagnose` | ✅ | عیب‌یابی AI |
 | GET | `/api/diagnose?history=true` | ✅ | تاریخچه |
+| POST | `/api/feedback` | ✅ | امتیاز + نظر روی عیب‌یابی |
+| POST | `/api/events` | اختیاری | آنالیتیکس محصول |
+| GET | `/api/cars` | — | لیست خودروها |
+| GET | `/api/products` | — | لیست محصولات |
 | POST | `/api/purchase` | ✅ | ایجاد پرداخت |
 | GET | `/api/purchase/verify` | — | بازگشت از درگاه |
-| GET | `/api/products` | — | لیست محصولات |
 | GET | `/api/health` | — | سلامت سرویس + DB |
 | GET/POST | `/api/admin` | Admin | پنل مدیریت |
+
+نسخه ` /api/v1/* ` هم از طریق rewrite پشتیبانی می‌شود.
 
 ## Security Notes
 
 - **هرگز** فایل `.env` را commit نکنید.
-- اگر قبلاً `.env` در تاریخچه گیت بوده، secrets را rotate کنید.
-- در production حتماً Upstash Redis را فعال کنید تا rate limit بین instanceها مشترک باشد.
-- `ADMIN_BYPASS_CODE` و `UNIVERSAL_BYPASS_CODE` فقط برای توسعه/اضطراری.
+- اگر قبلاً secrets در گیت بوده، **همه را rotate** کنید.
+- در production، bypassهای OTP فقط با `ALLOW_AUTH_BYPASS=true` فعال می‌شوند.
+- Upstash Redis را در production فعال کنید.
 
 ## Deploy
 
-- Vercel / Liara / هر host سازگار با Next.js
-- `DATABASE_URL` باید Neon (یا Postgres سازگار) باشد
-- `UPSTASH_REDIS_REST_URL` و `UPSTASH_REDIS_REST_TOKEN` برای rate limit
-- `maxDuration` برای `/api/diagnose` روی ۶۰ ثانیه تنظیم شده
+- Vercel (region `fra1`) / Liara
+- `maxDuration` برای diagnose = ۶۰ ثانیه
+- envهای ضروری: `DATABASE_URL`, `JWT_SECRET`, `KAVENEGAR_*`, `DEEPSEEK_*`, `PAYPING_TOKEN`, `UPSTASH_*`
 
 ## License
 
