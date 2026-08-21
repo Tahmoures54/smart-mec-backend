@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
 
-    // محدودیت نرخ درخواست برای جلوگیری از اسپم
-    RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
+    // محدودیت نرخ درخواست برای جلوگیری از اسپم (Upstash Redis)
+    await RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
     const body = await request.json();
     const carId = validateCarId(body.carId);
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
     // ─── مدیریت مصرف اتمیک (Atomic) و ذخیره در دیتابیس با Transaction ───
     let remainingFree: number | null = null;
     let remainingCredits: number | null = null;
-    let diagnosticId: number | undefined; // ✅ تغییر تایپ برای رفع خطای TypeScript
+    let diagnosticId: number | undefined;
 
     try {
       await db.transaction(async (tx) => {
