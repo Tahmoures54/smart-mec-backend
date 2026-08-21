@@ -45,10 +45,9 @@ export async function POST(request: NextRequest) {
       body;
 
     if (action === 'send') {
-      RateLimiter.check(ip, 'send_otp', 3, 5 * 60 * 1000);
+      await RateLimiter.check(ip, 'send_otp', 3, 5 * 60 * 1000);
       const phone = validatePhone(rawPhone);
 
-      // پاکسازی سبک OTPهای قدیمی
       await cleanupExpiredOtps();
 
       const code = SMSService.generateOTP();
@@ -63,7 +62,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // در حالت توسعه، کد را برگردان (اگر فعال باشد)
       const showInDev =
         process.env.SHOW_OTP_IN_DEV === 'true' &&
         process.env.NODE_ENV !== 'production';
@@ -76,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'verify') {
-      RateLimiter.check(ip, 'verify_otp', 5, 5 * 60 * 1000);
+      await RateLimiter.check(ip, 'verify_otp', 5, 5 * 60 * 1000);
       const phone = validatePhone(rawPhone);
       const code = validateOTP(rawCode);
       const inputReferral = normalizeReferralCode(rawReferral);
@@ -171,7 +169,6 @@ export async function POST(request: NextRequest) {
             user.referralCode = refCode;
           }
 
-          // 🎁 پاداش رفرال: ۱ اعتبار هدیه به معرف
           if (referrerId && !isAdmin) {
             await db
               .update(users)

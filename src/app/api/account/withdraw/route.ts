@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const ip = RateLimiter.getIP(request);
-    RateLimiter.check(ip, 'withdraw', 5, 60 * 60 * 1000);
+    await RateLimiter.check(ip, 'withdraw', 5, 60 * 60 * 1000);
 
     const user = await getUserFromRequest(request);
     const body = await request.json();
@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('نام صاحب حساب الزامی است');
     }
 
-    // درخواست باز pending نداشته باشد
     const pending = await db.query.withdrawals.findFirst({
       where: and(
         eq(withdrawals.userId, user.id),
@@ -72,7 +71,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // قفل اتمیک مبلغ از earnings + ثبت درخواست
     const row = await db.transaction(async (tx) => {
       const updated = await tx
         .update(users)
@@ -80,9 +78,7 @@ export async function POST(request: NextRequest) {
           earnings: sql`${users.earnings} - ${amount}`,
           updatedAt: new Date(),
         })
-        .where(
-          and(eq(users.id, user.id), gte(users.earnings, amount))
-        )
+        .where(and(eq(users.id, user.id), gte(users.earnings, amount)))
         .returning({ id: users.id, earnings: users.earnings });
 
       if (updated.length === 0) {
