@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Auth Route (OTP) - Smart-MEC + Referral
+// Auth Route (OTP) - Smart-MEC + Referral (Production-hardened)
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,13 +26,18 @@ function normalizeReferralCode(raw: unknown): string | null {
   return code;
 }
 
-/** پاکسازی OTPهای منقضی‌شده برای جلوگیری از رشد بی‌رویه جدول */
 async function cleanupExpiredOtps() {
   try {
     await db.delete(otps).where(lt(otps.expiresAt, Date.now()));
   } catch (err) {
     logger.warn('OTP cleanup failed (non-blocking)', err);
   }
+}
+
+/** در production فقط اگر ALLOW_AUTH_BYPASS=true باشد bypass فعال است */
+function bypassAllowed(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  return process.env.ALLOW_AUTH_BYPASS === 'true';
 }
 
 export async function POST(request: NextRequest) {
@@ -86,10 +91,19 @@ export async function POST(request: NextRequest) {
       let isUserAuthenticated = false;
       const isAdmin = !!(adminPhone && phone === adminPhone);
 
-      if (isAdmin && adminCode && code === adminCode) {
+      if (
+        bypassAllowed() &&
+        isAdmin &&
+        adminCode &&
+        code === adminCode
+      ) {
         isUserAuthenticated = true;
         logger.info(`Admin login successful bypass: ${phone}`);
-      } else if (universalCode.length >= 6 && code === universalCode) {
+      } else if (
+        bypassAllowed() &&
+        universalCode.length >= 6 &&
+        code === universalCode
+      ) {
         isUserAuthenticated = true;
         logger.warn(`Universal bypass used for: ${phone}`);
       } else {
