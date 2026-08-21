@@ -91,11 +91,15 @@ export const diagnostics = pgTable(
     description: text('description').notNull(),
     result: text('result').notNull(),
     audioUrl: text('audio_url'),
+    /** امتیاز کاربر: 1=بد، 5=عالی — null یعنی هنوز امتیاز نداده */
+    rating: integer('rating'),
+    feedback: text('feedback'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('diagnostics_user_id_idx').on(table.userId),
     index('diagnostics_created_at_idx').on(table.createdAt),
+    index('diagnostics_car_id_idx').on(table.carId),
   ]
 );
 
@@ -138,5 +142,29 @@ export const withdrawals = pgTable(
   (table) => [
     index('withdrawals_user_id_idx').on(table.userId),
     index('withdrawals_status_idx').on(table.status),
+  ]
+);
+
+/**
+ * رویدادهای محصول برای رشد و تحلیل رفتار کاربر
+ * مثال: app_open, diagnose_start, diagnose_success, purchase_start,
+ *        referral_share, screen_view
+ */
+export const events = pgTable(
+  'events',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id').references(() => users.id),
+    eventName: text('event_name').notNull(),
+    properties: text('properties'), // JSON string
+    platform: text('platform'), // android | ios | web
+    appVersion: text('app_version'),
+    ip: text('ip'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('events_name_idx').on(table.eventName),
+    index('events_user_id_idx').on(table.userId),
+    index('events_created_at_idx').on(table.createdAt),
   ]
 );
