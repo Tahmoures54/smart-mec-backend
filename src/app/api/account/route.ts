@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { users, otps } from '@/db/schema';
-import { eq, and, desc, gt, sql } from 'drizzle-orm';
+import { eq, and, desc, gt, sql, lt } from 'drizzle-orm';
 import { signToken } from '@/lib/auth';
 import { SMSService } from '@/lib/sms';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -26,9 +26,17 @@ function normalizeReferralCode(raw: unknown): string | null {
   return code;
 }
 
+/** پاکسازی OTPهای منقضی‌شده برای جلوگیری از رشد بی‌رویه جدول */
+async function cleanupExpiredOtps() {
+  try {
+    await db.delete(otps).where(lt(otps.expiresAt, Date.now()));
+  } catch (err) {
+    logger.warn('OTP cleanup failed (non-blocking)', err);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // ✅ اطمینان از آماده بودن دیتابیس و اعمال ALTER قبل از هر کوئری
     await ensureDbReady();
 
     const ip = RateLimiter.getIP(request);
@@ -39,6 +47,9 @@ export async function POST(request: NextRequest) {
     if (action === 'send') {
       RateLimiter.check(ip, 'send_otp', 3, 5 * 60 * 1000);
       const phone = validatePhone(rawPhone);
+
+      // پاکسازی سبک OTPهای قدیمی
+      await cleanupExpiredOtps();
 
       const code = SMSService.generateOTP();
       const expiresAt = Date.now() + 2 * 60 * 1000;
@@ -52,9 +63,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // در حالت توسعه، کد را برگردان (اگر فعال باشد)
+      const showInDev =
+        process.env.SHOW_OTP_IN_DEV === 'true' &&
+        process.env.NODE_ENV !== 'production';
+
       return NextResponse.json({
         success: true,
         message: 'کد تایید ارسال شد',
+        ...(showInDev && { debugCode: code }),
       });
     }
 
@@ -141,7 +158,6 @@ export async function POST(request: NextRequest) {
 
           user = insertedUsers[0];
 
-          // ✅ بررسی وجود کاربر جدید برای رفع خطای TypeScript
           if (!user) {
             throw new Error('خطا در ایجاد حساب کاربری');
           }
@@ -164,7 +180,7 @@ export async function POST(request: NextRequest) {
 
             logger.info('Referral reward granted', {
               referrerId,
-              newUserId: user.id, // ✅ حالا TypeScript مطمئن است user وجود دارد
+              newUserId: user.id,
             });
           }
         } else if (isAdmin && (!user.isGolden || user.credits < 9000)) {
