@@ -137,7 +137,7 @@ async function ensureTables() {
       );
     `;
 
-    // 🔧 اگر جدول otps از قبل با ستون INTEGER ساخته شده، به BIGINT تبدیل می‌شود
+    // Migrate otps.expires_at to BIGINT if needed
     try {
       await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
     } catch (alterError) {
@@ -153,10 +153,77 @@ async function ensureTables() {
       // column already exists
     }
 
-    logger.info('✅ Database tables verified and ready.');
+    // ── Performance & uniqueness indexes ──
+    const indexStatements = [
+      `CREATE UNIQUE INDEX IF NOT EXISTS golden_usage_user_month_uidx ON golden_usage (user_id, year_month)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS monthly_free_usage_user_month_uidx ON monthly_free_usage (user_id, year_month)`,
+      `CREATE INDEX IF NOT EXISTS otps_phone_idx ON otps (phone)`,
+      `CREATE INDEX IF NOT EXISTS otps_expires_at_idx ON otps (expires_at)`,
+      `CREATE INDEX IF NOT EXISTS diagnostics_user_id_idx ON diagnostics (user_id)`,
+      `CREATE INDEX IF NOT EXISTS diagnostics_created_at_idx ON diagnostics (created_at)`,
+      `CREATE INDEX IF NOT EXISTS purchases_user_id_idx ON purchases (user_id)`,
+      `CREATE INDEX IF NOT EXISTS purchases_status_idx ON purchases (status)`,
+      `CREATE INDEX IF NOT EXISTS withdrawals_user_id_idx ON withdrawals (user_id)`,
+      `CREATE INDEX IF NOT EXISTS withdrawals_status_idx ON withdrawals (status)`,
+      `CREATE INDEX IF NOT EXISTS users_referred_by_idx ON users (referred_by)`,
+      `CREATE INDEX IF NOT EXISTS users_is_golden_idx ON users (is_golden)`,
+    ];
+
+    for (const stmt of indexStatements) {
+      try {
+        await sql(stmt as any);
+      } catch (idxErr) {
+        // neon tagged template expects template literal; fallback via raw
+        try {
+          // @ts-expect-error neon accepts string for some drivers
+          await (sql as any).query?.(stmt);
+        } catch {
+          logger.warn('Index creation skipped/failed', { stmt, idxErr });
+        }
+      }
+    }
+
+    // Safer index creation using individual tagged calls where possible
+    try {
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS golden_usage_user_month_uidx ON golden_usage (user_id, year_month)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS monthly_free_usage_user_month_uidx ON monthly_free_usage (user_id, year_month)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS otps_phone_idx ON otps (phone)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS otps_expires_at_idx ON otps (expires_at)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS diagnostics_user_id_idx ON diagnostics (user_id)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS diagnostics_created_at_idx ON diagnostics (created_at)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS purchases_user_id_idx ON purchases (user_id)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS purchases_status_idx ON purchases (status)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS withdrawals_user_id_idx ON withdrawals (user_id)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS withdrawals_status_idx ON withdrawals (status)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS users_referred_by_idx ON users (referred_by)`;
+    } catch { /* exists */ }
+    try {
+      await sql`CREATE INDEX IF NOT EXISTS users_is_golden_idx ON users (is_golden)`;
+    } catch { /* exists */ }
+
+    logger.info('✅ Database tables & indexes verified and ready.');
   } catch (error) {
     logger.error('❌ Failed to ensure database tables:', error);
-    // ✅ دوباره پرتاب می‌کنیم تا در route قابل مدیریت باشد
     throw error;
   }
 }
