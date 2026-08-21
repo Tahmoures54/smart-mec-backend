@@ -6,6 +6,7 @@
 
 - **Next.js 16** (App Router) — API Routes
 - **Drizzle ORM** + **Neon PostgreSQL**
+- **Upstash Redis** — Rate limiting (distributed)
 - **JWT** (jose) برای احراز هویت
 - **Kavenegar** برای OTP
 - **PayPing** برای پرداخت
@@ -23,17 +24,28 @@
 | Referral | کد دعوت + پاداش اعتبار + کمیسیون فروش |
 | Withdraw | درخواست برداشت درآمد رفرال |
 | Admin Panel | داشبورد، کاربران، برداشت‌ها، خریدها |
+| Rate Limit | Upstash Redis (با fallback حافظه محلی) |
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# مقادیر واقعی را پر کنید
+# مقادیر واقعی را پر کنید (DATABASE_URL، JWT_SECRET، ...)
 
 npm install
 npm run db:push   # یا db:migrate
 npm run dev
 ```
+
+### Rate Limiter (Upstash)
+
+1. در [console.upstash.com](https://console.upstash.com) یک Redis بسازید.
+2. از بخش **REST API** مقادیر زیر را کپی کنید:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+3. در `.env` قرار دهید.
+
+اگر این دو متغیر خالی باشند، سیستم به‌صورت خودکار از **in-memory** استفاده می‌کند (فقط مناسب local).
 
 ## API Overview
 
@@ -55,13 +67,14 @@ npm run dev
 
 - **هرگز** فایل `.env` را commit نکنید.
 - اگر قبلاً `.env` در تاریخچه گیت بوده، secrets را rotate کنید.
-- Rate limit فعلی in-memory است؛ برای multi-instance از Redis استفاده کنید.
+- در production حتماً Upstash Redis را فعال کنید تا rate limit بین instanceها مشترک باشد.
 - `ADMIN_BYPASS_CODE` و `UNIVERSAL_BYPASS_CODE` فقط برای توسعه/اضطراری.
 
 ## Deploy
 
 - Vercel / Liara / هر host سازگار با Next.js
 - `DATABASE_URL` باید Neon (یا Postgres سازگار) باشد
+- `UPSTASH_REDIS_REST_URL` و `UPSTASH_REDIS_REST_TOKEN` برای rate limit
 - `maxDuration` برای `/api/diagnose` روی ۶۰ ثانیه تنظیم شده
 
 ## License
