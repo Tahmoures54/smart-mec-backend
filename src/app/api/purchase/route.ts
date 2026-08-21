@@ -15,7 +15,7 @@ import { logger } from '@/utils/logger';
 export async function POST(request: NextRequest) {
   try {
     const ip = RateLimiter.getIP(request);
-    RateLimiter.check(ip, 'create_purchase', 10, 15 * 60 * 1000);
+    await RateLimiter.check(ip, 'create_purchase', 10, 15 * 60 * 1000);
 
     const user = await getUserFromRequest(request);
 
@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
         amount: product.price,
         payerIdentity: user.phone,
         payerName: 'کاربر مکانیک هوشمند',
-        // productId در returnUrl؛ code معمولاً توسط درگاه برمی‌گردد
         returnUrl: `${appUrl}/api/purchase/verify?productId=${productId}`,
         clientRefId,
         description: `خرید ${product.name}`,

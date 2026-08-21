@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { users, withdrawals } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql, gte } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const ip = RateLimiter.getIP(request);
-    RateLimiter.check(ip, 'withdraw', 5, 60 * 60 * 1000);
+    await RateLimiter.check(ip, 'withdraw', 5, 60 * 60 * 1000);
 
     const user = await getUserFromRequest(request);
     const body = await request.json();
@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('نام صاحب حساب الزامی است');
     }
 
-    // درخواست باز pending نداشته باشد
     const pending = await db.query.withdrawals.findFirst({
       where: and(
         eq(withdrawals.userId, user.id),
@@ -72,26 +71,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // قفل مبلغ از earnings
-    const newEarnings = (user.earnings ?? 0) - amount;
-    await db
-      .update(users)
-      .set({
-        earnings: newEarnings,
-        updatedAt: new Date(), // اصلاح شد
-      })
-      .where(eq(users.id, user.id));
+    const row = await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(users)
+        .set({
+          earnings: sql`${users.earnings} - ${amount}`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(users.id, user.id), gte(users.earnings, amount)))
+        .returning({ id: users.id, earnings: users.earnings });
 
-    const [row] = (await db
-      .insert(withdrawals)
-      .values({
-        userId: user.id,
-        amount,
-        cardNumber,
-        fullName,
-        status: 'pending',
-      })
-      .returning()) as any[];
+      if (updated.length === 0) {
+        throw new BadRequestError('موجودی درآمد شما کافی نیست');
+      }
+
+      const [inserted] = await tx
+        .insert(withdrawals)
+        .values({
+          userId: user.id,
+          amount,
+          cardNumber,
+          fullName,
+          status: 'pending',
+        })
+        .returning();
+
+      return inserted;
+    });
 
     return NextResponse.json({
       success: true,

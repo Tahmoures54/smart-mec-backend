@@ -105,6 +105,8 @@ async function ensureTables() {
         description TEXT NOT NULL,
         result TEXT NOT NULL,
         audio_url TEXT,
+        rating INTEGER,
+        feedback TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
     `;
@@ -137,7 +139,19 @@ async function ensureTables() {
       );
     `;
 
-    // 🔧 اگر جدول otps از قبل با ستون INTEGER ساخته شده، به BIGINT تبدیل می‌شود
+    await sql`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        event_name TEXT NOT NULL,
+        properties TEXT,
+        platform TEXT,
+        app_version TEXT,
+        ip TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+
     try {
       await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
     } catch (alterError) {
@@ -150,13 +164,50 @@ async function ensureTables() {
     try {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_limit INTEGER DEFAULT 200;`;
     } catch {
-      // column already exists
+      /* exists */
+    }
+    try {
+      await sql`ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS rating INTEGER;`;
+    } catch {
+      /* exists */
+    }
+    try {
+      await sql`ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS feedback TEXT;`;
+    } catch {
+      /* exists */
     }
 
-    logger.info('✅ Database tables verified and ready.');
+    // Indexes
+    const indexes = [
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS golden_usage_user_month_uidx ON golden_usage (user_id, year_month)`,
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS monthly_free_usage_user_month_uidx ON monthly_free_usage (user_id, year_month)`,
+      sql`CREATE INDEX IF NOT EXISTS otps_phone_idx ON otps (phone)`,
+      sql`CREATE INDEX IF NOT EXISTS otps_expires_at_idx ON otps (expires_at)`,
+      sql`CREATE INDEX IF NOT EXISTS diagnostics_user_id_idx ON diagnostics (user_id)`,
+      sql`CREATE INDEX IF NOT EXISTS diagnostics_created_at_idx ON diagnostics (created_at)`,
+      sql`CREATE INDEX IF NOT EXISTS diagnostics_car_id_idx ON diagnostics (car_id)`,
+      sql`CREATE INDEX IF NOT EXISTS purchases_user_id_idx ON purchases (user_id)`,
+      sql`CREATE INDEX IF NOT EXISTS purchases_status_idx ON purchases (status)`,
+      sql`CREATE INDEX IF NOT EXISTS withdrawals_user_id_idx ON withdrawals (user_id)`,
+      sql`CREATE INDEX IF NOT EXISTS withdrawals_status_idx ON withdrawals (status)`,
+      sql`CREATE INDEX IF NOT EXISTS users_referred_by_idx ON users (referred_by)`,
+      sql`CREATE INDEX IF NOT EXISTS users_is_golden_idx ON users (is_golden)`,
+      sql`CREATE INDEX IF NOT EXISTS events_name_idx ON events (event_name)`,
+      sql`CREATE INDEX IF NOT EXISTS events_user_id_idx ON events (user_id)`,
+      sql`CREATE INDEX IF NOT EXISTS events_created_at_idx ON events (created_at)`,
+    ];
+
+    for (const idx of indexes) {
+      try {
+        await idx;
+      } catch {
+        /* already exists */
+      }
+    }
+
+    logger.info('✅ Database tables & indexes verified and ready.');
   } catch (error) {
     logger.error('❌ Failed to ensure database tables:', error);
-    // ✅ دوباره پرتاب می‌کنیم تا در route قابل مدیریت باشد
     throw error;
   }
 }

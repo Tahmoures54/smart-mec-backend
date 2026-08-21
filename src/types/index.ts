@@ -39,6 +39,8 @@ export interface Diagnostic {
   description: string;
   result: string;
   audioUrl?: string | null;
+  rating?: number | null;
+  feedback?: string | null;
   createdAt: string;
 }
 
