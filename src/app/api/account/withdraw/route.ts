@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { users, withdrawals } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql, gte } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -72,26 +72,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // قفل مبلغ از earnings
-    const newEarnings = (user.earnings ?? 0) - amount;
-    await db
-      .update(users)
-      .set({
-        earnings: newEarnings,
-        updatedAt: new Date(), // اصلاح شد
-      })
-      .where(eq(users.id, user.id));
+    // قفل اتمیک مبلغ از earnings + ثبت درخواست
+    const row = await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(users)
+        .set({
+          earnings: sql`${users.earnings} - ${amount}`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(eq(users.id, user.id), gte(users.earnings, amount))
+        )
+        .returning({ id: users.id, earnings: users.earnings });
 
-    const [row] = (await db
-      .insert(withdrawals)
-      .values({
-        userId: user.id,
-        amount,
-        cardNumber,
-        fullName,
-        status: 'pending',
-      })
-      .returning()) as any[];
+      if (updated.length === 0) {
+        throw new BadRequestError('موجودی درآمد شما کافی نیست');
+      }
+
+      const [inserted] = await tx
+        .insert(withdrawals)
+        .values({
+          userId: user.id,
+          amount,
+          cardNumber,
+          fullName,
+          status: 'pending',
+        })
+        .returning();
+
+      return inserted;
+    });
 
     return NextResponse.json({
       success: true,
