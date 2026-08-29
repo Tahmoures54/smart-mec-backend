@@ -7,13 +7,12 @@ import { logger } from '@/utils/logger';
 export class SMSService {
   private static apiKey = process.env.KAVENEGAR_API_KEY;
   private static template = process.env.KAVENEGAR_TEMPLATE || 'verify';
-  private static adminPhone = process.env.ADMIN_PHONE; // شماره ادمین از env
+  private static adminPhone = process.env.ADMIN_PHONE;
 
   static async sendOTP(phone: string, code: string): Promise<boolean> {
-    
-    // 👑 ترفند درِ مخفی: اگر شماره ادمین بود، وانمود کن پیامک با موفقیت ارسال شد
+    // ادمین: SMS ارسال نمی‌شود؛ از ADMIN_BYPASS_CODE استفاده کنید
     if (this.adminPhone && phone === this.adminPhone) {
-      logger.info(`👑 [ADMIN BYPASS] No SMS sent. Use your bypass code to login.`);
+      logger.info(`[ADMIN BYPASS] No SMS sent for admin phone.`);
       return true;
     }
 
@@ -38,19 +37,20 @@ export class SMSService {
       const data = await response.json();
 
       if (data.return && data.return.status === 200) {
-        logger.info(`✅ OTP sent successfully to ${phone}`);
+        logger.info(`OTP sent successfully to ${phone.slice(0, 4)}****`);
         return true;
-      } else {
-        logger.error('❌ Kavenegar Error', data.return);
-        return false;
       }
+
+      logger.error('Kavenegar Error', data.return);
+      return false;
     } catch (error) {
-      logger.error('❌ Failed to send SMS via Kavenegar', error);
+      logger.error('Failed to send SMS via Kavenegar', error);
       return false;
     }
   }
 
+  /** کد ۶ رقمی — هماهنگ با اپ فلاتر */
   static generateOTP(): string {
-    return Math.floor(10000 + Math.random() * 90000).toString();
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 }
