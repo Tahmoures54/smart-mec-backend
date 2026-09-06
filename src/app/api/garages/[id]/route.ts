@@ -1,4 +1,4 @@
-// GET /api/garages/:id (و /api/v1/garages/:id)
+// GET /api/garages/:id
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
@@ -68,6 +68,8 @@ export async function GET(
         isOpen: g.isOpen,
         isFeatured: g.isFeatured,
         isVerified: g.isVerified,
+        subscriptionTier: g.subscriptionTier || 'free',
+        subscriptionExpiresAt: g.subscriptionExpiresAt,
         city: g.city,
         distanceMeters,
         openingHours: [],
