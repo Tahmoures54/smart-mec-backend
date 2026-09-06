@@ -1,4 +1,4 @@
-// Admin API - Smart-MEC — فقط ADMIN_PHONE
+// Admin API - Smart-MEC
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
@@ -170,6 +170,8 @@ export async function GET(request: NextRequest) {
         isFeatured: g.isFeatured,
         isVerified: g.isVerified,
         isActive: g.isActive,
+        subscriptionTier: g.subscriptionTier || 'free',
+        subscriptionExpiresAt: g.subscriptionExpiresAt,
         city: g.city,
         createdAt: g.createdAt,
       }));
@@ -243,7 +245,7 @@ export async function POST(request: NextRequest) {
       const specialties = Array.isArray(body.specialties)
         ? body.specialties.join(',')
         : String(body.specialties || '');
-      const values = {
+      const values: any = {
         name,
         address: body.address ? String(body.address) : null,
         phone: body.phone ? String(body.phone) : null,
@@ -257,12 +259,23 @@ export async function POST(request: NextRequest) {
         website: body.website ? String(body.website) : null,
         description: body.description ? String(body.description) : null,
         isOpen: body.isOpen !== false && body.isOpen !== '0',
-        isFeatured: Boolean(body.isFeatured === true || body.isFeatured === '1'),
         isVerified: Boolean(body.isVerified === true || body.isVerified === '1'),
         isActive: body.isActive !== false && body.isActive !== '0',
+        subscriptionTier: ['free', 'silver', 'gold'].includes(String(body.subscriptionTier || ''))
+          ? String(body.subscriptionTier)
+          : 'free',
+        subscriptionExpiresAt: body.subscriptionExpiresAt
+          ? String(body.subscriptionExpiresAt)
+          : null,
         city: body.city ? String(body.city) : null,
         updatedAt: new Date(),
       };
+      const tier = values.subscriptionTier as string;
+      values.isFeatured =
+        tier === 'gold'
+          ? true
+          : Boolean(body.isFeatured === true || body.isFeatured === '1');
+
       if (action === 'create_garage') {
         const inserted = await db.insert(garages).values(values).returning();
         logger.info(`Admin created garage ${inserted[0]?.id}`);
