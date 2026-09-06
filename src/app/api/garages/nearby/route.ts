@@ -1,4 +1,4 @@
-// GET /api/garages/nearby (و /api/v1/garages/nearby)
+// GET /api/garages/nearby
 // Query: lat, lng, radius, limit, featured, openNow, q, specialties
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -89,6 +89,8 @@ export async function GET(request: NextRequest) {
         isOpen: g.isOpen,
         isFeatured: g.isFeatured,
         isVerified: g.isVerified,
+        subscriptionTier: g.subscriptionTier || 'free',
+        subscriptionExpiresAt: g.subscriptionExpiresAt,
         city: g.city,
         distanceMeters: Math.round(distanceMeters),
       };
@@ -118,7 +120,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const tierRank = (t: string) => (t === 'gold' ? 3 : t === 'silver' ? 2 : 1);
     results.sort((a, b) => {
+      const tr = tierRank(b.subscriptionTier || 'free') - tierRank(a.subscriptionTier || 'free');
+      if (tr !== 0) return tr;
       if (a.isFeatured !== b.isFeatured) return a.isFeatured ? -1 : 1;
       return a.distanceMeters - b.distanceMeters;
     });
