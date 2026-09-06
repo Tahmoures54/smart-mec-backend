@@ -20,11 +20,9 @@ function getSql() {
     }
     throw new Error('❌ DATABASE_URL is not set in environment variables');
   }
-
   if (!sqlClient) {
     sqlClient = neon(process.env.DATABASE_URL);
   }
-
   return sqlClient;
 }
 
@@ -155,6 +153,8 @@ async function ensureTables() {
         is_featured BOOLEAN DEFAULT false NOT NULL,
         is_verified BOOLEAN DEFAULT false NOT NULL,
         is_active BOOLEAN DEFAULT true NOT NULL,
+        subscription_tier TEXT DEFAULT 'free' NOT NULL,
+        subscription_expires_at TEXT,
         city TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -170,13 +170,13 @@ async function ensureTables() {
       const count = Number((countResult as any)?.[0]?.c ?? 0);
       if (count === 0) {
         await sql`
-          INSERT INTO garages (name, address, phone, lat, lng, rating, reviews_count, specialties, is_open, is_featured, is_verified, is_active, city, description)
+          INSERT INTO garages (name, address, phone, lat, lng, rating, reviews_count, specialties, is_open, is_featured, is_verified, is_active, subscription_tier, city, description)
           VALUES
-            ('تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.3380, 4.6, 128, 'موتور,تنظیم موتور', true, true, true, true, 'تهران', 'تخصص در موتورهای بنزینی و توربو'),
-            ('خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.4100, 4.3, 86, 'عمومی,سرویس دوره‌ای', true, false, true, true, 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'),
-            ('گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.7010, 51.3910, 4.5, 210, 'گیربکس,دیفرانسیل', true, true, true, true, 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'),
-            ('برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.7570, 51.4105, 4.4, 95, 'برق,ایسیو', true, false, true, true, 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'),
-            ('تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.5930, 51.4350, 4.1, 54, 'جلوبندی,فرمان', true, false, false, true, 'تهران', 'تنظیم فرمان و جلوبندی')
+            ('تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.3380, 4.6, 128, 'موتور,تنظیم موتور', true, true, true, true, 'gold', 'تهران', 'تخصص در موتورهای بنزینی و توربو'),
+            ('خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.4100, 4.3, 86, 'عمومی,سرویس دوره‌ای', true, false, true, true, 'free', 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'),
+            ('گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.7010, 51.3910, 4.5, 210, 'گیربکس,دیفرانسیل', true, true, true, true, 'silver', 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'),
+            ('برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.7570, 51.4105, 4.4, 95, 'برق,ایسیو', true, false, true, true, 'free', 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'),
+            ('تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.5930, 51.4350, 4.1, 54, 'جلوبندی,فرمان', true, false, false, true, 'free', 'تهران', 'تنظیم فرمان و جلوبندی')
         `;
         logger.info('✅ Seeded sample garages (Tehran).');
       }
@@ -187,16 +187,20 @@ async function ensureTables() {
     try {
       await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
     } catch (alterError) {
-      logger.warn(
-        'Could not alter otps.expires_at type (maybe already BIGINT)',
-        alterError
-      );
+      logger.warn('Could not alter otps.expires_at type (maybe already BIGINT)', alterError);
     }
 
     try {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_limit INTEGER DEFAULT 200;`;
     } catch {
       // column already exists
+    }
+
+    try {
+      await sql`ALTER TABLE garages ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free' NOT NULL;`;
+      await sql`ALTER TABLE garages ADD COLUMN IF NOT EXISTS subscription_expires_at TEXT;`;
+    } catch (e) {
+      logger.warn('Could not add subscription columns to garages', e);
     }
 
     logger.info('✅ Database tables verified and ready.');
@@ -212,13 +216,9 @@ export function ensureDbReady(): Promise<void> {
   if (isBuilding) {
     return Promise.resolve();
   }
-
   if (!process.env.DATABASE_URL) {
-    return Promise.reject(
-      new Error('❌ DATABASE_URL is not set in environment variables')
-    );
+    return Promise.reject(new Error('❌ DATABASE_URL is not set in environment variables'));
   }
-
   if (!tablesReady) {
     tablesReady = ensureTables();
   }
