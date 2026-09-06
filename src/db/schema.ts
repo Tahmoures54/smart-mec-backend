@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   bigint,
+  doublePrecision,
   AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
@@ -43,7 +44,6 @@ export const otps = pgTable('otps', {
   id: serial('id').primaryKey(),
   phone: text('phone').notNull(),
   code: text('code').notNull(),
-  // 🔧 تغییر از integer به bigint
   expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
   isUsed: boolean('is_used').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -79,6 +79,33 @@ export const withdrawals = pgTable('withdrawals', {
   fullName: text('full_name').notNull(),
   status: text('status').default('pending').notNull(),
   adminNote: text('admin_note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * تعمیرگاه‌ها — دیتابیس خود اپ (جایگزین Google Places)
+ * isFeatured / isVerified برای درآمدزایی
+ */
+export const garages = pgTable('garages', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  address: text('address'),
+  phone: text('phone'),
+  lat: doublePrecision('lat').notNull(),
+  lng: doublePrecision('lng').notNull(),
+  rating: doublePrecision('rating'),
+  reviewsCount: integer('reviews_count').default(0),
+  /** تخصص‌ها با کاما: موتور,گیربکس,برق */
+  specialties: text('specialties'),
+  photoUrl: text('photo_url'),
+  website: text('website'),
+  description: text('description'),
+  isOpen: boolean('is_open').default(true),
+  isFeatured: boolean('is_featured').default(false).notNull(),
+  isVerified: boolean('is_verified').default(false).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  city: text('city'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
