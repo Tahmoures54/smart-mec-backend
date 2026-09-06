@@ -84,8 +84,8 @@ export const withdrawals = pgTable('withdrawals', {
 });
 
 /**
- * تعمیرگاه‌ها — دیتابیس خود اپ (جایگزین Google Places)
- * isFeatured / isVerified برای درآمدزایی
+ * تعمیرگاه‌ها — دیتابیس خود اپ
+ * subscriptionTier: free | silver | gold
  */
 export const garages = pgTable('garages', {
   id: serial('id').primaryKey(),
@@ -96,7 +96,6 @@ export const garages = pgTable('garages', {
   lng: doublePrecision('lng').notNull(),
   rating: doublePrecision('rating'),
   reviewsCount: integer('reviews_count').default(0),
-  /** تخصص‌ها با کاما: موتور,گیربکس,برق */
   specialties: text('specialties'),
   photoUrl: text('photo_url'),
   website: text('website'),
@@ -105,6 +104,8 @@ export const garages = pgTable('garages', {
   isFeatured: boolean('is_featured').default(false).notNull(),
   isVerified: boolean('is_verified').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  subscriptionTier: text('subscription_tier').default('free').notNull(),
+  subscriptionExpiresAt: text('subscription_expires_at'),
   city: text('city'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
