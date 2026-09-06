@@ -137,7 +137,53 @@ async function ensureTables() {
       );
     `;
 
-    // 🔧 اگر جدول otps از قبل با ستون INTEGER ساخته شده، به BIGINT تبدیل می‌شود
+    await sql`
+      CREATE TABLE IF NOT EXISTS garages (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        address TEXT,
+        phone TEXT,
+        lat DOUBLE PRECISION NOT NULL,
+        lng DOUBLE PRECISION NOT NULL,
+        rating DOUBLE PRECISION,
+        reviews_count INTEGER DEFAULT 0,
+        specialties TEXT,
+        photo_url TEXT,
+        website TEXT,
+        description TEXT,
+        is_open BOOLEAN DEFAULT true,
+        is_featured BOOLEAN DEFAULT false NOT NULL,
+        is_verified BOOLEAN DEFAULT false NOT NULL,
+        is_active BOOLEAN DEFAULT true NOT NULL,
+        city TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_garages_lat_lng ON garages (lat, lng);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_garages_active ON garages (is_active);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_garages_featured ON garages (is_featured);`;
+
+    try {
+      const countResult = await sql`SELECT COUNT(*)::int AS c FROM garages;`;
+      const count = Number((countResult as any)?.[0]?.c ?? 0);
+      if (count === 0) {
+        await sql`
+          INSERT INTO garages (name, address, phone, lat, lng, rating, reviews_count, specialties, is_open, is_featured, is_verified, is_active, city, description)
+          VALUES
+            ('تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.3380, 4.6, 128, 'موتور,تنظیم موتور', true, true, true, true, 'تهران', 'تخصص در موتورهای بنزینی و توربو'),
+            ('خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.4100, 4.3, 86, 'عمومی,سرویس دوره‌ای', true, false, true, true, 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'),
+            ('گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.7010, 51.3910, 4.5, 210, 'گیربکس,دیفرانسیل', true, true, true, true, 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'),
+            ('برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.7570, 51.4105, 4.4, 95, 'برق,ایسیو', true, false, true, true, 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'),
+            ('تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.5930, 51.4350, 4.1, 54, 'جلوبندی,فرمان', true, false, false, true, 'تهران', 'تنظیم فرمان و جلوبندی')
+        `;
+        logger.info('✅ Seeded sample garages (Tehran).');
+      }
+    } catch (seedErr) {
+      logger.warn('Could not seed garages', seedErr);
+    }
+
     try {
       await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
     } catch (alterError) {
@@ -156,7 +202,6 @@ async function ensureTables() {
     logger.info('✅ Database tables verified and ready.');
   } catch (error) {
     logger.error('❌ Failed to ensure database tables:', error);
-    // ✅ دوباره پرتاب می‌کنیم تا در route قابل مدیریت باشد
     throw error;
   }
 }
