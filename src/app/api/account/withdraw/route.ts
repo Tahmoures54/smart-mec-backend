@@ -5,10 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { users, withdrawals } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql, gte } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
+import { minWithdrawal } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,17 +37,12 @@ export async function POST(request: NextRequest) {
       .replace(/\s|-/g, '')
       .trim();
     const fullName = String(body.fullName || '').trim();
+    const min = minWithdrawal();
 
-    const minWithdrawal = parseInt(process.env.MIN_WITHDRAWAL || '50000', 10);
-
-    if (!Number.isInteger(amount) || amount < minWithdrawal) {
+    if (!Number.isInteger(amount) || amount < min) {
       throw new BadRequestError(
-        `حداقل مبلغ برداشت ${minWithdrawal.toLocaleString('fa-IR')} تومان است`
+        `حداقل مبلغ برداشت ${min.toLocaleString('fa-IR')} تومان است`
       );
-    }
-
-    if (amount > (user.earnings ?? 0)) {
-      throw new BadRequestError('موجودی درآمد شما کافی نیست');
     }
 
     if (!/^\d{16}$/.test(cardNumber) && !/^IR\d{24}$/i.test(cardNumber)) {
@@ -59,39 +55,45 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('نام صاحب حساب الزامی است');
     }
 
-    // درخواست باز pending نداشته باشد
-    const pending = await db.query.withdrawals.findFirst({
-      where: and(
-        eq(withdrawals.userId, user.id),
-        eq(withdrawals.status, 'pending')
-      ),
+    const row = await db.transaction(async (tx) => {
+      const pending = await tx.query.withdrawals.findFirst({
+        where: and(
+          eq(withdrawals.userId, user.id),
+          eq(withdrawals.status, 'pending')
+        ),
+      });
+      if (pending) {
+        throw new BadRequestError(
+          'یک درخواست برداشت در انتظار بررسی دارید. تا تعیین تکلیف صبر کنید.'
+        );
+      }
+
+      const deducted = await tx
+        .update(users)
+        .set({
+          earnings: sql`${users.earnings} - ${amount}`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(users.id, user.id), gte(users.earnings, amount)))
+        .returning({ earnings: users.earnings });
+
+      if (deducted.length === 0) {
+        throw new BadRequestError('موجودی درآمد شما کافی نیست');
+      }
+
+      const inserted = await tx
+        .insert(withdrawals)
+        .values({
+          userId: user.id,
+          amount,
+          cardNumber,
+          fullName,
+          status: 'pending',
+        })
+        .returning();
+
+      return inserted[0];
     });
-    if (pending) {
-      throw new BadRequestError(
-        'یک درخواست برداشت در انتظار بررسی دارید. تا تعیین تکلیف صبر کنید.'
-      );
-    }
-
-    // قفل مبلغ از earnings
-    const newEarnings = (user.earnings ?? 0) - amount;
-    await db
-      .update(users)
-      .set({
-        earnings: newEarnings,
-        updatedAt: new Date(), // اصلاح شد
-      })
-      .where(eq(users.id, user.id));
-
-    const [row] = (await db
-      .insert(withdrawals)
-      .values({
-        userId: user.id,
-        amount,
-        cardNumber,
-        fullName,
-        status: 'pending',
-      })
-      .returning()) as any[];
 
     return NextResponse.json({
       success: true,

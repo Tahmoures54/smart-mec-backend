@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { users, otps } from '@/db/schema';
-import { eq, and, desc, gt, sql } from 'drizzle-orm';
+import { eq, and, desc, gt, lt, sql } from 'drizzle-orm';
 import { signToken } from '@/lib/auth';
 import { SMSService } from '@/lib/sms';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -43,6 +43,16 @@ export async function POST(request: NextRequest) {
       const code = SMSService.generateOTP();
       const expiresAt = Date.now() + 2 * 60 * 1000;
 
+      try {
+        await db.delete(otps).where(lt(otps.expiresAt, Date.now() - 24 * 60 * 60 * 1000));
+        await db
+          .update(otps)
+          .set({ isUsed: true })
+          .where(and(eq(otps.phone, phone), eq(otps.isUsed, false)));
+      } catch (cleanupError) {
+        logger.warn('OTP cleanup skipped', cleanupError);
+      }
+
       await db.insert(otps).values({ phone, code, expiresAt });
 
       const sent = await SMSService.sendOTP(phone, code);
@@ -55,6 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'کد تایید ارسال شد',
+        ...(SMSService.isDevOtpVisible() ? { otp: code } : {}),
       });
     }
 

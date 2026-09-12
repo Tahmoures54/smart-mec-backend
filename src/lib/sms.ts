@@ -7,16 +7,17 @@ import { logger } from '@/utils/logger';
 export class SMSService {
   private static apiKey = process.env.KAVENEGAR_API_KEY;
   private static template = process.env.KAVENEGAR_TEMPLATE || 'verify';
-  private static adminPhone = process.env.ADMIN_PHONE;
+
+  static isDevOtpVisible(): boolean {
+    return process.env.SHOW_OTP_IN_DEV === 'true';
+  }
 
   static async sendOTP(phone: string, code: string): Promise<boolean> {
-    // ادمین: SMS ارسال نمی‌شود؛ از ADMIN_BYPASS_CODE استفاده کنید
-    if (this.adminPhone && phone === this.adminPhone) {
-      logger.info(`[ADMIN BYPASS] No SMS sent for admin phone.`);
-      return true;
-    }
-
     if (!this.apiKey) {
+      if (this.isDevOtpVisible() || process.env.NODE_ENV !== 'production') {
+        logger.warn(`[DEV OTP] ${phone.slice(0, 4)}**** → ${code}`);
+        return true;
+      }
       logger.error('KAVENEGAR_API_KEY is missing');
       return false;
     }

@@ -216,6 +216,14 @@ export function sanitizeText(text: string): string {
 /**
  * بررسی اینکه یک مقدار عدد صحیح مثبت است
  */
+export function validateOptionalId(
+  value: unknown,
+  fieldName: string
+): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  return validatePositiveInteger(value, fieldName);
+}
+
 export function validatePositiveInteger(
   value: any,
   fieldName: string

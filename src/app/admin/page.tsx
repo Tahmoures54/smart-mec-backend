@@ -4,10 +4,13 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 
 const API = typeof window !== 'undefined' ? window.location.origin : '';
 
-type Tab = 'dashboard' | 'users' | 'withdrawals' | 'purchases' | 'garages';
+type Tab = 'dashboard' | 'users' | 'withdrawals' | 'purchases' | 'garages' | 'diagnostics';
 
 export default function AdminPage() {
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('admin_token') || '';
+  });
   const [phone, setPhone] = useState('09160684552');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -19,20 +22,25 @@ export default function AdminPage() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [garages, setGarages] = useState<any[]>([]);
+  const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [wStatus, setWStatus] = useState('pending');
   const [garageForm, setGarageForm] = useState<any | null>(null);
   const [gSearch, setGSearch] = useState('');
 
-  useEffect(() => {
-    const t = localStorage.getItem('admin_token');
-    if (t) setToken(t);
-  }, []);
-
   const headers = useCallback(
     () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }),
     [token]
   );
+
+  useEffect(() => {
+    if (!token) return;
+    const handle = window.setTimeout(() => {
+      void load(tab);
+    }, 0);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, tab, wStatus]);
 
   async function sendOtp() {
     setError('');
@@ -96,6 +104,7 @@ export default function AdminPage() {
       if (section === 'withdrawals') setWithdrawals(data.data);
       if (section === 'purchases') setPurchases(data.data);
       if (section === 'garages') setGarages(data.data);
+      if (section === 'diagnostics') setDiagnostics(data.data);
     } catch (e: any) {
       setError(e.message);
       if (String(e.message).includes('ادمین') || String(e.message).includes('401') || String(e.message).includes('توکن')) logout();
@@ -103,11 +112,6 @@ export default function AdminPage() {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (token) load(tab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, tab, wStatus]);
 
   async function resolveWithdrawal(id: number, status: 'paid' | 'rejected') {
     const note = status === 'rejected' ? prompt('دلیل رد:') || '' : prompt('یادداشت:') || '';
@@ -271,6 +275,7 @@ export default function AdminPage() {
     { key: 'dashboard', label: 'داشبورد', icon: '📊' },
     { key: 'users', label: 'کاربران', icon: '👥' },
     { key: 'garages', label: 'تعمیرگاه‌ها', icon: '🔧' },
+    { key: 'diagnostics', label: 'عیب‌یابی‌ها', icon: '🧠' },
     { key: 'withdrawals', label: 'برداشت‌ها', icon: '💳' },
     { key: 'purchases', label: 'خریدها', icon: '🧾' },
   ];
@@ -313,6 +318,8 @@ export default function AdminPage() {
               <StatCard icon="⏳" title="برداشت معلق" value={fmt(dash.pendingWithdrawals)} accent="#ff9800" />
               <StatCard icon="🔧" title="تعمیرگاه‌ها" value={fmt(dash.garages || 0)} accent="#ffa726" />
               <StatCard icon="⭐" title="ویژه / فعال" value={`${fmt(dash.garagesFeatured || 0)} / ${fmt(dash.garagesActive || 0)}`} accent="#ffca28" />
+              <StatCard icon="🎁" title="درآمد رفرال" value={`${fmt(dash.totalReferralEarnings || 0)} ت`} accent="#26c6da" />
+              <StatCard icon="⭐" title="بازخورد" value={fmt(dash.feedback || 0)} accent="#ef5350" />
             </div>
           )}
 
@@ -401,13 +408,15 @@ export default function AdminPage() {
               </div>
               <div style={s.tableCard}>
                 <table style={s.table}>
-                  <thead><tr><th style={s.th}>ID</th><th style={s.th}>موبایل</th><th style={s.th}>اعتبار</th><th style={s.th}>وضعیت</th><th style={s.th}></th></tr></thead>
+                  <thead><tr><th style={s.th}>ID</th><th style={s.th}>موبایل</th><th style={s.th}>اعتبار</th><th style={s.th}>درآمد</th><th style={s.th}>رفرال</th><th style={s.th}>وضعیت</th><th style={s.th}></th></tr></thead>
                   <tbody>
                     {users.map((u) => (
                       <tr key={u.id}>
                         <td style={s.td}>{u.id}</td>
                         <td style={{ ...s.td, direction: 'ltr' }}>{u.phone}</td>
                         <td style={s.td}>{u.credits}</td>
+                        <td style={s.td}>{fmt(u.earnings || 0)}</td>
+                        <td style={s.td}>{u.referralCode || '—'}</td>
                         <td style={s.td}>{u.isGolden ? <span style={badgeGold}>طلایی</span> : <span style={badgeMuted}>عادی</span>}</td>
                         <td style={s.td}><button style={s.btnGhostSm} onClick={() => adjustUser(u.id)}>ویرایش</button></td>
                       </tr>
@@ -451,6 +460,26 @@ export default function AdminPage() {
                 </table>
               </div>
             </>
+          )}
+
+          {tab === 'diagnostics' && (
+            <div style={s.tableCard}>
+              <table style={s.table}>
+                <thead><tr><th style={s.th}>ID</th><th style={s.th}>موبایل</th><th style={s.th}>خودرو</th><th style={s.th}>شرح</th><th style={s.th}>نتیجه</th></tr></thead>
+                <tbody>
+                  {diagnostics.length === 0 && <tr><td colSpan={5} style={{ ...s.td, textAlign: 'center', color: '#777' }}>خالی</td></tr>}
+                  {diagnostics.map((d) => (
+                    <tr key={d.id}>
+                      <td style={s.td}>{d.id}</td>
+                      <td style={s.td}>{d.phone || d.userId}</td>
+                      <td style={s.td}>{d.carId}</td>
+                      <td style={s.td}>{d.description}</td>
+                      <td style={{ ...s.td, maxWidth: 280 }}>{d.resultPreview}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {tab === 'purchases' && (

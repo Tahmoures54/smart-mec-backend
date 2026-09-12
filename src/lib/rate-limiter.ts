@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Rate Limiter (In-Memory) - Smart-MEC
+// روی چند اینستنس (Vercel) این محدودیت تقریبی است؛ روی Liara کافی است.
 // ═══════════════════════════════════════════════════════════
 
 import { RateLimitError } from './error-handler';
@@ -10,42 +11,37 @@ interface RateLimitData {
   resetAt: number;
 }
 
-// چون پروژه روی Liara به صورت Single Instance اجرا می‌شود، 
-// یک Map درون‌حافظه‌ای کارآمد و سریع است.
 const rateLimitStore = new Map<string, RateLimitData>();
+const MAX_KEYS = 20_000;
+let lastCleanup = 0;
 
-/**
- * پاکسازی خودکار رکوردهای منقضی شده هر 5 دقیقه
- */
-setInterval(() => {
-  const now = Date.now();
+function cleanup(now: number) {
+  if (now - lastCleanup < 60_000 && rateLimitStore.size < MAX_KEYS) return;
+  lastCleanup = now;
   for (const [key, data] of rateLimitStore.entries()) {
     if (data.resetAt < now) {
       rateLimitStore.delete(key);
     }
   }
-}, 5 * 60 * 1000);
+  if (rateLimitStore.size > MAX_KEYS) {
+    const extra = rateLimitStore.size - MAX_KEYS;
+    let removed = 0;
+    for (const key of rateLimitStore.keys()) {
+      rateLimitStore.delete(key);
+      removed += 1;
+      if (removed >= extra) break;
+    }
+  }
+}
 
 export class RateLimiter {
-  /**
-   * بررسی محدودیت درخواست
-   * @param ip آدرس IP کاربر
-   * @param action نوع عملیات (مثلا 'send_otp')
-   * @param limit حداکثر تعداد درخواست مجاز
-   * @param windowMs بازه زمانی به میلی‌ثانیه
-   */
   static check(ip: string, action: string, limit: number, windowMs: number): void {
     const key = `${ip}:${action}`;
     const now = Date.now();
+    cleanup(now);
     const record = rateLimitStore.get(key);
 
-    if (!record) {
-      rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-      return;
-    }
-
-    if (now > record.resetAt) {
-      // زمان منقضی شده، ریست می‌کنیم
+    if (!record || now > record.resetAt) {
       rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
       return;
     }
@@ -63,9 +59,6 @@ export class RateLimiter {
     rateLimitStore.set(key, record);
   }
 
-  /**
-   * استخراج IP واقعی کاربر از درخواست
-   */
   static getIP(req: Request): string {
     const forwardedFor = req.headers.get('x-forwarded-for');
     if (forwardedFor) {
@@ -75,6 +68,6 @@ export class RateLimiter {
     if (realIp) {
       return realIp.trim();
     }
-    return '127.0.0.1'; // در محیط محلی
+    return '127.0.0.1';
   }
 }
