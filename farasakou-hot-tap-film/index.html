@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FARASAKOU — اتصال زنده در ساحل خلیج فارس</title>
+  <style>
+    :root {
+      --navy: #070e18;
+      --gold: #c9a227;
+      --paper: #f4efe4;
+      --muted: #b7c0c9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Naskh Arabic", "Noto Sans", Georgia, serif;
+      background: radial-gradient(1200px 600px at 70% -10%, #16324d 0%, var(--navy) 45%);
+      color: var(--paper);
+    }
+    header {
+      padding: 48px 8vw 24px;
+      border-bottom: 1px solid rgba(201,162,39,.35);
+    }
+    .brand { letter-spacing: .28em; color: var(--gold); font-family: "Noto Sans", sans-serif; font-size: 13px; }
+    h1 { font-size: clamp(28px, 4vw, 52px); margin: 12px 0 8px; font-weight: 700; }
+    .sub { color: var(--muted); max-width: 720px; line-height: 1.9; }
+    main { padding: 32px 8vw 80px; }
+    video {
+      width: 100%;
+      max-width: 1100px;
+      display: block;
+      background: #000;
+      border: 1px solid rgba(201,162,39,.25);
+    }
+    .meta { margin: 10px 0 36px; color: var(--gold); font-family: "Noto Sans", sans-serif; font-size: 13px; letter-spacing: .08em; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 18px;
+    }
+    figure {
+      margin: 0;
+      background: rgba(0,0,0,.28);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    figure img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+    figcaption { padding: 10px 12px 14px; font-size: 14px; color: var(--muted); }
+    figcaption strong { color: var(--paper); display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">FARASAKOU / فراسکو عسلویه</div>
+    <h1>اتصال زنده در ساحل خلیج فارس</h1>
+    <p class="sub">
+      مستند صنعتی سه‌دقیقه‌ای درباره هات‌تپ خط ۳۶ اینچ سراسری کندنسات در منتهی‌الیه زاگرس و ساحل خلیج فارس؛
+      عملیات روی خط در حال سرویس، بدون توقف، بدون نشت و با رعایت کامل HSE.
+    </p>
+  </header>
+  <main>
+    <video controls playsinline poster="assets/stills/scene01_aerial_zagros_gulf.jpg">
+      <source src="output/FARASAKOU_live_hot_tap_1080p_24fps.mp4" type="video/mp4" />
+    </video>
+    <p class="meta">03:00 · 16:9 · 24 fps · 1080p / 4K · Safe Hot Tap, No Shutdown</p>
+    <div class="grid">
+      <figure>
+        <img src="assets/stills/scene01_aerial_zagros_gulf.jpg" alt="زاگرس تا خلیج فارس" />
+        <figcaption><strong>صحنه ۱</strong> نمای هوایی زاگرس و ساحل خلیج فارس</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene02c_tanks_unlit_flares.jpg" alt="مخازن عسلویه" />
+        <figcaption><strong>صحنه ۲</strong> بندر، مخازن و خط ۳۶ اینچ</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene03_pipe_cutaway_condensate.jpg" alt="برش داخل لوله" />
+        <figcaption><strong>صحنه ۳</strong> خط زنده و جریان کندنسات</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene04_hse_crew_site_prep.jpg" alt="آماده‌سازی HSE" />
+        <figcaption><strong>صحنه ۴</strong> HSE و آماده‌سازی محل</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene05c_hot_tap_machine_on_flange.jpg" alt="دستگاه هات‌تپ" />
+        <figcaption><strong>صحنه ۵</strong> اسپلیت‌تی، شیر و دستگاه هیدرولیک</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene06_pilot_drill_live_cut.jpg" alt="برش زنده" />
+        <figcaption><strong>صحنه ۶</strong> برش زنده و خروج کاپون</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene07b_control_room_scada.jpg" alt="اتاق کنترل" />
+        <figcaption><strong>صحنه ۷</strong> انتقال به مخازن و پایش اتاق فرمان</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene08_finale_zagros_gulf_port.jpg" alt="نماى پایانى" />
+        <figcaption><strong>صحنه ۸</strong> FARASAKOU — Safe Hot Tap, No Shutdown</figcaption>
+      </figure>
+    </div>
+  </main>
+</body>
+</html>

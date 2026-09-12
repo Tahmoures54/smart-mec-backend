@@ -46,6 +46,13 @@ next-env.d.ts
 # Testing
 coverage/
 
+# Film intermediates (final masters are copied to artifacts)
+farasakou-hot-tap-film/output/shots/
+farasakou-hot-tap-film/output/picture_*.mp4
+farasakou-hot-tap-film/output/*.txt
+farasakou-hot-tap-film/assets/audio/*.wav
+**/__pycache__/
+
 # Misc
 *.pem
 .vercel
