@@ -9,7 +9,9 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config import HEIGHT, OVERLAYS, SCENES, WIDTH  # noqa: E402
+from config import HEIGHT, OVERLAYS, ROOT, SCENES, WIDTH  # noqa: E402
+
+LOGO_WHITE = ROOT / "assets" / "brand" / "farasakou_logo_white.png"
 
 GOLD = (201, 162, 39, 255)
 GOLD_DIM = (201, 162, 39, 180)
@@ -53,20 +55,25 @@ def gradient_bar(w: int, h: int) -> Image.Image:
     return img
 
 
+def paste_official_logo(canvas: Image.Image, width: int, xy: tuple[int, int]) -> None:
+    logo = Image.open(LOGO_WHITE).convert("RGBA")
+    ratio = width / logo.width
+    logo = logo.resize((width, max(1, int(logo.height * ratio))), Image.Resampling.LANCZOS)
+    canvas.alpha_composite(logo, xy)
+
+
 def make_scene_overlay(scene: dict) -> Image.Image:
     canvas = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
 
-    draw.rectangle((0, 0, WIDTH, 72), fill=(6, 14, 26, 140))
-    draw.rectangle((0, 72, WIDTH, 74), fill=GOLD_DIM)
-
-    en_sm = load_font(FONT_EN, 28)
-    fa_sm = load_font(FONT_FA, 32)
-    draw_ltr(draw, (48, 36), "FARASAKOU", en_sm, GOLD, "lm")
-    draw_rtl(draw, (WIDTH - 48, 36), "فراسکو عسلویه", fa_sm, WHITE, "rm")
+    draw.rectangle((0, 0, WIDTH, 88), fill=(6, 14, 26, 150))
+    draw.rectangle((0, 88, WIDTH, 90), fill=GOLD_DIM)
+    paste_official_logo(canvas, 200, (32, 8))
+    draw = ImageDraw.Draw(canvas)
+    draw_rtl(draw, (WIDTH - 48, 44), "فراسکو عسلویه", load_font(FONT_FA, 30), WHITE, "rm")
     draw_ltr(
         draw,
-        (WIDTH // 2, 36),
+        (WIDTH // 2 + 40, 44),
         "LIVE HOT TAP  •  36-IN  •  NO SHUTDOWN",
         load_font(FONT_EN_REG, 16),
         SILVER,
@@ -103,33 +110,32 @@ def make_center_logo() -> Image.Image:
     vignette = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     g = ImageDraw.Draw(vignette)
     g.ellipse(
-        (WIDTH // 2 - 560, HEIGHT // 2 - 240, WIDTH // 2 + 560, HEIGHT // 2 + 240),
-        fill=(6, 14, 26, 150),
+        (WIDTH // 2 - 620, HEIGHT // 2 - 280, WIDTH // 2 + 620, HEIGHT // 2 + 280),
+        fill=(6, 14, 26, 170),
     )
     canvas.alpha_composite(vignette.filter(ImageFilter.GaussianBlur(48)))
-
+    logo = Image.open(LOGO_WHITE).convert("RGBA")
+    target_w = 760
+    logo = logo.resize((target_w, int(logo.height * target_w / logo.width)), Image.Resampling.LANCZOS)
+    canvas.alpha_composite(logo, ((WIDTH - logo.width) // 2, HEIGHT // 2 - logo.height // 2 - 36))
     draw = ImageDraw.Draw(canvas)
-    title = load_font(FONT_EN, 92)
-    sub = load_font(FONT_EN_REG, 26)
-    fa = load_font(FONT_FA, 42)
-    draw_ltr(draw, (WIDTH // 2, HEIGHT // 2 - 24), "FARASAKOU", title, GOLD, "mm")
     draw.rectangle(
-        (WIDTH // 2 - 220, HEIGHT // 2 + 28, WIDTH // 2 + 220, HEIGHT // 2 + 31),
+        (WIDTH // 2 - 220, HEIGHT // 2 + 78, WIDTH // 2 + 220, HEIGHT // 2 + 81),
         fill=GOLD,
     )
     draw_rtl(
         draw,
-        (WIDTH // 2, HEIGHT // 2 + 64),
+        (WIDTH // 2, HEIGHT // 2 + 118),
         "اتصال زنده در ساحل خلیج فارس",
-        fa,
+        load_font(FONT_FA, 40),
         WHITE,
         "mm",
     )
     draw_ltr(
         draw,
-        (WIDTH // 2, HEIGHT // 2 + 112),
+        (WIDTH // 2, HEIGHT // 2 + 166),
         "ASSALUYEH  •  INDUSTRIAL DOCUMENTARY",
-        sub,
+        load_font(FONT_EN_REG, 24),
         SILVER,
         "mm",
     )
@@ -139,17 +145,25 @@ def make_center_logo() -> Image.Image:
 def make_end_card() -> Image.Image:
     canvas = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(6, 10, 18, 90))
-    title = load_font(FONT_EN, 64)
-    fa = load_font(FONT_FA, 40)
-    sub = load_font(FONT_EN, 28)
-    draw_ltr(draw, (WIDTH // 2, HEIGHT // 2 - 40), "FARASAKOU", title, GOLD, "mm")
-    draw_ltr(draw, (WIDTH // 2, HEIGHT // 2 + 28), "Safe Hot Tap, No Shutdown", sub, WHITE, "mm")
+    draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(6, 10, 18, 110))
+    logo = Image.open(LOGO_WHITE).convert("RGBA")
+    target_w = 720
+    logo = logo.resize((target_w, int(logo.height * target_w / logo.width)), Image.Resampling.LANCZOS)
+    canvas.alpha_composite(logo, ((WIDTH - logo.width) // 2, HEIGHT // 2 - logo.height // 2 - 50))
+    draw = ImageDraw.Draw(canvas)
+    draw_ltr(
+        draw,
+        (WIDTH // 2, HEIGHT // 2 + 92),
+        "Safe Hot Tap, No Shutdown",
+        load_font(FONT_EN, 28),
+        WHITE,
+        "mm",
+    )
     draw_rtl(
         draw,
-        (WIDTH // 2, HEIGHT // 2 + 88),
+        (WIDTH // 2, HEIGHT // 2 + 148),
         "اتصال ایمن، بدون توقف تولید",
-        fa,
+        load_font(FONT_FA, 38),
         WHITE,
         "mm",
     )

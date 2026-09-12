@@ -3,7 +3,9 @@
 
 فیلم مستند صنعتی ۳ دقیقه‌ای درباره هات‌تپ خط ۳۶ اینچ سراسری کندنسات در عسلویه.
 
-Production method: photoreal cinematic stills (16:9) assembled with Ken Burns camera moves, original industrial score, Persian neural narration, and bilingual lower-thirds. Native real-time 3D CGI for a continuous 180-second 4K shot is not available in this environment; this pipeline is the broadcast-style substitute used in industrial documentaries.
+Production method: photoreal cinematic stills (16:9) assembled with Ken Burns camera moves, original industrial score, Persian neural narration, and bilingual lower-thirds. Establishing shots and branding use **official Farasakou Assaluyeh photographs and the company logo** from [apc.co.ir](https://apc.co.ir/), plus the published port-layout photo from the Pars Geometry development report. Hot-tap cutaways remain technical visualizations because those operations are not in the public gallery. Native real-time 3D CGI for a continuous 180-second 4K shot is not available in this environment.
+
+See `SOURCES.md` for image URLs.
 
 ### Specs
 - Duration: 03:00

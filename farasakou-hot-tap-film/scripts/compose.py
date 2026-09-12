@@ -249,8 +249,6 @@ def main() -> None:
             extra = None
             if scene["id"] == 1 and sidx == 0:
                 extra = OVERLAYS / "logo_center.png"
-            if scene["id"] == 8 and sidx == 2:
-                extra = OVERLAYS / "end_card.png"
             out = shots_dir / f"{shot_i:02d}_s{scene['id']:02d}.mp4"
             jobs.append((shot_i, shot, scene, out, overlay, extra))
             shot_i += 1

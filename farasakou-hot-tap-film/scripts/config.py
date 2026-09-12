@@ -33,8 +33,8 @@ SCENES = [
             "فراسکو عسلویه آماده یک عملیات مهندسی دقیق است."
         ),
         "shots": [
-            {"file": "scene01_aerial_zagros_gulf.jpg", "duration": 8.0, "motion": "right"},
-            {"file": "scene01b_coast_golden_hour.jpg", "duration": 7.0, "motion": "in"},
+            {"file": "real_harbor_dji.jpg", "duration": 8.0, "motion": "in"},
+            {"file": "real_zagros_window.jpg", "duration": 7.0, "motion": "right"},
         ],
         "grade": {"contrast": 1.08, "brightness": 0.03, "saturation": 1.12, "gamma": 1.02},
         "sfx": ["wind", "waves"],
@@ -52,8 +52,8 @@ SCENES = [
             "و مخازن ذخیره‌سازی مواد نفتی عسلویه است."
         ),
         "shots": [
-            {"file": "scene02c_tanks_unlit_flares.jpg", "duration": 10.0, "motion": "left"},
-            {"file": "scene02b_36inch_line_corridor.jpg", "duration": 10.0, "motion": "in"},
+            {"file": "real_tanks_farm.jpg", "duration": 10.0, "motion": "left"},
+            {"file": "real_port_plan.jpg", "duration": 10.0, "motion": "in"},
         ],
         "grade": {"contrast": 1.06, "brightness": 0.02, "saturation": 1.08, "gamma": 1.0},
         "sfx": ["wind", "waves"],
@@ -149,8 +149,8 @@ SCENES = [
             "اتاق فرمان همه پارامترها را پایش می‌کند."
         ),
         "shots": [
-            {"file": "scene07_branch_to_tanks_control.jpg", "duration": 12.0, "motion": "right"},
-            {"file": "scene07b_control_room_scada.jpg", "duration": 13.0, "motion": "in"},
+            {"file": "real_night_loading.jpg", "duration": 12.0, "motion": "right"},
+            {"file": "real_ship_bridge.jpg", "duration": 13.0, "motion": "in"},
         ],
         "grade": {"contrast": 1.04, "brightness": 0.01, "saturation": 0.98, "gamma": 1.0},
         "sfx": ["fluid", "control", "hum"],
@@ -167,9 +167,9 @@ SCENES = [
             "از دل زاگرس تا ساحل خلیج فارس. FARASAKOU."
         ),
         "shots": [
-            {"file": "scene08c_completed_no_flame.jpg", "duration": 6.0, "motion": "out"},
-            {"file": "scene08_finale_zagros_gulf_port.jpg", "duration": 6.0, "motion": "left"},
-            {"file": "logo_farasakou_titlecard.jpg", "duration": 3.0, "motion": "in"},
+            {"file": "real_site_zagros.jpg", "duration": 6.0, "motion": "out"},
+            {"file": "real_night_jetty.jpg", "duration": 6.0, "motion": "left"},
+            {"file": "real_title_logo.jpg", "duration": 3.0, "motion": "in"},
         ],
         "grade": {"contrast": 1.08, "brightness": 0.02, "saturation": 1.1, "gamma": 1.02},
         "sfx": ["wind", "waves"],

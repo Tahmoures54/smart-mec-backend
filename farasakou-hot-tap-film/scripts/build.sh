@@ -7,6 +7,9 @@ cd "$ROOT"
 python3 scripts/overlays.py
 python3 scripts/narration.py
 python3 scripts/score.py
+if [[ -d /tmp/farasakou_web/imgs ]]; then
+  python3 scripts/prepare_real_stills.py || true
+fi
 python3 scripts/compose.py
 
 echo "Film outputs:"
