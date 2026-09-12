@@ -17,6 +17,9 @@ export function SiteFooter() {
           </a>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-amber-100/75">
+          <Link href="/diagnose" className="hover:text-white">
+            عیب‌یابی آنلاین
+          </Link>
           <Link href="/#download" className="hover:text-white">
             دانلود اپ
           </Link>

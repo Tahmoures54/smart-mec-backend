@@ -24,24 +24,24 @@ export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-amber-100/80 md:flex">
+          <Link href="/diagnose" className="hover:text-white">
+            عیب‌یابی
+          </Link>
           <Link href="/#features" className="hover:text-white">
             امکانات
           </Link>
-          <Link href="/#how" className="hover:text-white">
-            روش کار
-          </Link>
           <Link href="/#download" className="hover:text-white">
-            دانلود
+            دانلود اپ
           </Link>
           {showStatus ? <StatusBadge /> : null}
         </nav>
 
-        <a
-          href="/download"
+        <Link
+          href="/diagnose"
           className="rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_24px_rgba(255,122,26,0.35)] hover:bg-orange-400"
         >
-          دانلود اپ
-        </a>
+          عیب‌یابی آنلاین
+        </Link>
       </div>
     </header>
   );

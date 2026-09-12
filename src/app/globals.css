@@ -20,3 +20,28 @@ body {
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 42px 42px, 42px 42px;
 }
+
+.diagnose-result h1,
+.diagnose-result h2,
+.diagnose-result h3 {
+  margin: 1.1rem 0 0.4rem;
+  font-weight: 700;
+  color: #f5dfb0;
+}
+
+.diagnose-result p {
+  margin: 0.4rem 0;
+}
+
+.diagnose-result ul {
+  margin: 0.4rem 0 0.8rem;
+  padding-right: 1.2rem;
+  list-style: disc;
+}
+
+.diagnose-result code {
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+}

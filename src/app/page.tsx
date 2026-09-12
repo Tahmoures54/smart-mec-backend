@@ -40,8 +40,8 @@ const FEATURES = [
 const STEPS = [
   {
     n: '۱',
-    title: 'اپ را نصب کن',
-    body: 'دانلود مستقیم اندروید، یا به‌زودی از کافه‌بازار و گوگل‌پلی.',
+    title: 'در وب شروع کن',
+    body: 'همین حالا عیب‌یابی آنلاین را باز کن؛ اگر خواستی بعداً اپ اندروید را هم نصب کن.',
   },
   {
     n: '۲',
@@ -51,7 +51,7 @@ const STEPS = [
   {
     n: '۳',
     title: 'راهنمایی بگیر و اقدام کن',
-    body: 'علت‌های محتمل را بخوان، اگر لازم شد تعمیرگاه نزدیک را روی نقشه پیدا کن.',
+    body: 'علت‌های محتمل را بخوان و اگر لازم شد حضوری به تعمیرگاه مراجعه کن.',
   },
 ];
 
@@ -107,7 +107,7 @@ export default function Home() {
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 md:grid-cols-2 md:py-24">
             <div>
               <p className="mb-4 inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-sm text-amber-200">
-                اپلیکیشن اندروید · {SITE.nameEn}
+                نسخه وب + اپ اندروید · {SITE.nameEn}
               </p>
               <h1 className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
                 مکانیک همیشه
@@ -118,18 +118,18 @@ export default function Home() {
               <p className="mt-5 max-w-xl text-lg leading-8 text-amber-100/80">{SITE.description}</p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <a
-                  href="/download"
+                <Link
+                  href="/diagnose"
                   className="inline-flex items-center justify-center rounded-2xl bg-orange-500 px-6 py-3.5 text-base font-bold text-white shadow-[0_12px_40px_rgba(255,122,26,0.35)] hover:bg-orange-400"
                 >
-                  دانلود اپلیکیشن اندروید
-                </a>
-                <Link
-                  href="#how"
+                  شروع عیب‌یابی آنلاین
+                </Link>
+                <a
+                  href="/download"
                   className="inline-flex items-center justify-center rounded-2xl border border-white/15 px-6 py-3.5 text-base font-semibold text-amber-100 hover:border-orange-400/50 hover:text-white"
                 >
-                  چطور کار می‌کند؟
-                </Link>
+                  دانلود اپ اندروید
+                </a>
               </div>
 
               <dl className="mt-10 grid grid-cols-3 gap-4 text-center sm:text-right">

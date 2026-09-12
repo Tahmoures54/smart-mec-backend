@@ -15,7 +15,15 @@ import {
 } from '@/lib/payment';
 import { referralPercentage } from '@/lib/constants';
 
-const renderHTML = (title: string, message: string, isSuccess: boolean) => `
+const renderHTML = (
+  title: string,
+  message: string,
+  isSuccess: boolean,
+  fromWeb = false
+) => {
+  const backHref = fromWeb ? '/diagnose' : isSuccess ? 'smartmec://success' : 'smartmec://failed';
+  const backLabel = fromWeb ? 'بازگشت به عیب‌یابی' : 'بازگشت به اپلیکیشن';
+  return `
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -38,19 +46,20 @@ const renderHTML = (title: string, message: string, isSuccess: boolean) => `
         <div class="icon ${isSuccess ? 'success' : 'error'}">${isSuccess ? '✓' : '✗'}</div>
         <h1>${escapeHtml(title)}</h1>
         <p>${escapeHtml(message)}</p>
-        <a href="${isSuccess ? 'smartmec://success' : 'smartmec://failed'}" class="btn">بازگشت به اپلیکیشن</a>
+        <a href="${backHref}" class="btn">${backLabel}</a>
     </div>
     <script>
         setTimeout(function() {
-          window.location.href = '${isSuccess ? 'smartmec://success' : 'smartmec://failed'}';
+          window.location.href = '${backHref}';
         }, 1500);
     </script>
 </body>
 </html>
 `;
+};
 
-function html(title: string, message: string, ok: boolean, status = 200) {
-  return new NextResponse(renderHTML(title, message, ok), {
+function html(title: string, message: string, ok: boolean, status = 200, fromWeb = false) {
+  return new NextResponse(renderHTML(title, message, ok, fromWeb), {
     status,
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
@@ -128,9 +137,12 @@ export async function GET(request: NextRequest) {
       url.searchParams.get('code') ||
       url.searchParams.get('authority') ||
       url.searchParams.get('Authority');
+    const fromWeb = url.searchParams.get('from') === 'web';
+    const page = (title: string, message: string, ok: boolean, status = 200) =>
+      html(title, message, ok, status, fromWeb);
 
     if (!productId || !(productId in PRODUCTS)) {
-      return html('محصول نامعتبر', 'اطلاعات محصول ارسالی معتبر نیست.', false, 400);
+      return page('محصول نامعتبر', 'اطلاعات محصول ارسالی معتبر نیست.', false, 400);
     }
 
     const product = PRODUCTS[productId];
@@ -138,7 +150,7 @@ export async function GET(request: NextRequest) {
     const mock = isMockAuthority(code);
 
     if (!code) {
-      return html('تراکنش نامعتبر', 'کد رهگیری پرداخت ارسال نشده است.', false, 400);
+      return page('تراکنش نامعتبر', 'کد رهگیری پرداخت ارسال نشده است.', false, 400);
     }
 
     const purchase = await db.query.purchases.findFirst({
@@ -146,7 +158,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!purchase) {
-      return html(
+      return page(
         'تراکنش منقضی',
         'این تراکنش قبلاً پردازش شده یا یافت نشد.',
         false,
@@ -155,7 +167,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (purchase.status === 'completed') {
-      return html(
+      return page(
         'پرداخت موفق',
         `${product.name} قبلاً به حساب شما اضافه شده است.`,
         true
@@ -163,7 +175,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (purchase.status !== 'pending') {
-      return html(
+      return page(
         'تراکنش منقضی',
         'این تراکنش قبلاً پردازش شده یا یافت نشد.',
         false,
@@ -172,13 +184,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (purchase.productId !== productId) {
-      return html('محصول نامعتبر', 'محصول با تراکنش مطابقت ندارد.', false, 400);
+      return page('محصول نامعتبر', 'محصول با تراکنش مطابقت ندارد.', false, 400);
     }
 
     if (!mock) {
       if (!paypingToken) {
         logger.error('PayPing token missing while verifying live payment');
-        return html(
+        return page(
           'خطای پیکربندی',
           'درگاه پرداخت پیکربندی نشده است.',
           false,
@@ -186,7 +198,7 @@ export async function GET(request: NextRequest) {
         );
       }
       if (!refId) {
-        return html(
+        return page(
           'پرداخت ناموفق',
           'رسید درگاه دریافت نشد. اگر مبلغ از حساب شما کم شده با پشتیبانی تماس بگیرید.',
           false,
@@ -214,7 +226,7 @@ export async function GET(request: NextRequest) {
           .where(
             and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending'))
           );
-        return html(
+        return page(
           'پرداخت ناموفق',
           'تراکنش توسط درگاه بانکی تایید نشد.',
           false,
@@ -244,7 +256,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (claimed.length === 0) {
-      return html(
+      return page(
         'پرداخت موفق',
         `${product.name} قبلاً به حساب شما اضافه شده است.`,
         true
@@ -254,7 +266,7 @@ export async function GET(request: NextRequest) {
     logger.info(
       `✅ Payment Success: User ${purchase.userId} bought ${product.name}`
     );
-    return html(
+    return page(
       'پرداخت موفق',
       `${product.name} با موفقیت به حساب شما اضافه شد.`,
       true

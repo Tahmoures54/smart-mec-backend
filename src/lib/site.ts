@@ -3,7 +3,7 @@ export const SITE = {
   nameEn: 'Smart Mechanic',
   tagline: 'عیب‌یابی هوشمند خودرو',
   description:
-    'مشکل ماشینت را با هوش مصنوعی بفهم؛ از روی شرح مشکل یا صدای موتور. بعد نزدیک‌ترین تعمیرگاه را روی نقشه پیدا کن.',
+    'عیب‌یابی خودرو با هوش مصنوعی در نسخه وب یا اپ اندروید؛ از روی شرح مشکل یا صدای موتور.',
   supportEmail: 'support@smart-mec.ir',
   packageId: 'ir.smartmec.app',
   githubApp: 'https://github.com/Tahmoures54/smart-mechanic-flutter',
