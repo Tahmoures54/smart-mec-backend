@@ -78,6 +78,7 @@ export function DiagnoseApp() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [cars, setCars] = useState<Car[]>([]);
   const [query, setQuery] = useState('');
+  const [carMenuOpen, setCarMenuOpen] = useState(false);
   const [carId, setCarId] = useState('');
   const [carLabel, setCarLabel] = useState('');
   const [customName, setCustomName] = useState('');
@@ -166,6 +167,7 @@ export function DiagnoseApp() {
     setCarId(String(car.id));
     setCarLabel(`${car.brand} ${car.model}`);
     setQuery(`${car.brand} ${car.model}`);
+    setCarMenuOpen(false);
   }
 
   async function sendOtp() {
@@ -441,13 +443,16 @@ export function DiagnoseApp() {
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
+                setCarMenuOpen(true);
                 if (carId && e.target.value !== carLabel) setCarId('');
               }}
+              onFocus={() => setCarMenuOpen(true)}
               placeholder="مثلاً پژو ۲۰۶ یا پراید"
               className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-orange-400"
             />
           </label>
 
+          {carMenuOpen ? (
           <div className="max-h-40 overflow-auto rounded-xl border border-white/10">
             {filteredCars.map((car) => (
               <button
@@ -468,12 +473,14 @@ export function DiagnoseApp() {
                 setCarId('custom');
                 setCarLabel('خودروی خارج از لیست');
                 setQuery('خودروی خارج از لیست');
+                setCarMenuOpen(false);
               }}
               className="block w-full px-3 py-2 text-right text-sm text-orange-300 hover:bg-white/5"
             >
               خودروی من در لیست نیست
             </button>
           </div>
+          ) : null}
 
           {selectedCustom ? (
             <label className="block text-sm">
