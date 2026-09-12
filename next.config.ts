@@ -27,10 +27,21 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: '/downloads/:file*.apk',
+        headers: [
+          { key: 'Content-Type', value: 'application/vnd.android.package-archive' },
+          {
+            key: 'Content-Disposition',
+            value: 'attachment; filename="smart-mec.apk"',
+          },
+        ],
+      },
     ];
   },
 
   images: {
+    dangerouslyAllowSVG: true,
     remotePatterns: [
       {
         protocol: 'https',

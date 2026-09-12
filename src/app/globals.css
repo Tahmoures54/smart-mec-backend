@@ -11,3 +11,12 @@ body {
     transform: rotate(360deg);
   }
 }
+
+.hero-grid {
+  background-image:
+    radial-gradient(ellipse 70% 55% at 80% 10%, rgba(255, 179, 0, 0.16), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 10% 80%, rgba(255, 122, 26, 0.1), transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 42px 42px, 42px 42px;
+}

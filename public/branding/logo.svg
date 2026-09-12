@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5DFB0"/>
+      <stop offset="45%" stop-color="#E4BA56"/>
+      <stop offset="100%" stop-color="#D6A330"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="#FAFBFB"/>
+  <circle cx="256" cy="256" r="222" fill="#121212"/>
+  <!-- Gear (simplified 8-tooth) -->
+  <g fill="#484747">
+    <path d="M256 56 l28 28 h40 l14 40 40 14 v40 l28 28 -28 28 v40 l-40 14 -14 40 h-40 l-28 28 -28-28 h-40 l-14-40 -40-14 v-40 l-28-28 28-28 v-40 l40-14 14-40 h40 z"/>
+  </g>
+  <circle cx="256" cy="256" r="78" fill="#121212"/>
+  <circle cx="256" cy="256" r="92" fill="none" stroke="#484747" stroke-width="14"/>
+  <!-- Screwdriver -->
+  <g transform="translate(256,256) rotate(-48) translate(-256,-256)">
+    <rect x="240" y="70" width="32" height="90" rx="8" fill="url(#gold)"/>
+    <rect x="246" y="160" width="20" height="16" rx="3" fill="#303030"/>
+    <rect x="250" y="174" width="12" height="70" rx="3" fill="url(#gold)"/>
+  </g>
+  <!-- Wrench -->
+  <g transform="translate(256,256) rotate(48) translate(-256,-256)">
+    <rect x="244" y="150" width="24" height="110" rx="10" fill="url(#gold)"/>
+    <path d="M210 70 h36 v30 h20 v24 h-20 v20 h-36 v-24 h-18 v-26 h18 z" fill="url(#gold)"/>
+  </g>
+  <!-- Lock -->
+  <path d="M206 210 a50 48 0 0 1 100 0 v28 h-22 v-28 a28 28 0 0 0 -56 0 v28 h-22 z" fill="url(#gold)"/>
+  <rect x="186" y="228" width="140" height="130" rx="22" fill="url(#gold)"/>
+  <circle cx="256" cy="278" r="16" fill="#202020"/>
+  <path d="M248 278 l16 0 8 40 h-32 z" fill="#202020"/>
+</svg>
