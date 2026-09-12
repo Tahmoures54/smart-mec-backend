@@ -1,13 +1,7 @@
-'use client';
-
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-
-type Health = {
-  status: string;
-  timestamp?: string;
-  checks?: { database?: { ok?: boolean; latencyMs?: number; error?: string } };
-};
+import { PRODUCTS } from '@/types';
+import carsData from '@/data/cars.json';
+import { HealthPanel } from './health-panel';
 
 const ENDPOINTS = [
   { path: '/api/account', desc: 'ورود با OTP و کد دعوت' },
@@ -25,27 +19,8 @@ const ENDPOINTS = [
 ];
 
 export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [products, setProducts] = useState<number | null>(null);
-  const [cars, setCars] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setHealth({ status: 'degraded' }));
-    fetch('/api/products')
-      .then((r) => r.json())
-      .then((d) => setProducts(d.meta?.count ?? d.data?.length ?? 0))
-      .catch(() => setProducts(0));
-    fetch('/api/cars')
-      .then((r) => r.json())
-      .then((d) => setCars(d.meta?.count ?? d.data?.length ?? 0))
-      .catch(() => setCars(0));
-  }, []);
-
-  const dbOk = health?.checks?.database?.ok;
-  const online = health?.status === 'ok';
+  const productCount = Object.keys(PRODUCTS).length;
+  const carCount = Array.isArray(carsData) ? carsData.length : 0;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 py-12" dir="rtl">
@@ -55,33 +30,23 @@ export default function Home() {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl mb-6">
-        <div className="bg-gray-800 p-6 rounded-lg border border-orange-500/30">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">وضعیت سرور</h2>
-          <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${online ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
-            <span className={online ? 'text-green-400' : 'text-amber-400'}>
-              {health ? (online ? 'آماده سرویس‌دهی' : 'حالت محدود (دیتابیس در دسترس نیست)') : 'در حال بررسی…'}
-            </span>
-          </div>
-          <p className="text-sm text-gray-400 mt-3">
-            دیتابیس: {dbOk ? `سالم (${health?.checks?.database?.latencyMs}ms)` : health ? 'قطع / پیکربندی نشده' : '…'}
-          </p>
-          <div className="mt-4 flex gap-4 text-sm">
-            <Link href="/api/health" className="text-orange-400 hover:text-orange-300 underline">
-              /api/health
-            </Link>
-            <Link href="/admin" className="text-orange-400 hover:text-orange-300 underline">
-              پنل ادمین
-            </Link>
-          </div>
-        </div>
+        <HealthPanel />
 
         <div className="bg-gray-800 p-6 rounded-lg border border-orange-500/30">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">کاتالوگ</h2>
           <ul className="space-y-2 text-gray-300">
-            <li>محصولات فروش: {products ?? '…'} بسته</li>
-            <li>خودروهای پشتیبانی‌شده: {cars ?? '…'} مدل</li>
-            <li>نسخه API: <code className="text-orange-300">/api</code> و <code className="text-orange-300">/api/v1</code></li>
+            <li>محصولات فروش: {productCount} بسته</li>
+            <li>خودروهای پشتیبانی‌شده: {carCount} مدل</li>
+            <li>
+              نسخه API:{' '}
+              <code dir="ltr" className="text-orange-300 bg-gray-900 px-1 rounded">
+                /api
+              </code>{' '}
+              و{' '}
+              <code dir="ltr" className="text-orange-300 bg-gray-900 px-1 rounded">
+                /api/v1
+              </code>
+            </li>
           </ul>
         </div>
       </div>
@@ -90,8 +55,14 @@ export default function Home() {
         <h2 className="text-xl font-semibold mb-4 text-orange-400">نقاط پایانی</h2>
         <ul className="space-y-2 text-gray-300">
           {ENDPOINTS.map((item) => (
-            <li key={item.path} className="flex flex-col sm:flex-row sm:gap-3">
-              <code className="text-orange-300 bg-gray-900 px-1 rounded shrink-0">{item.path}</code>
+            <li key={item.path} className="flex flex-col sm:flex-row sm:gap-3 sm:items-center">
+              <Link
+                href={item.path}
+                dir="ltr"
+                className="text-orange-300 bg-gray-900 px-1 rounded shrink-0 font-mono text-sm hover:text-orange-200"
+              >
+                {item.path}
+              </Link>
               <span>{item.desc}</span>
             </li>
           ))}
