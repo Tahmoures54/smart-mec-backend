@@ -6,48 +6,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { applyCorsHeaders } from '@/lib/cors';
-
-/** مسیرهای محافظت‌شده (با و بدون پیشوند /v1) */
-const protectedPrefixes = [
-  '/api/diagnose',
-  '/api/v1/diagnose',
-  '/api/purchase',
-  '/api/v1/purchase',
-  '/api/account/credits',
-  '/api/v1/account/credits',
-  '/api/account/withdraw',
-  '/api/v1/account/withdraw',
-  '/api/admin',
-  '/api/v1/admin',
-  '/api/feedback',
-  '/api/v1/feedback',
-];
-
-/** کال‌بک درگاه پرداخت نباید توکن بخواهد */
-const publicExactOrPrefix = [
-  '/api/purchase/verify',
-  '/api/v1/purchase/verify',
-];
-
-function normalizePath(pathname: string): string {
-  if (pathname.length > 1 && pathname.endsWith('/')) {
-    return pathname.slice(0, -1);
-  }
-  return pathname;
-}
-
-function isPublicCallback(pathname: string): boolean {
-  return publicExactOrPrefix.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-}
-
-function isProtectedPath(pathname: string): boolean {
-  if (isPublicCallback(pathname)) return false;
-  return protectedPrefixes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-}
+import { isProtectedApiPath } from '@/lib/api-guard';
 
 function withCors(request: NextRequest, response: NextResponse): NextResponse {
   applyCorsHeaders(request, response);
@@ -55,13 +14,11 @@ function withCors(request: NextRequest, response: NextResponse): NextResponse {
 }
 
 export async function middleware(request: NextRequest) {
-  const pathname = normalizePath(request.nextUrl.pathname);
-
   if (request.method === 'OPTIONS') {
     return withCors(request, new NextResponse(null, { status: 204 }));
   }
 
-  if (isProtectedPath(pathname)) {
+  if (isProtectedApiPath(request.nextUrl.pathname)) {
     const authHeader = request.headers.get('authorization');
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

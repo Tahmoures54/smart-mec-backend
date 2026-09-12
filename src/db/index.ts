@@ -1,6 +1,6 @@
-import { drizzle } from 'drizzle-orm/neon-http';
-import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
+import { neon, Pool } from '@neondatabase/serverless';
 import * as schema from './schema';
 import { logger } from '@/utils/logger';
 
@@ -8,9 +8,10 @@ const isBuilding =
   process.env.npm_lifecycle_event === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
-type Database = NeonHttpDatabase<typeof schema>;
+type Database = NeonDatabase<typeof schema>;
 
 let sqlClient: ReturnType<typeof neon> | null = null;
+let pool: Pool | null = null;
 let dbInstance: Database | null = null;
 
 function getSql() {
@@ -26,9 +27,20 @@ function getSql() {
   return sqlClient;
 }
 
+function getPool(): Pool {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('❌ DATABASE_URL is not set in environment variables');
+  }
+  if (!pool) {
+    // neon-http cannot run interactive transactions; Pool/WebSocket can.
+    pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+  }
+  return pool;
+}
+
 function getDb(): Database {
   if (!dbInstance) {
-    dbInstance = drizzle(getSql(), { schema }) as Database;
+    dbInstance = drizzle(getPool(), { schema });
   }
   return dbInstance;
 }

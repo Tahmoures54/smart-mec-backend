@@ -56,40 +56,44 @@ function html(title: string, message: string, ok: boolean, status = 200) {
   });
 }
 
-async function creditReferrerCommission(buyerUserId: number, purchaseAmount: number) {
-  try {
-    const buyer = await db.query.users.findFirst({
-      where: eq(users.id, buyerUserId),
-    });
-    if (!buyer?.referredBy) return;
-    const commission = computeReferralCommission(
-      purchaseAmount,
-      referralPercentage()
-    );
-    if (commission <= 0) return;
-    await db
-      .update(users)
-      .set({
-        earnings: sql`${users.earnings} + ${commission}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, buyer.referredBy));
-    logger.info(
-      `Referral commission: +${commission} Toman to user ${buyer.referredBy} from buyer ${buyerUserId}`
-    );
-  } catch (err) {
-    logger.error('Failed to credit referral commission', err);
-  }
+async function creditReferrerCommission(
+  tx: Pick<typeof db, 'query' | 'update'>,
+  buyerUserId: number,
+  purchaseAmount: number
+) {
+  const buyer = await tx.query.users.findFirst({
+    where: eq(users.id, buyerUserId),
+  });
+  if (!buyer?.referredBy) return;
+  const commission = computeReferralCommission(
+    purchaseAmount,
+    referralPercentage()
+  );
+  if (commission <= 0) return;
+  await tx
+    .update(users)
+    .set({
+      earnings: sql`${users.earnings} + ${commission}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, buyer.referredBy));
+  logger.info(
+    `Referral commission: +${commission} Toman to user ${buyer.referredBy} from buyer ${buyerUserId}`
+  );
 }
 
-async function grantProduct(userId: number, product: (typeof PRODUCTS)[ProductId]) {
-  const user = await db.query.users.findFirst({
+async function grantProduct(
+  tx: Pick<typeof db, 'query' | 'update'>,
+  userId: number,
+  product: (typeof PRODUCTS)[ProductId]
+) {
+  const user = await tx.query.users.findFirst({
     where: eq(users.id, userId),
   });
   if (!user) return;
 
   if (product.goldenDays) {
-    await db
+    await tx
       .update(users)
       .set({
         isGolden: true,
@@ -102,7 +106,7 @@ async function grantProduct(userId: number, product: (typeof PRODUCTS)[ProductId
   }
 
   if (product.credits) {
-    await db
+    await tx
       .update(users)
       .set({
         credits: sql`${users.credits} + ${product.credits}`,
@@ -219,15 +223,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const claimed = await db
-      .update(purchases)
-      .set({
-        status: 'completed',
-        refId: refId || (mock ? 'MOCK_REF' : null),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending')))
-      .returning({ id: purchases.id });
+    const claimed = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(purchases)
+        .set({
+          status: 'completed',
+          refId: refId || (mock ? 'MOCK_REF' : null),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending')))
+        .returning({ id: purchases.id });
+
+      if (rows.length === 0) {
+        return [];
+      }
+
+      await grantProduct(tx, purchase.userId, product);
+      await creditReferrerCommission(tx, purchase.userId, purchase.amount);
+      return rows;
+    });
 
     if (claimed.length === 0) {
       return html(
@@ -236,9 +250,6 @@ export async function GET(request: NextRequest) {
         true
       );
     }
-
-    await grantProduct(purchase.userId, product);
-    await creditReferrerCommission(purchase.userId, purchase.amount);
 
     logger.info(
       `✅ Payment Success: User ${purchase.userId} bought ${product.name}`

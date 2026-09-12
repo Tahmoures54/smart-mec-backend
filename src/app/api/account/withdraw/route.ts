@@ -55,33 +55,33 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('نام صاحب حساب الزامی است');
     }
 
-    const pending = await db.query.withdrawals.findFirst({
-      where: and(
-        eq(withdrawals.userId, user.id),
-        eq(withdrawals.status, 'pending')
-      ),
-    });
-    if (pending) {
-      throw new BadRequestError(
-        'یک درخواست برداشت در انتظار بررسی دارید. تا تعیین تکلیف صبر کنید.'
-      );
-    }
+    const row = await db.transaction(async (tx) => {
+      const pending = await tx.query.withdrawals.findFirst({
+        where: and(
+          eq(withdrawals.userId, user.id),
+          eq(withdrawals.status, 'pending')
+        ),
+      });
+      if (pending) {
+        throw new BadRequestError(
+          'یک درخواست برداشت در انتظار بررسی دارید. تا تعیین تکلیف صبر کنید.'
+        );
+      }
 
-    const deducted = await db
-      .update(users)
-      .set({
-        earnings: sql`${users.earnings} - ${amount}`,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(users.id, user.id), gte(users.earnings, amount)))
-      .returning({ earnings: users.earnings });
+      const deducted = await tx
+        .update(users)
+        .set({
+          earnings: sql`${users.earnings} - ${amount}`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(users.id, user.id), gte(users.earnings, amount)))
+        .returning({ earnings: users.earnings });
 
-    if (deducted.length === 0) {
-      throw new BadRequestError('موجودی درآمد شما کافی نیست');
-    }
+      if (deducted.length === 0) {
+        throw new BadRequestError('موجودی درآمد شما کافی نیست');
+      }
 
-    try {
-      const [row] = await db
+      const inserted = await tx
         .insert(withdrawals)
         .values({
           userId: user.id,
@@ -92,22 +92,15 @@ export async function POST(request: NextRequest) {
         })
         .returning();
 
-      return NextResponse.json({
-        success: true,
-        message:
-          'درخواست برداشت ثبت شد. پس از بررسی ادمین، واریز دستی انجام می‌شود.',
-        data: row,
-      });
-    } catch (insertError) {
-      await db
-        .update(users)
-        .set({
-          earnings: sql`${users.earnings} + ${amount}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, user.id));
-      throw insertError;
-    }
+      return inserted[0];
+    });
+
+    return NextResponse.json({
+      success: true,
+      message:
+        'درخواست برداشت ثبت شد. پس از بررسی ادمین، واریز دستی انجام می‌شود.',
+      data: row,
+    });
   } catch (error) {
     return handleError(error);
   }

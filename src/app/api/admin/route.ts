@@ -228,27 +228,29 @@ export async function POST(request: NextRequest) {
       if (!['paid', 'rejected'].includes(status)) {
         throw new BadRequestError('status باید paid یا rejected باشد');
       }
-      const w = await db.query.withdrawals.findFirst({
-        where: eq(withdrawals.id, Number(withdrawalId)),
+      await db.transaction(async (tx) => {
+        const w = await tx.query.withdrawals.findFirst({
+          where: eq(withdrawals.id, Number(withdrawalId)),
+        });
+        if (!w || w.status !== 'pending') {
+          throw new NotFoundError('درخواست برداشت یافت نشد یا قبلاً بررسی شده');
+        }
+        const claimed = await tx
+          .update(withdrawals)
+          .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
+          .where(and(eq(withdrawals.id, w.id), eq(withdrawals.status, 'pending')))
+          .returning({ id: withdrawals.id });
+        if (claimed.length === 0) {
+          throw new NotFoundError('درخواست برداشت یافت نشد یا قبلاً بررسی شده');
+        }
+        if (status === 'rejected') {
+          await tx
+            .update(users)
+            .set({ earnings: sql`${users.earnings} + ${w.amount}`, updatedAt: new Date() })
+            .where(eq(users.id, w.userId));
+        }
+        logger.info(`Admin resolved withdrawal ${w.id} -> ${status}`);
       });
-      if (!w || w.status !== 'pending') {
-        throw new NotFoundError('درخواست برداشت یافت نشد یا قبلاً بررسی شده');
-      }
-      const claimed = await db
-        .update(withdrawals)
-        .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
-        .where(and(eq(withdrawals.id, w.id), eq(withdrawals.status, 'pending')))
-        .returning({ id: withdrawals.id });
-      if (claimed.length === 0) {
-        throw new NotFoundError('درخواست برداشت یافت نشد یا قبلاً بررسی شده');
-      }
-      if (status === 'rejected') {
-        await db
-          .update(users)
-          .set({ earnings: sql`${users.earnings} + ${w.amount}`, updatedAt: new Date() })
-          .where(eq(users.id, w.userId));
-      }
-      logger.info(`Admin resolved withdrawal ${w.id} -> ${status}`);
       return NextResponse.json({ success: true, message: 'وضعیت بروزرسانی شد' });
     }
 
