@@ -172,18 +172,20 @@ def mix_audio(video: Path, out: Path) -> None:
         narr_filters.append(chain)
         labels.append(f"[n{i}]")
 
-    nmix = "".join(labels) + f"amix=inputs={len(labels)}:duration=first:dropout_transition=0:normalize=0[narr]"
-    # Duck score when narrator speaks, then blend.
+    nmix = "".join(labels) + f"amix=inputs={len(labels)}:duration=first:dropout_transition=0[narr]"
+    # Duck score when narrator speaks, then blend. asplit because a pad can be used once.
     fc = (
         ";".join(narr_filters)
         + ";"
         + nmix
         + ";"
-        + "[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.55[score]"
+        + "[narr]asplit=2[narr_sc][narr_mix]"
         + ";"
-        + "[score][narr]sidechaincompress=threshold=0.04:ratio=8:attack=30:release=650:makeup=2[ducked]"
+        + "[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.42[score]"
         + ";"
-        + "[ducked][narr]amix=inputs=2:duration=first:weights=0.85 1.15,alimiter=limit=0.95[a]"
+        + "[score][narr_sc]sidechaincompress=threshold=0.05:ratio=6:attack=40:release=500:makeup=3[ducked]"
+        + ";"
+        + "[ducked][narr_mix]amix=inputs=2:duration=first:weights=1 1.2,alimiter=limit=0.94[a]"
     )
     run(
         inputs
@@ -254,21 +256,30 @@ def main() -> None:
             shot_i += 1
 
     all_clips: list[Path] = [Path()] * len(jobs)
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        futs = {
-            pool.submit(render_shot, shot, scene, out, overlay, extra): (idx, out)
-            for idx, shot, scene, out, overlay, extra in jobs
-        }
-        for fut in as_completed(futs):
-            idx, out = futs[fut]
-            fut.result()
+    pending = [j for j in jobs if not j[3].exists()]
+    for idx, shot, scene, out, overlay, extra in jobs:
+        if out.exists():
             all_clips[idx] = out
-            print("shot ready", out.name)
+    if pending:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futs = {
+                pool.submit(render_shot, shot, scene, out, overlay, extra): (idx, out)
+                for idx, shot, scene, out, overlay, extra in pending
+            }
+            for fut in as_completed(futs):
+                idx, out = futs[fut]
+                fut.result()
+                all_clips[idx] = out
+                print("shot ready", out.name)
+    else:
+        print("reusing existing shots")
 
     silent = OUTPUT / "picture_silent.mp4"
-    concat_clips(all_clips, silent)
+    if not silent.exists():
+        concat_clips(all_clips, silent)
     faded = OUTPUT / "picture_faded.mp4"
-    fade_master(silent, faded, TOTAL_DURATION)
+    if not faded.exists():
+        fade_master(silent, faded, TOTAL_DURATION)
 
     hd = OUTPUT / "FARASAKOU_live_hot_tap_1080p_24fps.mp4"
     mix_audio(faded, hd)
