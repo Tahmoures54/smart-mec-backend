@@ -54,6 +54,23 @@ export interface Purchase {
   updatedAt?: string;
 }
 
+export type VehicleCategory =
+  | 'سواری'
+  | 'شاسی‌بلند'
+  | 'وانت'
+  | 'ون'
+  | 'مینی‌بوس'
+  | 'کامیون'
+  | 'اتوبوس'
+  | 'ماشین‌آلات سنگین'
+  | 'تراکتور'
+  | 'لیفتراک'
+  | 'جرثقیل'
+  | 'موتورسیکلت'
+  | 'اسکوتر'
+  | 'موتور برقی'
+  | 'سه چرخ';
+
 /** خودرو — سال ساخت توسط کاربر وارد می‌شود، نه از لیست ثابت */
 export interface Car {
   id: string | number;
@@ -63,6 +80,8 @@ export interface Car {
   year?: number | string;
   engine: string;
   gearbox?: string;
+  /** نوع وسیله برای فیلتر لیست و عیب‌یابی دقیق‌تر */
+  category?: VehicleCategory | string;
   commonIssues?: string | string[];
 }
 

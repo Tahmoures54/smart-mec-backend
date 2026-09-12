@@ -11,7 +11,7 @@ const ENDPOINTS = [
   { path: '/api/purchase', desc: 'ایجاد تراکنش PayPing' },
   { path: '/api/purchase/verify', desc: 'تأیید پرداخت (کال‌بک درگاه)' },
   { path: '/api/products', desc: 'لیست بسته‌های اعتبار و اشتراک طلایی' },
-  { path: '/api/cars', desc: 'لیست خودروها با جستجو' },
+  { path: '/api/cars', desc: 'لیست خودرو، موتورسیکلت و ماشین‌آلات (q, brand, category)' },
   { path: '/api/garages/nearby', desc: 'تعمیرگاه‌های نزدیک روی نقشه' },
   { path: '/api/feedback', desc: 'امتیاز به نتیجه عیب‌یابی' },
   { path: '/cars.json', desc: 'فایل استاتیک خودروها برای اپ فلاتر' },
@@ -20,7 +20,9 @@ const ENDPOINTS = [
 
 export default function Home() {
   const productCount = Object.keys(PRODUCTS).length;
-  const carCount = Array.isArray(carsData) ? carsData.length : 0;
+  const cars = Array.isArray(carsData) ? (carsData as { category?: string }[]) : [];
+  const carCount = cars.length;
+  const categoryCount = new Set(cars.map((c) => c.category).filter(Boolean)).size;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 py-12" dir="rtl">
@@ -36,7 +38,7 @@ export default function Home() {
           <h2 className="text-xl font-semibold mb-4 text-orange-400">کاتالوگ</h2>
           <ul className="space-y-2 text-gray-300">
             <li>محصولات فروش: {productCount} بسته</li>
-            <li>خودروهای پشتیبانی‌شده: {carCount} مدل</li>
+            <li>وسایل پشتیبانی‌شده: {carCount} مدل در {categoryCount} دسته</li>
             <li>
               نسخه API:{' '}
               <code dir="ltr" className="text-orange-300 bg-gray-900 px-1 rounded">

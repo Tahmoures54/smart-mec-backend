@@ -24,7 +24,9 @@ export function buildCarDetails(
     ? car.commonIssues.join('، ')
     : car.commonIssues ?? 'نامشخص';
 
-  return `برند: ${car.brand}\nمدل: ${car.model}\nسال ساخت (اعلام کاربر): ${year}\nموتور: ${car.engine}\nگیربکس: ${car.gearbox ?? 'نامشخص'}\nمشکلات شایع: ${issues}`;
+  const categoryLine = car.category ? `\nنوع وسیله: ${car.category}` : '';
+
+  return `برند: ${car.brand}\nمدل: ${car.model}${categoryLine}\nسال ساخت (اعلام کاربر): ${year}\nموتور: ${car.engine}\nگیربکس: ${car.gearbox ?? 'نامشخص'}\nمشکلات شایع: ${issues}`;
 }
 
 export function storedCarId(
