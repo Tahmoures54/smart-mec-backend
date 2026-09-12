@@ -1,23 +1,11 @@
-// GET /api/garages/nearby
-// Query: lat, lng, radius, limit, featured, openNow, q, specialties
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { garages } from '@/db/schema';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { logger } from '@/utils/logger';
-
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { boundingBox, haversineMeters } from '@/lib/geo';
+import { compareGarages, toPublicGarage } from '@/lib/garage-dto';
 
 function parseBool(v: string | null): boolean {
   if (!v) return false;
@@ -45,19 +33,13 @@ export async function GET(request: NextRequest) {
       throw new BadRequestError('مختصات نامعتبر است');
     }
 
-    const deg = radius / 111000;
-    const minLat = lat - deg;
-    const maxLat = lat + deg;
-    const cosLat = Math.max(Math.cos((lat * Math.PI) / 180), 0.2);
-    const minLng = lng - deg / cosLat;
-    const maxLng = lng + deg / cosLat;
-
+    const box = boundingBox(lat, lng, radius);
     const conditions = [
       eq(garages.isActive, true),
-      gte(garages.lat, minLat),
-      lte(garages.lat, maxLat),
-      gte(garages.lng, minLng),
-      lte(garages.lng, maxLng),
+      gte(garages.lat, box.minLat),
+      lte(garages.lat, box.maxLat),
+      gte(garages.lng, box.minLng),
+      lte(garages.lng, box.maxLng),
     ];
 
     if (featuredOnly) conditions.push(eq(garages.isFeatured, true));
@@ -65,38 +47,13 @@ export async function GET(request: NextRequest) {
 
     const rows = await db.select().from(garages).where(and(...conditions)).limit(500);
 
-    let results = rows.map((g) => {
-      const distanceMeters = haversineMeters(lat, lng, g.lat, g.lng);
-      const specialties = (g.specialties || '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
+    let results = rows.map((g) =>
+      toPublicGarage(g, {
+        distanceMeters: Math.round(haversineMeters(lat, lng, g.lat, g.lng)),
+      })
+    );
 
-      return {
-        id: String(g.id),
-        name: g.name,
-        address: g.address,
-        phone: g.phone,
-        lat: g.lat,
-        lng: g.lng,
-        rating: g.rating,
-        userRatingsTotal: g.reviewsCount ?? 0,
-        reviewsCount: g.reviewsCount ?? 0,
-        specialties,
-        photoUrl: g.photoUrl,
-        website: g.website,
-        description: g.description,
-        isOpen: g.isOpen,
-        isFeatured: g.isFeatured,
-        isVerified: g.isVerified,
-        subscriptionTier: g.subscriptionTier || 'free',
-        subscriptionExpiresAt: g.subscriptionExpiresAt,
-        city: g.city,
-        distanceMeters: Math.round(distanceMeters),
-      };
-    });
-
-    results = results.filter((g) => g.distanceMeters <= radius);
+    results = results.filter((g) => (g.distanceMeters ?? Infinity) <= radius);
 
     if (q) {
       const qq = q.toLowerCase();
@@ -120,14 +77,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const tierRank = (t: string) => (t === 'gold' ? 3 : t === 'silver' ? 2 : 1);
-    results.sort((a, b) => {
-      const tr = tierRank(b.subscriptionTier || 'free') - tierRank(a.subscriptionTier || 'free');
-      if (tr !== 0) return tr;
-      if (a.isFeatured !== b.isFeatured) return a.isFeatured ? -1 : 1;
-      return a.distanceMeters - b.distanceMeters;
-    });
-
+    results.sort(compareGarages);
     results = results.slice(0, limit);
 
     logger.info(`[garages/nearby] lat=${lat} lng=${lng} radius=${radius} → ${results.length}`);

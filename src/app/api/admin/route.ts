@@ -8,8 +8,9 @@ import {
   withdrawals,
   diagnostics,
   garages,
+  feedbacks,
 } from '@/db/schema';
-import { eq, desc, sql, like, or } from 'drizzle-orm';
+import { eq, desc, sql, like, or, and } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/auth';
 import { handleError, BadRequestError, NotFoundError } from '@/lib/error-handler';
 import { logger } from '@/utils/logger';
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
           active: sql<number>`coalesce(sum(case when is_active then 1 else 0 end),0)`,
         })
         .from(garages);
+      const feedbackCount = await db
+        .select({ c: sql<number>`count(*)` })
+        .from(feedbacks);
 
       return NextResponse.json({
         success: true,
@@ -56,12 +60,13 @@ export async function GET(request: NextRequest) {
           garages: Number(garageStats[0]?.total ?? 0),
           garagesFeatured: Number(garageStats[0]?.featured ?? 0),
           garagesActive: Number(garageStats[0]?.active ?? 0),
+          feedback: Number(feedbackCount[0]?.c ?? 0),
         },
       });
     }
 
     if (section === 'users') {
-      const q = url.searchParams.get('q')?.trim() || '';
+      const q = (url.searchParams.get('q')?.trim() || '').replace(/[%_]/g, '');
       let list;
       if (q) {
         list = await db.query.users.findMany({
@@ -135,6 +140,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: list });
     }
 
+    if (section === 'diagnostics') {
+      const list = await db
+        .select({
+          id: diagnostics.id,
+          userId: diagnostics.userId,
+          phone: users.phone,
+          carId: diagnostics.carId,
+          description: diagnostics.description,
+          result: diagnostics.result,
+          createdAt: diagnostics.createdAt,
+        })
+        .from(diagnostics)
+        .leftJoin(users, eq(diagnostics.userId, users.id))
+        .orderBy(desc(diagnostics.createdAt))
+        .limit(50);
+
+      const data = list.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        phone: row.phone,
+        carId: row.carId,
+        description: (row.description || '').slice(0, 180),
+        resultPreview: (row.result || '').slice(0, 220),
+        createdAt: row.createdAt,
+      }));
+      return NextResponse.json({ success: true, data });
+    }
+
     if (section === 'garages') {
       const q = url.searchParams.get('q')?.trim() || '';
       const rows = await db
@@ -201,16 +234,20 @@ export async function POST(request: NextRequest) {
       if (!w || w.status !== 'pending') {
         throw new NotFoundError('درخواست برداشت یافت نشد یا قبلاً بررسی شده');
       }
+      const claimed = await db
+        .update(withdrawals)
+        .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
+        .where(and(eq(withdrawals.id, w.id), eq(withdrawals.status, 'pending')))
+        .returning({ id: withdrawals.id });
+      if (claimed.length === 0) {
+        throw new NotFoundError('درخواست برداشت یافت نشد یا قبلاً بررسی شده');
+      }
       if (status === 'rejected') {
         await db
           .update(users)
           .set({ earnings: sql`${users.earnings} + ${w.amount}`, updatedAt: new Date() })
           .where(eq(users.id, w.userId));
       }
-      await db
-        .update(withdrawals)
-        .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
-        .where(eq(withdrawals.id, w.id));
       logger.info(`Admin resolved withdrawal ${w.id} -> ${status}`);
       return NextResponse.json({ success: true, message: 'وضعیت بروزرسانی شد' });
     }

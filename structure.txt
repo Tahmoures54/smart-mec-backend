@@ -5,58 +5,49 @@ smart-mec-backend:
 |   next.config.ts
 |   package.json
 |   postcss.config.mjs
-|   structure.txt
+|   README.md
 |   tsconfig.json
-|   .env
-|   
+|   vitest.config.ts
+|   vercel.json
+|
 +---public
 |       cars.json
-|       
+|
 \---src
     |   middleware.ts
-    |   
+    |
     +---app
     |   |   globals.css
     |   |   layout.tsx
     |   |   page.tsx
-    |   |   
+    |   |
+    |   +---admin
+    |   |       page.tsx
+    |   |
     |   \---api
     |       +---account
     |       |   |   route.ts
-    |       |   |   
-    |       |   \---credits
-    |       |           route.ts
-    |       |           
+    |       |   +---credits
+    |       |   \---withdraw
+    |       +---admin
+    |       +---cars
     |       +---diagnose
-    |       |       route.ts
-    |       |       
+    |       |   +---audio
+    |       |   \---[id]
+    |       +---feedback
+    |       +---garages
+    |       |   +---nearby
+    |       |   \---[id]
     |       +---health
-    |       |       route.ts
-    |       |       
+    |       +---products
     |       \---purchase
-    |           |   route.ts
-    |           |   
     |           \---verify
-    |                   route.ts
-    |                   
+    |
     +---data
     |       cars.json
-    |       
     +---db
     |       index.ts
     |       schema.ts
-    |       
     +---lib
-    |       auth.ts
-    |       error-handler.ts
-    |       rate-limiter.ts
-    |       sms.ts
-    |       validation.ts
-    |       
     +---types
-    |       index.ts
-    |       
     \---utils
-            backup.ts
-            logger.ts
-            

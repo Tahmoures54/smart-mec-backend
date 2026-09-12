@@ -1,21 +1,10 @@
-// GET /api/garages/:id
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { garages } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { handleError, BadRequestError, NotFoundError } from '@/lib/error-handler';
-
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { haversineMeters } from '@/lib/geo';
+import { toPublicGarage } from '@/lib/garage-dto';
 
 export async function GET(
   request: NextRequest,
@@ -44,34 +33,12 @@ export async function GET(
       distanceMeters = Math.round(haversineMeters(userLat, userLng, g.lat, g.lng));
     }
 
-    const specialties = (g.specialties || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const dto = toPublicGarage(g, { distanceMeters });
 
     return NextResponse.json({
       success: true,
       data: {
-        id: String(g.id),
-        name: g.name,
-        address: g.address,
-        phone: g.phone,
-        lat: g.lat,
-        lng: g.lng,
-        rating: g.rating,
-        userRatingsTotal: g.reviewsCount ?? 0,
-        reviewsCount: g.reviewsCount ?? 0,
-        specialties,
-        photoUrl: g.photoUrl,
-        website: g.website,
-        description: g.description,
-        isOpen: g.isOpen,
-        isFeatured: g.isFeatured,
-        isVerified: g.isVerified,
-        subscriptionTier: g.subscriptionTier || 'free',
-        subscriptionExpiresAt: g.subscriptionExpiresAt,
-        city: g.city,
-        distanceMeters,
+        ...dto,
         openingHours: [],
         photos: g.photoUrl ? [g.photoUrl] : [],
       },

@@ -1,11 +1,10 @@
-// GET  /api/garages — لیست
-// POST /api/garages — افزودن (توکن ادمین سیستم)
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { garages } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { and, desc, eq, ilike } from 'drizzle-orm';
 import { handleError, BadRequestError, UnauthorizedError } from '@/lib/error-handler';
+import { toPublicGarage } from '@/lib/garage-dto';
+import { normalizeGarageTier } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,31 +13,23 @@ export async function GET(request: NextRequest) {
     const city = (searchParams.get('city') || '').trim();
     const limit = Math.min(Math.max(Number(searchParams.get('limit') || 50), 1), 200);
 
+    const conditions = [eq(garages.isActive, true)];
+    if (city) {
+      conditions.push(ilike(garages.city, `%${city}%`));
+    }
+
     const rows = await db
       .select()
       .from(garages)
-      .where(eq(garages.isActive, true))
+      .where(and(...conditions))
       .orderBy(desc(garages.isFeatured), desc(garages.id))
       .limit(limit);
 
-    const filtered = city ? rows.filter((g) => (g.city || '').includes(city)) : rows;
-
-    const data = filtered.map((g) => ({
-      id: String(g.id),
-      name: g.name,
-      address: g.address,
-      phone: g.phone,
-      lat: g.lat,
-      lng: g.lng,
-      rating: g.rating,
-      userRatingsTotal: g.reviewsCount ?? 0,
-      specialties: (g.specialties || '').split(',').map((s) => s.trim()).filter(Boolean),
-      photoUrl: g.photoUrl,
-      isOpen: g.isOpen,
-      isFeatured: g.isFeatured,
-      isVerified: g.isVerified,
-      city: g.city,
-    }));
+    const data = rows.map((g) => {
+      const { distanceMeters, ...rest } = toPublicGarage(g);
+      void distanceMeters;
+      return rest;
+    });
 
     return NextResponse.json({ success: true, data, meta: { count: data.length } });
   } catch (error) {
@@ -88,6 +79,10 @@ export async function POST(request: NextRequest) {
         isFeatured: Boolean(body.isFeatured),
         isVerified: Boolean(body.isVerified),
         isActive: body.isActive !== false,
+        subscriptionTier: normalizeGarageTier(body.subscriptionTier),
+        subscriptionExpiresAt: body.subscriptionExpiresAt
+          ? String(body.subscriptionExpiresAt)
+          : null,
         city: body.city ? String(body.city) : null,
       })
       .returning();
@@ -103,6 +98,7 @@ export async function POST(request: NextRequest) {
           lng: g.lng,
           isFeatured: g.isFeatured,
           isVerified: g.isVerified,
+          subscriptionTier: g.subscriptionTier || 'free',
         },
       },
       { status: 201 }

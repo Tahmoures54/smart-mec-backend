@@ -161,9 +161,36 @@ async function ensureTables() {
       );
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS feedbacks (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) NOT NULL,
+        diagnostic_id INTEGER REFERENCES diagnostics(id),
+        rating INTEGER NOT NULL,
+        comment TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+
     await sql`CREATE INDEX IF NOT EXISTS idx_garages_lat_lng ON garages (lat, lng);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_garages_active ON garages (is_active);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_garages_featured ON garages (is_featured);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_garages_city ON garages (city);`;
+    try {
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_golden_usage_user_month ON golden_usage (user_id, year_month);`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_monthly_free_usage_user_month ON monthly_free_usage (user_id, year_month);`;
+    } catch (indexErr) {
+      logger.warn('Could not create unique usage indexes (possible duplicates)', indexErr);
+    }
+    await sql`CREATE INDEX IF NOT EXISTS idx_diagnostics_user_id ON diagnostics (user_id);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_diagnostics_created_at ON diagnostics (created_at);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases (user_id);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases (status);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals (user_id);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals (status);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps (phone);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users (referred_by);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_feedbacks_user_id ON feedbacks (user_id);`;
 
     try {
       const countResult = await sql`SELECT COUNT(*)::int AS c FROM garages;`;
@@ -223,6 +250,13 @@ export function ensureDbReady(): Promise<void> {
     tablesReady = ensureTables();
   }
   return tablesReady;
+}
+
+export async function pingDb(): Promise<number> {
+  const started = Date.now();
+  await ensureDbReady();
+  await getSql()`select 1 as ok`;
+  return Date.now() - started;
 }
 
 if (!isBuilding) {
