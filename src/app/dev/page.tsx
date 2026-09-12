@@ -2,8 +2,7 @@ import Link from 'next/link';
 import { PRODUCTS } from '@/types';
 import carsData from '@/data/cars.json';
 import { HealthPanel } from '../health-panel';
-import { SiteFooter } from '../_components/site-footer';
-import { SiteHeader } from '../_components/site-header';
+import { SiteShell } from '../_components/site-shell';
 
 export const metadata = {
   title: 'وضعیت سرویس',
@@ -30,8 +29,7 @@ export default function DevStatusPage() {
   const carCount = Array.isArray(carsData) ? carsData.length : 0;
 
   return (
-    <div className="min-h-screen text-white">
-      <SiteHeader />
+    <SiteShell>
       <main className="mx-auto flex max-w-3xl flex-col items-center px-4 py-12">
         <p className="mb-2 text-sm text-amber-200/70">صفحه فنی سرویس</p>
         <h1 className="mb-3 text-4xl font-bold text-orange-500">وضعیت و API</h1>
@@ -83,7 +81,6 @@ export default function DevStatusPage() {
           </ul>
         </div>
       </main>
-      <SiteFooter />
-    </div>
+    </SiteShell>
   );
 }

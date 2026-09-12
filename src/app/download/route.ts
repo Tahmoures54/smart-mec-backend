@@ -3,6 +3,13 @@ import { primaryDownloadHref } from '@/lib/site';
 
 export function GET(request: Request) {
   const href = primaryDownloadHref();
-  const target = href.startsWith('http') ? href : new URL(href, request.url).toString();
-  return NextResponse.redirect(target);
+  if (href.startsWith('http://') || href.startsWith('https://')) {
+    return NextResponse.redirect(href);
+  }
+
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const host = forwardedHost || request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') || new URL(request.url).protocol.replace(/:$/, '');
+  const base = host ? `${proto}://${host}` : request.url;
+  return NextResponse.redirect(new URL(href, base).toString());
 }

@@ -1,5 +1,4 @@
-import { SiteFooter } from '../_components/site-footer';
-import { SiteHeader } from '../_components/site-header';
+import { SiteShell } from '../_components/site-shell';
 import { SITE } from '@/lib/site';
 
 export const metadata = {
@@ -9,8 +8,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen text-white">
-      <SiteHeader />
+    <SiteShell>
       <article className="mx-auto max-w-2xl px-4 py-16 leading-8 text-amber-100/85">
         <h1 className="text-3xl font-bold text-white">سیاست حریم خصوصی</h1>
         <p className="mt-2 text-sm text-amber-100/50">آخرین به‌روزرسانی: مرداد ۱۴۰۴</p>
@@ -34,7 +32,6 @@ export default function PrivacyPage() {
           پیام بدهید.
         </p>
       </article>
-      <SiteFooter />
-    </div>
+    </SiteShell>
   );
 }

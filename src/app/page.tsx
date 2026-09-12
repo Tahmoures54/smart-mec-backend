@@ -2,8 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import carsData from '@/data/cars.json';
 import { SITE, getDownloadLinks } from '@/lib/site';
-import { SiteFooter } from './_components/site-footer';
-import { SiteHeader } from './_components/site-header';
+import { SiteShell } from './_components/site-shell';
 
 const FEATURES = [
   {
@@ -100,9 +99,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen text-white">
+    <SiteShell>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <SiteHeader />
 
       <main>
         <section className="hero-grid relative overflow-hidden">
@@ -280,8 +278,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-
-      <SiteFooter />
-    </div>
+    </SiteShell>
   );
 }
