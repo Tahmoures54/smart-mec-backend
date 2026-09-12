@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FARASAKOU — اتصال زنده در ساحل خلیج فارس</title>
+  <style>
+    :root {
+      --navy: #070e18;
+      --gold: #c9a227;
+      --paper: #f4efe4;
+      --muted: #b7c0c9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Naskh Arabic", "Noto Sans", Georgia, serif;
+      background: radial-gradient(1200px 600px at 70% -10%, #16324d 0%, var(--navy) 45%);
+      color: var(--paper);
+    }
+    header {
+      padding: 48px 8vw 24px;
+      border-bottom: 1px solid rgba(201,162,39,.35);
+    }
+    .brand { letter-spacing: .28em; color: var(--gold); font-family: "Noto Sans", sans-serif; font-size: 13px; }
+    h1 { font-size: clamp(28px, 4vw, 52px); margin: 12px 0 8px; font-weight: 700; }
+    .sub { color: var(--muted); max-width: 720px; line-height: 1.9; }
+    main { padding: 32px 8vw 80px; }
+    video {
+      width: 100%;
+      max-width: 1100px;
+      display: block;
+      background: #000;
+      border: 1px solid rgba(201,162,39,.25);
+    }
+    .meta { margin: 10px 0 36px; color: var(--gold); font-family: "Noto Sans", sans-serif; font-size: 13px; letter-spacing: .08em; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 18px;
+    }
+    figure {
+      margin: 0;
+      background: rgba(0,0,0,.28);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    figure img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+    figcaption { padding: 10px 12px 14px; font-size: 14px; color: var(--muted); }
+    figcaption strong { color: var(--paper); display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">FARASAKOU / فراسکو عسلویه</div>
+    <h1>اتصال زنده در ساحل خلیج فارس</h1>
+    <p class="sub">
+      مستند صنعتی سه‌دقیقه‌ای درباره هات‌تپ خط ۳۶ اینچ سراسری کندنسات در منتهی‌الیه زاگرس و ساحل خلیج فارس؛
+      عملیات روی خط در حال سرویس، بدون توقف، بدون نشت و با رعایت کامل HSE.
+    </p>
+  </header>
+  <main>
+    <video controls playsinline poster="assets/stills/real_harbor_dji.jpg">
+      <source src="output/FARASAKOU_live_hot_tap_1080p_24fps.mp4" type="video/mp4" />
+    </video>
+    <p class="meta">03:00 · 16:9 · 24 fps · 1080p / 4K · Safe Hot Tap, No Shutdown</p>
+    <div class="grid">
+      <figure>
+        <img src="assets/stills/real_harbor_dji.jpg" alt="بندر واقعی فراسکو عسلویه" />
+        <figcaption><strong>صحنه ۱</strong> عکس رسمی بندر فراسکو از apc.co.ir؛ زاگرس و نفتکش از بازدید سایت</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/real_tanks_farm.jpg" alt="مخازن واقعی فراسکو" />
+        <figcaption><strong>صحنه ۲</strong> مخازن واقعی شرکت و پلان بندر فراسکو</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene03_pipe_cutaway_condensate.jpg" alt="برش داخل لوله" />
+        <figcaption><strong>صحنه ۳</strong> تصویرسازی فنی خط زنده (هات‌تپ در گالری عمومی نیست)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene04_hse_crew_site_prep.jpg" alt="آماده‌سازی HSE" />
+        <figcaption><strong>صحنه ۴</strong> آماده‌سازی HSE</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene05c_hot_tap_machine_on_flange.jpg" alt="دستگاه هات‌تپ" />
+        <figcaption><strong>صحنه ۵</strong> اسپلیت‌تی، شیر و دستگاه هیدرولیک</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/scene06_pilot_drill_live_cut.jpg" alt="برش زنده" />
+        <figcaption><strong>صحنه ۶</strong> برش زنده و خروج کاپون</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/real_night_loading.jpg" alt="بارانداز شب فراسکو" />
+        <figcaption><strong>صحنه ۷</strong> بارانداز و مخازن واقعی فراسکو</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/stills/real_title_logo.jpg" alt="لوگوی رسمی فراسکو" />
+        <figcaption><strong>صحنه ۸</strong> لوگوی رسمی FARASAKOU Assaluyeh Co.</figcaption>
+      </figure>
+    </div>
+  </main>
+</body>
+</html>
