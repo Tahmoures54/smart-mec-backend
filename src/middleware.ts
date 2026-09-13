@@ -7,13 +7,55 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { applyCorsHeaders } from '@/lib/cors';
 import { isProtectedApiPath } from '@/lib/api-guard';
+import { ENAMAD_PASS_HEADER, injectEnamadMeta, isEnamadCrawler } from '@/lib/enamad';
 
 function withCors(request: NextRequest, response: NextResponse): NextResponse {
   applyCorsHeaders(request, response);
   return response;
 }
 
+async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
+  if (request.headers.get(ENAMAD_PASS_HEADER) === '1') {
+    return NextResponse.next();
+  }
+
+  if (isEnamadCrawler(request.headers.get('user-agent'))) {
+    return NextResponse.rewrite(new URL('/enamad-verify', request.url));
+  }
+
+  try {
+    const headers = new Headers(request.headers);
+    headers.set(ENAMAD_PASS_HEADER, '1');
+    const originRes = await fetch(request.nextUrl, {
+      method: 'GET',
+      headers,
+      redirect: 'manual',
+    });
+    const contentType = originRes.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) {
+      return new NextResponse(originRes.body, {
+        status: originRes.status,
+        headers: originRes.headers,
+      });
+    }
+    const html = injectEnamadMeta(await originRes.text());
+    const out = new Headers(originRes.headers);
+    out.delete('content-encoding');
+    out.delete('content-length');
+    return new NextResponse(html, { status: originRes.status, headers: out });
+  } catch {
+    return NextResponse.next();
+  }
+}
+
 export async function middleware(request: NextRequest) {
+  if (
+    request.nextUrl.pathname === '/' &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  ) {
+    return withEnamadHomepage(request);
+  }
+
   if (request.method === 'OPTIONS') {
     return withCors(request, new NextResponse(null, { status: 204 }));
   }
@@ -67,5 +109,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/', '/api/:path*'],
 };
