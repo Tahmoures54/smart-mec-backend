@@ -14,7 +14,13 @@ jobs:
           node-version: "22"
       - name: update-liara
         env:
-          LIARA_TOKEN: ${{ secrets.LIARA_API_TOKEN }}
+          LIARA_API_TOKEN: ${{ secrets.LIARA_API_TOKEN }}
         run: |
+          TOKEN="$(printf '%s' "$LIARA_API_TOKEN" | tr -d '\r\n[:space:]')"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret LIARA_API_TOKEN is empty. In GitHub: Settings → Secrets and variables → Actions → New repository secret. Name must be exactly LIARA_API_TOKEN. Value is the API key from Liara console → API → New key."
+            exit 1
+          fi
+          echo "LIARA_API_TOKEN is set (${#TOKEN} characters)."
           npm i -g @liara/cli@9
-          liara deploy --app="smart-mec" --port=3000 --api-token="$LIARA_TOKEN" --no-app-logs
+          liara deploy --app="smart-mec" --platform=next --port=3000 --api-token="$TOKEN" --no-app-logs
