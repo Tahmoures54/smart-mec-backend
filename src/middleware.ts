@@ -7,7 +7,13 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { applyCorsHeaders } from '@/lib/cors';
 import { isProtectedApiPath } from '@/lib/api-guard';
-import { ENAMAD_PASS_HEADER, isEnamadCrawler } from '@/lib/enamad';
+import {
+  ENAMAD_FILE_BODY,
+  ENAMAD_FILE_PATH,
+  ENAMAD_PASS_HEADER,
+  enamadFileHeaders,
+  isEnamadCrawler,
+} from '@/lib/enamad';
 
 function withCors(request: NextRequest, response: NextResponse): NextResponse {
   applyCorsHeaders(request, response);
@@ -33,6 +39,16 @@ async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function middleware(request: NextRequest) {
+  if (
+    request.nextUrl.pathname === ENAMAD_FILE_PATH &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  ) {
+    return new NextResponse(ENAMAD_FILE_BODY, {
+      status: 200,
+      headers: enamadFileHeaders(),
+    });
+  }
+
   if (
     request.nextUrl.pathname === '/' &&
     (request.method === 'GET' || request.method === 'HEAD')
@@ -93,5 +109,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/api/:path*'],
+  matcher: ['/', '/24876525.txt', '/api/:path*'],
 };

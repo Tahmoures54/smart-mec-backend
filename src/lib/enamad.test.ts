@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -6,7 +6,7 @@ import {
   ENAMAD_FILE_NAME,
   ENAMAD_META_GUIDE,
   ENAMAD_META_TAG,
-  emptyEnamadFileResponse,
+  enamadFileResponse,
   enamadVerifyHtml,
   injectEnamadMeta,
   isEnamadCrawler,
@@ -51,21 +51,19 @@ describe('Enamad homepage meta tag', () => {
     expect(html.indexOf(ENAMAD_META_GUIDE)).toBeLessThan(html.indexOf('<title>'));
   });
 
-  it('exposes an empty Enamad verification file at the site root', () => {
+  it('exposes the Enamad verification file at the site root', () => {
     const filePath = path.join(process.cwd(), 'public', ENAMAD_FILE_NAME);
-    const info = statSync(filePath);
-    const body = readFileSync(filePath);
+    const body = readFileSync(filePath, 'utf8');
 
-    expect(info.size).toBe(0);
-    expect(body.length).toBe(0);
-    expect(ENAMAD_FILE_BODY).toBe('');
+    expect(body).toBe('24876525');
+    expect(ENAMAD_FILE_BODY).toBe('24876525');
   });
 
-  it('returns HTTP 200 with Content-Length 0 for the verification file', async () => {
-    const response = emptyEnamadFileResponse();
+  it('returns HTTP 200 with the verification code as the file body', async () => {
+    const response = enamadFileResponse();
     expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('text/plain');
-    expect(response.headers.get('Content-Length')).toBe('0');
-    expect(await response.text()).toBe('');
+    expect(response.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
+    expect(response.headers.get('Content-Length')).toBe('8');
+    expect(await response.text()).toBe('24876525');
   });
 });

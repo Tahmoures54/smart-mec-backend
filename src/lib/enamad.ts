@@ -2,9 +2,12 @@ export const ENAMAD_CODE = '24876525';
 
 export const ENAMAD_FILE_NAME = `${ENAMAD_CODE}.txt`;
 export const ENAMAD_FILE_PATH = `/${ENAMAD_FILE_NAME}`;
-/** Enamad asks for an empty file (`فایل خالی`). */
-export const ENAMAD_FILE_BODY = '';
-export const ENAMAD_FILE_CONTENT_TYPE = 'text/plain';
+/**
+ * Enamad’s UI says «فایل خالی», but its checker treats an empty body as
+ * «صفحه بارگذاری نشده». Serve the verification code at /24876525.txt.
+ */
+export const ENAMAD_FILE_BODY = ENAMAD_CODE;
+export const ENAMAD_FILE_CONTENT_TYPE = 'text/plain; charset=utf-8';
 
 /** Exact markup from Enamad’s rejection message. */
 export const ENAMAD_META_TAG = `<meta name="enamad" content ="${ENAMAD_CODE}"/>`;
@@ -38,19 +41,19 @@ export function isEnamadCrawler(
   return false;
 }
 
-export function emptyEnamadFileHeaders(): HeadersInit {
+export function enamadFileHeaders(): HeadersInit {
   return {
     'Content-Type': ENAMAD_FILE_CONTENT_TYPE,
-    'Content-Length': '0',
+    'Content-Length': String(ENAMAD_FILE_BODY.length),
     'Cache-Control': 'no-store, no-cache, must-revalidate',
     'X-Content-Type-Options': 'nosniff',
   };
 }
 
-export function emptyEnamadFileResponse(): Response {
-  return new Response(null, {
+export function enamadFileResponse(): Response {
+  return new Response(ENAMAD_FILE_BODY, {
     status: 200,
-    headers: emptyEnamadFileHeaders(),
+    headers: enamadFileHeaders(),
   });
 }
 
