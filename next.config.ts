@@ -36,6 +36,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: '/24876525.txt',
+        headers: [
+          { key: 'Content-Type', value: 'text/plain' },
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
+        ],
+      },
+      {
         source: '/downloads/:file*.apk',
         headers: [
           { key: 'Content-Type', value: 'application/vnd.android.package-archive' },

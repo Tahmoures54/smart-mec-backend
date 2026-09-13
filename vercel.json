@@ -1,5 +1,14 @@
 {
   "framework": "nextjs",
   "regions": ["fra1"],
-  "buildCommand": "next build && node scripts/inject-enamad-meta.mjs"
+  "buildCommand": "next build && node scripts/inject-enamad-meta.mjs",
+  "headers": [
+    {
+      "source": "/24876525.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain" },
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
+    }
+  ]
 }

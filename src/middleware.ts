@@ -7,7 +7,12 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { applyCorsHeaders } from '@/lib/cors';
 import { isProtectedApiPath } from '@/lib/api-guard';
-import { ENAMAD_PASS_HEADER, isEnamadCrawler } from '@/lib/enamad';
+import {
+  ENAMAD_FILE_PATH,
+  ENAMAD_PASS_HEADER,
+  emptyEnamadFileHeaders,
+  isEnamadCrawler,
+} from '@/lib/enamad';
 
 function withCors(request: NextRequest, response: NextResponse): NextResponse {
   applyCorsHeaders(request, response);
@@ -20,7 +25,12 @@ async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
   }
 
   // Enamad’s PHP checker cannot parse the Next.js document. Give it a tiny valid page.
-  if (isEnamadCrawler(request.headers.get('user-agent'))) {
+  if (
+    isEnamadCrawler(
+      request.headers.get('user-agent'),
+      request.headers.get('accept')
+    )
+  ) {
     return NextResponse.rewrite(new URL('/enamad-verify', request.url));
   }
 
@@ -28,6 +38,16 @@ async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function middleware(request: NextRequest) {
+  if (
+    request.nextUrl.pathname === ENAMAD_FILE_PATH &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  ) {
+    return new NextResponse(null, {
+      status: 200,
+      headers: emptyEnamadFileHeaders(),
+    });
+  }
+
   if (
     request.nextUrl.pathname === '/' &&
     (request.method === 'GET' || request.method === 'HEAD')
@@ -88,5 +108,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/api/:path*'],
+  matcher: ['/', '/24876525.txt', '/api/:path*'],
 };
