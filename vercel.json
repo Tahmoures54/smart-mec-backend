@@ -1,4 +1,5 @@
 {
   "framework": "nextjs",
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "buildCommand": "next build && node scripts/inject-enamad-meta.mjs"
 }
