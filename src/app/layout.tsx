@@ -39,6 +39,9 @@ export const metadata: Metadata = {
     description: SITE.description,
     images: ['/branding/banner.png'],
   },
+  other: {
+    enamad: '24876525',
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
