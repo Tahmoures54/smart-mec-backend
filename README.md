@@ -9,7 +9,7 @@
 برنامه Next.js روی پلتفرم `next` لیارا با `liara.json` تنظیم شده است. متغیرهای `.env.example` را در کنسول لیارا وارد کنید، بعد یکی از این دو:
 
 - کنسول لیارا → استقرار جدید (GitHub یا آپلود)
-- یا در GitHub یک Secret به نام `LIARA_API_TOKEN` بگذارید تا workflow `Deploy Liara` روی `main` دیپلوی کند
+- یا در GitHub یک Secret به نام `LIARA_API_TOKEN` بگذارید تا workflow `CD-Liara` (`.github/workflows/liara.yaml`) روی `main` دیپلوی کند
 
 دامنه `smart-mec.ir` را در لیارا → دامنه‌ها اضافه کنید. ابر آروان را برای `@` و `www` **خاموش** کنید و رکوردهایی که لیارا می‌دهد (ALIAS/CNAME و TXT) را جایگزین A فعلی Vercel کنید. اینماد دامنه `.liara.run` را قبول نمی‌کند؛ باید روی `smart-mec.ir` باشد.
 
