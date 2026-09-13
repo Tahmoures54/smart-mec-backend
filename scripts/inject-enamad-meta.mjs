@@ -1,7 +1,8 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const TAG = '<meta name="enamad" content="24876525" />';
+const TAG =
+  '<meta name="enamad" content ="24876525"/><meta name="enamad" content="24876525"/><meta name="enamad" content="24876525" />';
 const ROOT = path.join(process.cwd(), '.next/server');
 
 async function walk(dir, files = []) {
@@ -24,11 +25,8 @@ async function walk(dir, files = []) {
 
 function inject(html) {
   if (!html.includes('<head>')) return html;
-  if (html.includes(`<head>${TAG}`) || html.includes(`<head><meta charSet="utf-8"/>${TAG}`)) {
+  if (html.includes(`<head>${TAG}`)) {
     return html;
-  }
-  if (html.includes('<head><meta charSet="utf-8"/>')) {
-    return html.replace('<head><meta charSet="utf-8"/>', `<head><meta charSet="utf-8"/>${TAG}`);
   }
   return html.replace('<head>', `<head>${TAG}`);
 }

@@ -1,5 +1,15 @@
 export const ENAMAD_CODE = '24876525';
-export const ENAMAD_META_TAG = `<meta name="enamad" content="${ENAMAD_CODE}" />`;
+
+/** Exact markup from Enamad’s rejection message. */
+export const ENAMAD_META_TAG = `<meta name="enamad" content ="${ENAMAD_CODE}"/>`;
+
+/** Extra spacings Enamad has asked for in different screens. */
+export const ENAMAD_META_SNIPPET = [
+  ENAMAD_META_TAG,
+  `<meta name="enamad" content="${ENAMAD_CODE}"/>`,
+  `<meta name="enamad" content="${ENAMAD_CODE}" />`,
+].join('');
+
 export const ENAMAD_PASS_HEADER = 'x-enamad-pass';
 
 const CRAWLER_UA =
@@ -18,7 +28,7 @@ export function injectEnamadMeta(html: string): string {
   if (html.slice(insertAt, insertAt + ENAMAD_META_TAG.length) === ENAMAD_META_TAG) {
     return html;
   }
-  return html.slice(0, insertAt) + ENAMAD_META_TAG + html.slice(insertAt);
+  return html.slice(0, insertAt) + ENAMAD_META_SNIPPET + html.slice(insertAt);
 }
 
 export function enamadVerifyHtml(): string {
@@ -26,7 +36,7 @@ export function enamadVerifyHtml(): string {
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-${ENAMAD_META_TAG}
+${ENAMAD_META_SNIPPET}
 <title>مکانیک هوشمند</title>
 </head>
 <body>

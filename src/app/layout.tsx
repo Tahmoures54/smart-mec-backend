@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="enamad" content="24876525" />
         <noscript
           dangerouslySetInnerHTML={{
-            __html: '<meta name="enamad" content="24876525" />',
+            __html: '<meta name="enamad" content ="24876525"/><meta name="enamad" content="24876525"/><meta name="enamad" content="24876525" />',
           }}
         />
       </head>

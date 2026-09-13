@@ -19,10 +19,6 @@ async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  if (isEnamadCrawler(request.headers.get('user-agent'))) {
-    return NextResponse.rewrite(new URL('/enamad-verify', request.url));
-  }
-
   try {
     const headers = new Headers(request.headers);
     headers.set(ENAMAD_PASS_HEADER, '1');
@@ -32,18 +28,21 @@ async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
       redirect: 'manual',
     });
     const contentType = originRes.headers.get('content-type') || '';
-    if (!contentType.includes('text/html')) {
-      return new NextResponse(originRes.body, {
-        status: originRes.status,
-        headers: originRes.headers,
-      });
+    if (contentType.includes('text/html')) {
+      const html = injectEnamadMeta(await originRes.text());
+      const out = new Headers(originRes.headers);
+      out.delete('content-encoding');
+      out.delete('content-length');
+      return new NextResponse(html, { status: originRes.status, headers: out });
     }
-    const html = injectEnamadMeta(await originRes.text());
-    const out = new Headers(originRes.headers);
-    out.delete('content-encoding');
-    out.delete('content-length');
-    return new NextResponse(html, { status: originRes.status, headers: out });
+    return new NextResponse(originRes.body, {
+      status: originRes.status,
+      headers: originRes.headers,
+    });
   } catch {
+    if (isEnamadCrawler(request.headers.get('user-agent'))) {
+      return NextResponse.rewrite(new URL('/enamad-verify', request.url));
+    }
     return NextResponse.next();
   }
 }
