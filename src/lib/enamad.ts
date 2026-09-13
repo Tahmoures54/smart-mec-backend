@@ -73,6 +73,7 @@ ${ENAMAD_META_GUIDE}
 <title>${ENAMAD_CODE}</title>
 </head>
 <body>
+<h1>${ENAMAD_CODE}</h1>
 </body>
 </html>
 `;

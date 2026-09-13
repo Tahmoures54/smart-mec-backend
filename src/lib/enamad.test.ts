@@ -47,6 +47,7 @@ describe('Enamad homepage meta tag', () => {
     expect(html).toContain('http-equiv="Content-Type"');
     expect(html).toContain(ENAMAD_META_GUIDE);
     expect(html).toContain(`<title>${'24876525'}</title>`);
+    expect(html).toContain(`<h1>${'24876525'}</h1>`);
     expect(html.indexOf(ENAMAD_META_GUIDE)).toBeLessThan(html.indexOf('<title>'));
   });
 

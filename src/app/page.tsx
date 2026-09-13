@@ -111,18 +111,19 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main>
+        <h1 className="sr-only">{ENAMAD_CODE}</h1>
         <section className="hero-grid relative overflow-hidden">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 md:grid-cols-2 md:py-24">
             <div>
               <p className="mb-4 inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-sm text-amber-200">
                 نسخه وب + اپ اندروید · {SITE.nameEn}
               </p>
-              <h1 className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
+              <p className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
                 مکانیک همیشه
                 <span className="block bg-gradient-to-l from-amber-200 via-orange-400 to-amber-500 bg-clip-text text-transparent">
                   همراه ماشینت
                 </span>
-              </h1>
+              </p>
               <p className="mt-5 max-w-xl text-lg leading-8 text-amber-100/80">{SITE.description}</p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
