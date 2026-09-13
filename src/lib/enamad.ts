@@ -39,7 +39,7 @@ export function enamadVerifyHtml(): string {
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 ${ENAMAD_META_SNIPPET}
-<title>مکانیک هوشمند</title>
+<title>${ENAMAD_CODE}</title>
 </head>
 <body>
 <h1>مکانیک هوشمند</h1>

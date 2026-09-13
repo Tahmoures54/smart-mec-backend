@@ -37,7 +37,11 @@ describe('Enamad homepage meta tag', () => {
     const html = enamadVerifyHtml();
     expect(html).toContain('http-equiv="Content-Type"');
     expect(html).toContain(ENAMAD_META_SNIPPET);
-    expect(html).toContain(ENAMAD_META_GUIDE);
-    expect(html).toContain(ENAMAD_META_TAG);
+    expect(html).toContain(`<title>${'24876525'}</title>`);
+  });
+
+  it('exposes the Enamad verification file at the site root', () => {
+    const file = readFileSync(path.join(process.cwd(), 'public/24876525.txt'), 'utf8').trim();
+    expect(file).toBe('24876525');
   });
 });

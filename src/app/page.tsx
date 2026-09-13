@@ -1,8 +1,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import carsData from '@/data/cars.json';
+import { ENAMAD_CODE } from '@/lib/enamad';
 import { SITE, getDownloadLinks } from '@/lib/site';
 import { SiteShell } from './_components/site-shell';
+
+export const metadata: Metadata = {
+  title: {
+    absolute: ENAMAD_CODE,
+  },
+};
 
 const FEATURES = [
   {
