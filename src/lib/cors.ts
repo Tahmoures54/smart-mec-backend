@@ -1,6 +1,7 @@
 const DEFAULT_ORIGINS = [
   'https://smart-mec.ir',
   'https://www.smart-mec.ir',
+  'https://smart-mec.liara.run',
   'https://smart-mec-backend-zeta.vercel.app',
   'http://localhost:3000',
 ];

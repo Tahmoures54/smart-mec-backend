@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/inject-enamad-meta.mjs",
-    "start": "next start",
+    "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -34,5 +34,8 @@
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

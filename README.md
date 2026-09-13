@@ -2,7 +2,16 @@
 
 سرور Next.js برای اپ فلاتر **مکانیک هوشمند**: ورود OTP، عیب‌یابی با هوش مصنوعی، اشتراک طلایی، پرداخت PayPing، رفرال، و جستجوی تعمیرگاه‌های نزدیک.
 
-زنده: [smart-mec-backend-zeta.vercel.app](https://smart-mec-backend-zeta.vercel.app)
+زنده: [smart-mec.ir](https://smart-mec.ir) — استقرار ایران: [smart-mec.liara.run](https://smart-mec.liara.run)
+
+## استقرار لیارا (اینماد)
+
+برنامه Next.js روی پلتفرم `next` لیارا با `liara.json` تنظیم شده است. متغیرهای `.env.example` را در کنسول لیارا وارد کنید، بعد یکی از این دو:
+
+- کنسول لیارا → استقرار جدید (GitHub یا آپلود)
+- یا در GitHub یک Secret به نام `LIARA_API_TOKEN` بگذارید تا workflow `Deploy Liara` روی `main` دیپلوی کند
+
+دامنه `smart-mec.ir` را در لیارا → دامنه‌ها اضافه کنید. ابر آروان را برای `@` و `www` **خاموش** کنید و رکوردهایی که لیارا می‌دهد (ALIAS/CNAME و TXT) را جایگزین A فعلی Vercel کنید. اینماد دامنه `.liara.run` را قبول نمی‌کند؛ باید روی `smart-mec.ir` باشد.
 
 ## اجرای محلی
 

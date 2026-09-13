@@ -10,7 +10,7 @@ const vazirmatn = Vazirmatn({
   display: 'swap',
 });
 
-const siteUrl = process.env.APP_URL || 'https://smart-mec-backend-zeta.vercel.app';
+const siteUrl = process.env.APP_URL || 'https://smart-mec.ir';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

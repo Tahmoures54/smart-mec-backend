@@ -1,0 +1,28 @@
+name: Deploy Liara
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy to Liara
+        env:
+          LIARA_TOKEN: ${{ secrets.LIARA_API_TOKEN }}
+        run: |
+          if [ -z "$LIARA_TOKEN" ]; then
+            echo "LIARA_API_TOKEN is not set. Add it in GitHub Actions secrets, or deploy from the Liara console."
+            exit 0
+          fi
+          npm i -g @liara/cli@9
+          liara deploy --app=smart-mec --platform=next --port=3000 --api-token="$LIARA_TOKEN" --no-app-logs
