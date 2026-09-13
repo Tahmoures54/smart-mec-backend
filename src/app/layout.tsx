@@ -39,9 +39,6 @@ export const metadata: Metadata = {
     description: SITE.description,
     images: ['/branding/banner.png'],
   },
-  other: {
-    enamad: '24876525',
-  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -49,11 +46,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="fa" dir="rtl">
       <head>
         <meta name="enamad" content="24876525" />
-        <noscript
-          dangerouslySetInnerHTML={{
-            __html: '<meta name="enamad" content ="24876525"/><meta name="enamad" content="24876525"/><meta name="enamad" content="24876525" />',
-          }}
-        />
       </head>
       <body className={`${vazirmatn.className} bg-[#140C08] text-slate-100 antialiased`}>{children}</body>
     </html>

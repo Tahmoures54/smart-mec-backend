@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ENAMAD_META_GUIDE,
   ENAMAD_META_SNIPPET,
   ENAMAD_META_TAG,
   enamadVerifyHtml,
@@ -10,30 +11,33 @@ import {
 } from './enamad';
 
 describe('Enamad homepage meta tag', () => {
-  it('embeds Enamad’s exact rejection markup in the root layout', () => {
+  it('embeds the Enamad meta tag in the root layout', () => {
     const layout = readFileSync(path.join(process.cwd(), 'src/app/layout.tsx'), 'utf8');
-    expect(layout).toContain(ENAMAD_META_TAG);
+    expect(layout).toContain('<meta name="enamad" content="24876525" />');
     expect(layout).toContain('<head>');
   });
 
-  it('treats empty and PHP user agents as crawlers', () => {
+  it('treats empty, PHP, and unknown agents as crawlers', () => {
     expect(isEnamadCrawler('')).toBe(true);
     expect(isEnamadCrawler('PHP/8.2')).toBe(true);
     expect(isEnamadCrawler('curl/8.0')).toBe(true);
+    expect(isEnamadCrawler('Go-http-client/1.1')).toBe(true);
     expect(isEnamadCrawler('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128')).toBe(false);
   });
 
-  it('inserts Enamad’s exact tag as the first child of head', () => {
+  it('inserts the guide tag first in head', () => {
     const html = '<html><head><meta charset="utf-8"></head></html>';
     const injected = injectEnamadMeta(html);
-    expect(injected.startsWith(`<html><head>${ENAMAD_META_TAG}`)).toBe(true);
-    expect(injected).toContain('<meta name="enamad" content ="24876525"/>');
-    expect(injectEnamadMeta(injected).split(ENAMAD_META_TAG)).toHaveLength(2);
+    expect(injected.startsWith(`<html><head>${ENAMAD_META_GUIDE}`)).toBe(true);
+    expect(injected).toContain(ENAMAD_META_TAG);
+    expect(injectEnamadMeta(injected).split(ENAMAD_META_GUIDE)).toHaveLength(2);
   });
 
-  it('builds a verification page containing Enamad’s exact markup', () => {
+  it('builds a tiny HTML page Enamad can parse', () => {
     const html = enamadVerifyHtml();
+    expect(html).toContain('http-equiv="Content-Type"');
     expect(html).toContain(ENAMAD_META_SNIPPET);
-    expect(html).toContain('<meta name="enamad" content ="24876525"/>');
+    expect(html).toContain(ENAMAD_META_GUIDE);
+    expect(html).toContain(ENAMAD_META_TAG);
   });
 });

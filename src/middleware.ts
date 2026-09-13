@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { applyCorsHeaders } from '@/lib/cors';
 import { isProtectedApiPath } from '@/lib/api-guard';
-import { ENAMAD_PASS_HEADER, injectEnamadMeta, isEnamadCrawler } from '@/lib/enamad';
+import { ENAMAD_PASS_HEADER, isEnamadCrawler } from '@/lib/enamad';
 
 function withCors(request: NextRequest, response: NextResponse): NextResponse {
   applyCorsHeaders(request, response);
@@ -19,32 +19,12 @@ async function withEnamadHomepage(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  try {
-    const headers = new Headers(request.headers);
-    headers.set(ENAMAD_PASS_HEADER, '1');
-    const originRes = await fetch(request.nextUrl, {
-      method: 'GET',
-      headers,
-      redirect: 'manual',
-    });
-    const contentType = originRes.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-      const html = injectEnamadMeta(await originRes.text());
-      const out = new Headers(originRes.headers);
-      out.delete('content-encoding');
-      out.delete('content-length');
-      return new NextResponse(html, { status: originRes.status, headers: out });
-    }
-    return new NextResponse(originRes.body, {
-      status: originRes.status,
-      headers: originRes.headers,
-    });
-  } catch {
-    if (isEnamadCrawler(request.headers.get('user-agent'))) {
-      return NextResponse.rewrite(new URL('/enamad-verify', request.url));
-    }
-    return NextResponse.next();
+  // Enamad’s PHP checker cannot parse the Next.js document. Give it a tiny valid page.
+  if (isEnamadCrawler(request.headers.get('user-agent'))) {
+    return NextResponse.rewrite(new URL('/enamad-verify', request.url));
   }
+
+  return NextResponse.next();
 }
 
 export async function middleware(request: NextRequest) {

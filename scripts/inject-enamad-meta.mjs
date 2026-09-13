@@ -1,8 +1,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const TAG =
-  '<meta name="enamad" content ="24876525"/><meta name="enamad" content="24876525"/><meta name="enamad" content="24876525" />';
+const TAG = '<meta name="enamad" content="24876525" />\n<meta name="enamad" content ="24876525"/>';
 const ROOT = path.join(process.cwd(), '.next/server');
 
 async function walk(dir, files = []) {
