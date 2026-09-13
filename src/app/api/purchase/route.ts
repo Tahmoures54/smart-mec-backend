@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const productId = validateProductId(body.productId);
     const product = PRODUCTS[productId];
+    const fromWeb = body.from === 'web';
+    const webQuery = fromWeb ? '&from=web' : '';
 
     const paypingToken = process.env.PAYPING_TOKEN;
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        paymentUrl: `${appUrl}/api/purchase/verify?code=${authority}&productId=${productId}&refid=MOCK_REF`,
+        paymentUrl: `${appUrl}/api/purchase/verify?code=${authority}&productId=${productId}&refid=MOCK_REF${webQuery}`,
       });
     }
 
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
         payerIdentity: user.phone,
         payerName: 'کاربر مکانیک هوشمند',
         // productId در returnUrl؛ code معمولاً توسط درگاه برمی‌گردد
-        returnUrl: `${appUrl}/api/purchase/verify?productId=${productId}`,
+        returnUrl: `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`,
         clientRefId,
         description: `خرید ${product.name}`,
       }),

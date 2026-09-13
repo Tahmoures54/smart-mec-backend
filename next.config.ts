@@ -23,7 +23,17 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(), microphone=(self), geolocation=()',
+          },
+        ],
+      },
+      {
+        source: '/downloads/:file*.apk',
+        headers: [
+          { key: 'Content-Type', value: 'application/vnd.android.package-archive' },
+          {
+            key: 'Content-Disposition',
+            value: 'attachment; filename="smart-mec.apk"',
           },
         ],
       },
@@ -31,6 +41,7 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    dangerouslyAllowSVG: true,
     remotePatterns: [
       {
         protocol: 'https',
