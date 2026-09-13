@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Enamad's crawler is not in Next's default bot list, so metadata was streamed
+  // after scripts. Blocking metadata puts the verification tag in the initial <head>.
+  htmlLimitedBots: /.*/,
+
   async rewrites() {
     return [
       {
