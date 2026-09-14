@@ -45,3 +45,14 @@ body {
   padding: 0.1rem 0.35rem;
   border-radius: 0.3rem;
 }
+
+.enamad-seal a,
+.enamad-seal img {
+  display: inline-block;
+  cursor: pointer;
+}
+
+.enamad-seal img {
+  width: 125px;
+  height: 125px;
+}

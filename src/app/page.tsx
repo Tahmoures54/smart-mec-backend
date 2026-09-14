@@ -1,16 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Metadata } from 'next';
 import carsData from '@/data/cars.json';
-import { ENAMAD_CODE } from '@/lib/enamad';
 import { SITE, getDownloadLinks } from '@/lib/site';
+import { EnamadSeal } from './_components/enamad-seal';
 import { SiteShell } from './_components/site-shell';
-
-export const metadata: Metadata = {
-  title: {
-    absolute: ENAMAD_CODE,
-  },
-};
 
 const FEATURES = [
   {
@@ -111,19 +104,18 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main>
-        <h1 className="sr-only">{ENAMAD_CODE}</h1>
         <section className="hero-grid relative overflow-hidden">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 md:grid-cols-2 md:py-24">
             <div>
-              <p className="mb-4 inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-sm text-amber-200">
-                نسخه وب + اپ اندروید · {SITE.nameEn}
+              <p className="mb-4 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200">
+                دارای نماد اعتماد الکترونیکی · پرداخت امن
               </p>
-              <p className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
+              <h1 className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
                 مکانیک همیشه
                 <span className="block bg-gradient-to-l from-amber-200 via-orange-400 to-amber-500 bg-clip-text text-transparent">
                   همراه ماشینت
                 </span>
-              </p>
+              </h1>
               <p className="mt-5 max-w-xl text-lg leading-8 text-amber-100/80">{SITE.description}</p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -151,8 +143,8 @@ export default function Home() {
                   <dd className="mt-1 text-2xl font-bold text-amber-300">OTP</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-amber-100/50">تشخیص</dt>
-                  <dd className="mt-1 text-lg font-bold text-amber-300">متن و صدا</dd>
+                  <dt className="text-xs text-amber-100/50">پرداخت</dt>
+                  <dd className="mt-1 text-lg font-bold text-amber-300">درگاه بانکی</dd>
                 </div>
               </dl>
             </div>
@@ -278,12 +270,21 @@ export default function Home() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-20">
-          <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-6 leading-8 text-amber-100/80">
-            <p className="font-bold text-amber-200">یک نکته مهم</p>
-            <p className="mt-2">
-              مکانیک هوشمند یک ابزار کمکی است، نه جایگزین مکانیک متخصص. اگر دود غلیظ، بوی سوختگی، صدای برخورد فلز یا
-              داغ‌کردن غیرعادی دیدی، رانندگی را متوقف کن و حضوری مراجعه کن.
-            </p>
+          <div className="flex flex-col items-center gap-8 rounded-2xl border border-emerald-400/25 bg-emerald-400/5 p-6 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <p className="font-bold text-emerald-200">اعتماد رسمی و پرداخت امن</p>
+              <p className="mt-2 leading-8 text-amber-100/80">
+                این سایت نماد اعتماد الکترونیکی دارد. خرید بسته و اشتراک از درگاه بانکی پی‌پینگ انجام می‌شود و اعتبار
+                همان لحظه روی حسابت می‌نشیند.
+              </p>
+              <Link
+                href="/diagnose"
+                className="mt-5 inline-flex items-center justify-center rounded-2xl bg-orange-500 px-6 py-3 text-base font-bold text-white hover:bg-orange-400"
+              >
+                شروع عیب‌یابی و خرید بسته
+              </Link>
+            </div>
+            <EnamadSeal />
           </div>
         </section>
       </main>

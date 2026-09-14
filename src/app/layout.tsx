@@ -44,9 +44,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fa" dir="rtl">
-      <head>
-        <meta name="enamad" content="24876525" />
-      </head>
       <body className={`${vazirmatn.className} bg-[#140C08] text-slate-100 antialiased`}>{children}</body>
     </html>
   );

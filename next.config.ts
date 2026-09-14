@@ -1,16 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Enamad's crawler is not in Next's default bot list, so metadata was streamed
-  // after scripts. Blocking metadata puts the verification tag in the initial <head>.
-  htmlLimitedBots: /.*/,
-
   async rewrites() {
     return [
-      {
-        source: '/24876525',
-        destination: '/24876525.txt',
-      },
       {
         source: '/api/v1/:path*',
         destination: '/api/:path*',
@@ -37,13 +29,6 @@ const nextConfig: NextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(self), geolocation=()',
           },
-        ],
-      },
-      {
-        source: '/24876525.txt',
-        headers: [
-          { key: 'Content-Type', value: 'text/plain; charset=utf-8' },
-          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
         ],
       },
       {

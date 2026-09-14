@@ -598,14 +598,16 @@ export function DiagnoseApp() {
             </article>
           ) : (
             <div className="rounded-2xl border border-dashed border-white/15 p-8 text-amber-100/60">
-              نتیجه عیب‌یابی این‌جا می‌آید. این تحلیل جای مکانیک متخصص را نمی‌گیرد.
+              نتیجه عیب‌یابی این‌جا می‌آید. شرح مشکل را بفرست تا راهنمای عملی بگیری.
             </div>
           )}
 
           {needCredits ? (
             <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5">
-              <h3 className="font-bold text-amber-200">اعتبار تمام شده</h3>
-              <p className="mt-2 text-sm text-amber-100/70">یک بسته بخر تا همان‌جا ادامه بدهی.</p>
+              <h3 className="font-bold text-amber-200">برای ادامه، یک بسته انتخاب کن</h3>
+              <p className="mt-2 text-sm text-amber-100/70">
+                پرداخت امن از درگاه بانکی پی‌پینگ — اعتبار همان لحظه روی حسابت می‌نشیند.
+              </p>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {products.map((p) => (
                   <li key={p.id}>

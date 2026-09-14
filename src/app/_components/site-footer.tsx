@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { SITE } from '@/lib/site';
+import { EnamadSeal } from './enamad-seal';
 
 export function SiteFooter() {
   return (
     <footer className="border-t border-white/10 bg-black/30">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 md:flex-row md:items-start md:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="font-bold text-white">{SITE.nameFa}</p>
           <p className="mt-1 text-sm text-amber-100/70">{SITE.tagline}</p>
@@ -36,9 +37,16 @@ export function SiteFooter() {
             ورود مدیران
           </Link>
         </div>
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-sm font-semibold text-amber-100">نماد اعتماد الکترونیکی</p>
+          <EnamadSeal />
+          <p className="max-w-[14rem] text-xs leading-6 text-amber-100/55">
+            پرداخت امن از درگاه بانکی — اعتبار بلافاصله بعد از خرید اعمال می‌شود.
+          </p>
+        </div>
       </div>
       <p className="px-4 pb-8 text-center text-xs text-amber-100/40">
-        تحلیل هوش مصنوعی جای بازدید حضوری مکانیک متخصص را نمی‌گیرد.
+        © {SITE.nameFa} — {SITE.nameEn}
       </p>
     </footer>
   );
