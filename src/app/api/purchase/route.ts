@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Purchase (Create Payment) Route - Smart-MEC
+// Purchase (Create Payment) Route - Smart-MEC (Zibal)
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,11 +25,11 @@ export async function POST(request: NextRequest) {
     const fromWeb = body.from === 'web';
     const webQuery = fromWeb ? '&from=web' : '';
 
-    const paypingToken = process.env.PAYPING_TOKEN;
+    const zibalMerchant = process.env.ZIBAL_MERCHANT;
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
-    // ─── MOCK (بدون توکن درگاه) ───
-    if (!paypingToken) {
+    // ─── MOCK (بدون کد مرچنت درگاه) ───
+    if (!zibalMerchant) {
       logger.info('Creating MOCK payment...');
       const authority =
         'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -44,50 +44,50 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        paymentUrl: `${appUrl}/api/purchase/verify?code=${authority}&productId=${productId}&refid=MOCK_REF${webQuery}`,
+        paymentUrl: `${appUrl}/api/purchase/verify?trackId=${authority}&productId=${productId}&success=1&status=2&refid=MOCK_REF${webQuery}`,
       });
     }
 
-    // ─── PRODUCTION PayPing ───
-    const clientRefId = `SM_${user.id}_${Date.now()}`;
+    // ─── PRODUCTION Zibal ───
+    const callbackUrl = `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`;
 
-    const response = await fetch('https://api.payping.ir/v2/pay', {
+    const zibalResponse = await fetch('https://gateway.zibal.ir/v1/request', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${paypingToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: product.price,
-        payerIdentity: user.phone,
-        payerName: 'کاربر مکانیک هوشمند',
-        // productId در returnUrl؛ code معمولاً توسط درگاه برمی‌گردد
-        returnUrl: `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`,
-        clientRefId,
-        description: `خرید ${product.name}`,
+        merchant: zibalMerchant,      // کد مرچنت از پنل زیبال
+        amount: product.price,         // مبلغ به ریال
+        callbackUrl: callbackUrl,      // آدرس بازگشت
+        mobile: user.phone,            // اختیاری - شماره موبایل کاربر
+        description: `خرید ${product.name}`, // اختیاری
       }),
     });
 
-    const payData = await response.json();
+    const zibalData = await zibalResponse.json();
 
-    if (!response.ok || !payData.code) {
-      logger.error('PayPing create payment error:', payData);
+    // بررسی کد موفقیت (result === 100)
+    if (!zibalResponse.ok || zibalData.result !== 100) {
+      logger.error('Zibal create payment error:', zibalData);
       throw new Error(
         'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
       );
     }
 
+    // ذخیره trackId به عنوان authority در دیتابیس
     await db.insert(purchases).values({
       userId: user.id,
       productId: product.id,
       amount: product.price,
       status: 'pending',
-      authority: payData.code,
+      authority: String(zibalData.trackId),
     });
 
+    // لینک هدایت کاربر به درگاه زیبال
     return NextResponse.json({
       success: true,
-      paymentUrl: `https://api.payping.ir/v2/pay/goto/${payData.code}`,
+      paymentUrl: `https://gateway.zibal.ir/start/${zibalData.trackId}`,
     });
   } catch (error) {
     return handleError(error);
