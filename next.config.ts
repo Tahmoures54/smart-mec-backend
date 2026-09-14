@@ -60,6 +60,10 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    // ⚠️ در پلتفرم لیارا، پوشه .next/cache/images به‌طور خودکار ساخته نمی‌شود
+    // و باعث خطای ENOENT می‌شود. با unoptimized، Next.js تصاویر را
+    // بدون کش محلی و بهینه‌سازی سرو می‌کند.
+    unoptimized: true,
     dangerouslyAllowSVG: true,
     remotePatterns: [
       {
