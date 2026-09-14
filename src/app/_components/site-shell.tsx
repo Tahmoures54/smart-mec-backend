@@ -23,9 +23,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
           alt="نماد اعتماد الکترونیکی"
           className="h-20 w-auto cursor-pointer"
           data-code="Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
-          onError={(e) => {
-            console.error('Enamad logo failed to load', e);
-          }}
         />
       </a>
     </div>
