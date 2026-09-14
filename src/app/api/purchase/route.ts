@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════
-// Purchase (Create Payment) Route - Smart-MEC (Zibal)
+// Purchase (Create Payment) Route - Smart-MEC
+// Gateway: Zibal (https://zibal.ir)
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,25 +13,39 @@ import { RateLimiter } from '@/lib/rate-limiter';
 import { PRODUCTS } from '@/types';
 import { logger } from '@/utils/logger';
 
+// ─── Zibal Config ───
+const ZIBAL_REQUEST_URL =
+  process.env.ZIBAL_REQUEST_URL || 'https://gateway.zibal.ir/v1/request';
+const ZIBAL_START_URL =
+  process.env.ZIBAL_START_URL || 'https://gateway.zibal.ir/start';
+const ZIBAL_TIMEOUT_MS = Number(process.env.ZIBAL_TIMEOUT_MS) || 15000;
+
 export async function POST(request: NextRequest) {
   try {
+    // ─── Rate Limit ───
     const ip = RateLimiter.getIP(request);
     RateLimiter.check(ip, 'create_purchase', 10, 15 * 60 * 1000);
 
+    // ─── Auth ───
     const user = await getUserFromRequest(request);
 
+    // ─── Body ───
     const body = await request.json();
     const productId = validateProductId(body.productId);
     const product = PRODUCTS[productId];
     const fromWeb = body.from === 'web';
     const webQuery = fromWeb ? '&from=web' : '';
 
+    // ─── Env ───
     const zibalMerchant = process.env.ZIBAL_MERCHANT;
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
-    // ─── MOCK (بدون کد مرچنت درگاه) ───
+    // ─────────────────────────────────────────────────────
+    // MOCK MODE (بدون کد مرچنت درگاه)
+    // ─────────────────────────────────────────────────────
     if (!zibalMerchant) {
-      logger.info('Creating MOCK payment...');
+      logger.info('Creating MOCK payment (ZIBAL_MERCHANT not set)...');
+
       const authority =
         'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
@@ -42,40 +57,67 @@ export async function POST(request: NextRequest) {
         authority,
       });
 
+      const mockVerifyUrl = `${appUrl}/api/purchase/verify?trackId=${authority}&productId=${productId}&success=1&status=2&refid=MOCK_REF${webQuery}`;
+
       return NextResponse.json({
         success: true,
-        paymentUrl: `${appUrl}/api/purchase/verify?trackId=${authority}&productId=${productId}&success=1&status=2&refid=MOCK_REF${webQuery}`,
+        paymentUrl: mockVerifyUrl,
+        mock: true,
       });
     }
 
-    // ─── PRODUCTION Zibal ───
+    // ─────────────────────────────────────────────────────
+    // PRODUCTION — Zibal Request
+    // ─────────────────────────────────────────────────────
     const callbackUrl = `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`;
 
-    const zibalResponse = await fetch('https://gateway.zibal.ir/v1/request', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        merchant: zibalMerchant,      // کد مرچنت از پنل زیبال
-        amount: product.price,         // مبلغ به ریال
-        callbackUrl: callbackUrl,      // آدرس بازگشت
-        mobile: user.phone,            // اختیاری - شماره موبایل کاربر
-        description: `خرید ${product.name}`, // اختیاری
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);
 
-    const zibalData = await zibalResponse.json();
+    let zibalResponse: Response;
+    try {
+      zibalResponse = await fetch(ZIBAL_REQUEST_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant: zibalMerchant,          // کد مرچنت زیبال (یا zibal برای sandbox)
+          amount: product.price,            // مبلغ به ریال
+          callbackUrl,                      // آدرس بازگشت پس از پرداخت
+          mobile: user.phone,               // اختیاری
+          description: `خرید ${product.name}`, // اختیاری
+        }),
+        signal: controller.signal,
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        logger.error('Zibal request timeout');
+        throw new Error('زمان پاسخ درگاه پرداخت به پایان رسید. لطفاً دوباره تلاش کنید.');
+      }
+      logger.error('Zibal fetch error:', err);
+      throw new Error('خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.');
+    } finally {
+      clearTimeout(timeout);
+    }
 
-    // بررسی کد موفقیت (result === 100)
-    if (!zibalResponse.ok || zibalData.result !== 100) {
+    // ─── Parse Response ───
+    let zibalData: { result?: number; trackId?: number; message?: string };
+    try {
+      zibalData = await zibalResponse.json();
+    } catch (err) {
+      logger.error('Zibal invalid JSON response:', err);
+      throw new Error('پاسخ نامعتبر از درگاه پرداخت دریافت شد.');
+    }
+
+    // کد 100 = موفقیت در زیبال
+    if (!zibalResponse.ok || zibalData.result !== 100 || !zibalData.trackId) {
       logger.error('Zibal create payment error:', zibalData);
       throw new Error(
         'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
       );
     }
 
-    // ذخیره trackId به عنوان authority در دیتابیس
+    // ─── ذخیره در دیتابیس ───
+    // trackId به عنوان authority ذخیره می‌شود
     await db.insert(purchases).values({
       userId: user.id,
       productId: product.id,
@@ -84,10 +126,11 @@ export async function POST(request: NextRequest) {
       authority: String(zibalData.trackId),
     });
 
-    // لینک هدایت کاربر به درگاه زیبال
+    // ─── لینک هدایت کاربر به درگاه زیبال ───
     return NextResponse.json({
       success: true,
-      paymentUrl: `https://gateway.zibal.ir/start/${zibalData.trackId}`,
+      paymentUrl: `${ZIBAL_START_URL}/${zibalData.trackId}`,
+      trackId: zibalData.trackId,
     });
   } catch (error) {
     return handleError(error);
