@@ -9,12 +9,12 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <div className="flex-1">{children}</div>
       <SiteFooter />
 
-      {/* ─── Enamad Trust Seal (Floating) ─── */}
+      {/* ─── Enamad Trust Seal (Floating - فقط در دسکتاپ) ─── */}
       <a
         target="_blank"
         rel="noopener noreferrer"
         href="https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
-        className="fixed bottom-4 left-4 z-50 rounded-lg bg-white p-2 shadow-lg transition-transform hover:scale-105"
+        className="hidden md:block fixed bottom-4 left-4 z-50 rounded-lg bg-white p-2 shadow-lg transition-transform hover:scale-105"
         aria-label="نماد اعتماد الکترونیکی"
       >
         <img
