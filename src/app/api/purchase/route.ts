@@ -20,6 +20,10 @@ const ZIBAL_START_URL =
   process.env.ZIBAL_START_URL || 'https://gateway.zibal.ir/start';
 const ZIBAL_TIMEOUT_MS = Number(process.env.ZIBAL_TIMEOUT_MS) || 15000;
 
+// ⚠️ قیمت‌ها در PRODUCTS به تومان هستند؛ زیبال فقط ریال می‌پذیرد.
+// این ثابت فقط در لحظه ارسال به زیبال اعمال می‌شود؛ ذخیره دیتابیس به تومان است.
+const TOMAN_TO_RIAL = 10;
+
 export async function POST(request: NextRequest) {
   try {
     // ─── Rate Limit ───
@@ -41,7 +45,7 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
     // ─────────────────────────────────────────────────────
-    // MOCK MODE (بدون کد مرچنت درگاه)
+    // MOCK MODE (بدون کد مرچنت درگاه — فقط برای توسعه محلی)
     // ─────────────────────────────────────────────────────
     if (!zibalMerchant) {
       logger.info('Creating MOCK payment (ZIBAL_MERCHANT not set)...');
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
       await db.insert(purchases).values({
         userId: user.id,
         productId: product.id,
-        amount: product.price,
+        amount: product.price, // تومان
         status: 'pending',
         authority,
       });
@@ -80,21 +84,25 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          merchant: zibalMerchant,          // کد مرچنت زیبال (یا zibal برای sandbox)
-          amount: product.price,            // مبلغ به ریال
-          callbackUrl,                      // آدرس بازگشت پس از پرداخت
-          mobile: user.phone,               // اختیاری
-          description: `خرید ${product.name}`, // اختیاری
+          merchant: zibalMerchant,               // کد مرچنت زیبال (یا zibal برای sandbox)
+          amount: product.price * TOMAN_TO_RIAL, // ← ریال (تبدیل از تومان)
+          callbackUrl,                           // آدرس بازگشت پس از پرداخت
+          mobile: user.phone,                    // اختیاری
+          description: `خرید ${product.name}`,   // اختیاری
         }),
         signal: controller.signal,
       });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         logger.error('Zibal request timeout');
-        throw new Error('زمان پاسخ درگاه پرداخت به پایان رسید. لطفاً دوباره تلاش کنید.');
+        throw new Error(
+          'زمان پاسخ درگاه پرداخت به پایان رسید. لطفاً دوباره تلاش کنید.'
+        );
       }
       logger.error('Zibal fetch error:', err);
-      throw new Error('خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.');
+      throw new Error(
+        'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -116,12 +124,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ─── ذخیره در دیتابیس ───
-    // trackId به عنوان authority ذخیره می‌شود
+    // ─── ذخیره در دیتابیس (مبلغ به تومان) ───
     await db.insert(purchases).values({
       userId: user.id,
       productId: product.id,
-      amount: product.price,
+      amount: product.price, // تومان — نه ریال
       status: 'pending',
       authority: String(zibalData.trackId),
     });
