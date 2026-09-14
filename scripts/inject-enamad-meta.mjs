@@ -1,7 +1,11 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const TAG = '<meta name="enamad" content="24876525" />\n<meta name="enamad" content ="24876525"/>';
+// ─── Enamad Config ───
+const ENAMAD_ID = '7731207';
+const ENAMAD_CODE = 'Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
+const TAG = `<meta name="enamad" content="${ENAMAD_ID}" />`;
+
 const ROOT = path.join(process.cwd(), '.next/server');
 
 async function walk(dir, files = []) {
@@ -24,10 +28,16 @@ async function walk(dir, files = []) {
 
 function inject(html) {
   if (!html.includes('<head>')) return html;
-  if (html.includes(`<head>${TAG}`)) {
-    return html;
-  }
-  return html.replace('<head>', `<head>${TAG}`);
+
+  // اگر هر متای enamad (با هر ID) از قبل هست، پاکش کن
+  // این کار از باقی موندن ID قدیمی جلوگیری می‌کنه
+  const cleaned = html.replace(
+    /<meta\s+name=["']enamad["']\s+content\s*=\s*["'][^"']*["']\s*\/?>/gi,
+    ''
+  );
+
+  // متای جدید رو تزریق کن
+  return cleaned.replace('<head>', `<head>${TAG}`);
 }
 
 const files = await walk(ROOT);
@@ -40,4 +50,4 @@ for (const file of files) {
   changed += 1;
 }
 
-console.log(`inject-enamad-meta: updated ${changed} html files`);
+console.log(`inject-enamad-meta: updated ${changed} html files (ID: ${ENAMAD_ID})`);
