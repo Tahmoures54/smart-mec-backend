@@ -48,7 +48,7 @@ body {
 
 .enamad-seal a,
 .enamad-seal img {
-  display: inline-block;
+  display: block;
   cursor: pointer;
 }
 
