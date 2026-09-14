@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Purchase (Create Payment) Route - Smart-MEC
+// Purchase (Create Payment) Route - Smart-MEC — درگاه زیبال
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,6 +11,12 @@ import { handleError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
 import { PRODUCTS } from '@/types';
 import { logger } from '@/utils/logger';
+import {
+  isZibalConfigured,
+  tomanToRial,
+  zibalRequest,
+  zibalStartUrl,
+} from '@/lib/zibal';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,12 +31,11 @@ export async function POST(request: NextRequest) {
     const fromWeb = body.from === 'web';
     const webQuery = fromWeb ? '&from=web' : '';
 
-    const paypingToken = process.env.PAYPING_TOKEN;
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const callbackUrl = `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`;
 
-    // ─── MOCK (بدون توکن درگاه) ───
-    if (!paypingToken) {
-      logger.info('Creating MOCK payment...');
+    if (!isZibalConfigured()) {
+      logger.info('Creating MOCK payment (ZIBAL_MERCHANT is empty)...');
       const authority =
         'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
@@ -44,50 +49,37 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        paymentUrl: `${appUrl}/api/purchase/verify?code=${authority}&productId=${productId}&refid=MOCK_REF${webQuery}`,
+        paymentUrl: `${callbackUrl}&code=${authority}&refid=MOCK_REF`,
       });
     }
 
-    // ─── PRODUCTION PayPing ───
-    const clientRefId = `SM_${user.id}_${Date.now()}`;
-
-    const response = await fetch('https://api.payping.ir/v2/pay', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${paypingToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: product.price,
-        payerIdentity: user.phone,
-        payerName: 'کاربر مکانیک هوشمند',
-        // productId در returnUrl؛ code معمولاً توسط درگاه برمی‌گردد
-        returnUrl: `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`,
-        clientRefId,
-        description: `خرید ${product.name}`,
-      }),
+    const orderId = `SM_${productId}_${user.id}_${Date.now()}`;
+    const payData = await zibalRequest({
+      amountRial: tomanToRial(product.price),
+      callbackUrl,
+      description: `خرید ${product.name}`,
+      orderId,
+      mobile: user.phone,
     });
 
-    const payData = await response.json();
-
-    if (!response.ok || !payData.code) {
-      logger.error('PayPing create payment error:', payData);
-      throw new Error(
-        'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
-      );
+    if (payData.result !== 100 || !payData.trackId) {
+      logger.error('Zibal create payment error:', payData);
+      throw new Error('خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.');
     }
+
+    const authority = String(payData.trackId);
 
     await db.insert(purchases).values({
       userId: user.id,
       productId: product.id,
       amount: product.price,
       status: 'pending',
-      authority: payData.code,
+      authority,
     });
 
     return NextResponse.json({
       success: true,
-      paymentUrl: `https://api.payping.ir/v2/pay/goto/${payData.code}`,
+      paymentUrl: zibalStartUrl(authority),
     });
   } catch (error) {
     return handleError(error);

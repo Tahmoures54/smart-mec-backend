@@ -14,6 +14,13 @@ import {
   isMockAuthority,
 } from '@/lib/payment';
 import { referralPercentage } from '@/lib/constants';
+import {
+  isZibalConfigured,
+  isZibalVerifyPaid,
+  parseZibalCallback,
+  tomanToRial,
+  zibalVerify,
+} from '@/lib/zibal';
 
 const renderHTML = (
   title: string,
@@ -128,33 +135,22 @@ async function grantProduct(
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const refId =
-      url.searchParams.get('refid') ||
-      url.searchParams.get('refId') ||
-      url.searchParams.get('Authority');
-    const productId = url.searchParams.get('productId') as ProductId;
-    const code =
-      url.searchParams.get('code') ||
-      url.searchParams.get('authority') ||
-      url.searchParams.get('Authority');
+    const callback = parseZibalCallback(url.searchParams);
+    const productIdParam = url.searchParams.get('productId') as ProductId | null;
+    const refId = url.searchParams.get('refid') || url.searchParams.get('refId');
     const fromWeb = url.searchParams.get('from') === 'web';
     const page = (title: string, message: string, ok: boolean, status = 200) =>
       html(title, message, ok, status, fromWeb);
 
-    if (!productId || !(productId in PRODUCTS)) {
-      return page('محصول نامعتبر', 'اطلاعات محصول ارسالی معتبر نیست.', false, 400);
-    }
+    const trackId = callback.trackId;
+    const mock = isMockAuthority(trackId);
 
-    const product = PRODUCTS[productId];
-    const paypingToken = process.env.PAYPING_TOKEN;
-    const mock = isMockAuthority(code);
-
-    if (!code) {
+    if (!trackId) {
       return page('تراکنش نامعتبر', 'کد رهگیری پرداخت ارسال نشده است.', false, 400);
     }
 
     const purchase = await db.query.purchases.findFirst({
-      where: eq(purchases.authority, code),
+      where: eq(purchases.authority, trackId),
     });
 
     if (!purchase) {
@@ -165,6 +161,20 @@ export async function GET(request: NextRequest) {
         404
       );
     }
+
+    const productId = (productIdParam && productIdParam in PRODUCTS
+      ? productIdParam
+      : purchase.productId) as ProductId;
+
+    if (!(productId in PRODUCTS)) {
+      return page('محصول نامعتبر', 'اطلاعات محصول ارسالی معتبر نیست.', false, 400);
+    }
+
+    if (productIdParam && productIdParam !== purchase.productId) {
+      return page('محصول نامعتبر', 'محصول با تراکنش مطابقت ندارد.', false, 400);
+    }
+
+    const product = PRODUCTS[productId];
 
     if (purchase.status === 'completed') {
       return page(
@@ -183,13 +193,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (purchase.productId !== productId) {
-      return page('محصول نامعتبر', 'محصول با تراکنش مطابقت ندارد.', false, 400);
-    }
+    let verifiedRef: string | null = refId || (mock ? 'MOCK_REF' : null);
 
     if (!mock) {
-      if (!paypingToken) {
-        logger.error('PayPing token missing while verifying live payment');
+      if (!callback.success) {
+        await db
+          .update(purchases)
+          .set({
+            status: 'failed',
+            updatedAt: new Date(),
+          })
+          .where(and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending')));
+        return page(
+          'پرداخت ناموفق',
+          'پرداخت در درگاه بانکی کامل نشد.',
+          false,
+          402
+        );
+      }
+
+      if (!isZibalConfigured()) {
+        logger.error('Zibal merchant missing while verifying live payment');
         return page(
           'خطای پیکربندی',
           'درگاه پرداخت پیکربندی نشده است.',
@@ -197,30 +221,14 @@ export async function GET(request: NextRequest) {
           503
         );
       }
-      if (!refId) {
-        return page(
-          'پرداخت ناموفق',
-          'رسید درگاه دریافت نشد. اگر مبلغ از حساب شما کم شده با پشتیبانی تماس بگیرید.',
-          false,
-          400
-        );
-      }
 
-      const verifyRes = await fetch('https://api.payping.ir/v2/pay/verify', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${paypingToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refId, amount: purchase.amount }),
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok || verifyData.status !== 200) {
+      const verifyData = await zibalVerify(trackId);
+      if (!isZibalVerifyPaid(verifyData.result)) {
         await db
           .update(purchases)
           .set({
             status: 'failed',
-            refId: refId || null,
+            refId: verifyData.refNumber != null ? String(verifyData.refNumber) : null,
             updatedAt: new Date(),
           })
           .where(
@@ -233,6 +241,25 @@ export async function GET(request: NextRequest) {
           402
         );
       }
+
+      if (
+        typeof verifyData.amount === 'number' &&
+        verifyData.amount !== tomanToRial(purchase.amount)
+      ) {
+        logger.error('Zibal amount mismatch', {
+          expected: tomanToRial(purchase.amount),
+          got: verifyData.amount,
+        });
+        return page(
+          'پرداخت ناموفق',
+          'مبلغ تراکنش با درگاه مطابقت ندارد. با پشتیبانی تماس بگیرید.',
+          false,
+          400
+        );
+      }
+
+      verifiedRef =
+        verifyData.refNumber != null ? String(verifyData.refNumber) : trackId;
     }
 
     const claimed = await db.transaction(async (tx) => {
@@ -240,7 +267,7 @@ export async function GET(request: NextRequest) {
         .update(purchases)
         .set({
           status: 'completed',
-          refId: refId || (mock ? 'MOCK_REF' : null),
+          refId: verifiedRef,
           updatedAt: new Date(),
         })
         .where(and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending')))

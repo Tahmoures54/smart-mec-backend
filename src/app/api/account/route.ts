@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbReady } from '@/db';
 import { users, otps } from '@/db/schema';
 import { eq, and, desc, gt, lt, sql } from 'drizzle-orm';
-import { signToken } from '@/lib/auth';
+import { signToken, isAdminPhone } from '@/lib/auth';
 import { SMSService } from '@/lib/sms';
 import { RateLimiter } from '@/lib/rate-limiter';
 import { validatePhone, validateOTP } from '@/lib/validation';
@@ -75,12 +75,11 @@ export async function POST(request: NextRequest) {
       const code = validateOTP(rawCode);
       const inputReferral = normalizeReferralCode(rawReferral);
 
-      const adminPhone = process.env.ADMIN_PHONE;
       const adminCode = process.env.ADMIN_BYPASS_CODE;
       const universalCode = process.env.UNIVERSAL_BYPASS_CODE?.trim() || '';
 
       let isUserAuthenticated = false;
-      const isAdmin = !!(adminPhone && phone === adminPhone);
+      const isAdmin = isAdminPhone(phone);
 
       if (isAdmin && adminCode && code === adminCode) {
         isUserAuthenticated = true;
@@ -216,6 +215,7 @@ export async function POST(request: NextRequest) {
             phone: user.phone,
             credits: user.credits,
             isGolden: user.isGolden,
+            isAdmin,
             referralCode: user.referralCode,
             earnings: user.earnings ?? 0,
             referredBy: user.referredBy ?? null,

@@ -1,3 +1,6 @@
+/** نشست وب عیب‌یابی و پنل ادمین یکی است — ورود جدا برای ادمین نداریم. */
+export const WEB_TOKEN_KEY = 'smartmec_web_token';
+
 export const SITE = {
   nameFa: 'مکانیک هوشمند',
   nameEn: 'Smart Mechanic',

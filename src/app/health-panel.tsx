@@ -48,9 +48,6 @@ export function HealthPanel() {
         <Link href="/api/health" dir="ltr" className="text-orange-400 hover:text-orange-300 underline">
           /api/health
         </Link>
-        <Link href="/admin" dir="ltr" className="text-orange-400 hover:text-orange-300 underline">
-          /admin
-        </Link>
       </div>
     </div>
   );

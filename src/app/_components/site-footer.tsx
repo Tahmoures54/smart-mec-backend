@@ -33,9 +33,6 @@ export function SiteFooter() {
           <Link href="/dev" className="hover:text-white">
             وضعیت سرویس
           </Link>
-          <Link href="/admin" className="hover:text-white">
-            ورود مدیران
-          </Link>
         </div>
         <div className="flex flex-col items-start gap-3">
           <p className="text-sm font-semibold text-amber-100">نماد اعتماد الکترونیکی</p>

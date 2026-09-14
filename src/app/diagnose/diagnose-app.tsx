@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { markdownToHtml } from '@/lib/markdown';
+import { WEB_TOKEN_KEY } from '@/lib/site';
 
-const TOKEN_KEY = 'smartmec_web_token';
+const TOKEN_KEY = WEB_TOKEN_KEY;
 
 type Car = {
   id: string | number;
@@ -18,6 +20,7 @@ type Profile = {
   isGolden: boolean;
   remainingFree: number | null;
   monthlyFreeLimit: number;
+  isAdmin?: boolean;
 };
 
 type HistoryItem = {
@@ -409,6 +412,11 @@ export function DiagnoseApp() {
               <button type="button" onClick={logout} className="text-orange-300 hover:text-orange-200">
                 خروج
               </button>
+              {profile.isAdmin ? (
+                <Link href="/admin" className="text-amber-200 hover:text-white">
+                  پنل مدیریت
+                </Link>
+              ) : null}
             </div>
           ) : (
             <button type="button" onClick={() => setShowLogin(true)} className="text-orange-300">
@@ -606,7 +614,7 @@ export function DiagnoseApp() {
             <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5">
               <h3 className="font-bold text-amber-200">برای ادامه، یک بسته انتخاب کن</h3>
               <p className="mt-2 text-sm text-amber-100/70">
-                پرداخت امن از درگاه بانکی پی‌پینگ — اعتبار همان لحظه روی حسابت می‌نشیند.
+                پرداخت امن از درگاه بانکی زیبال — اعتبار همان لحظه روی حسابت می‌نشیند.
               </p>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {products.map((p) => (

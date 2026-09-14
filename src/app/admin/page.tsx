@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import Link from 'next/link';
+import { DEFAULT_ADMIN_PHONE } from '@/lib/admin-phone';
+import { WEB_TOKEN_KEY } from '@/lib/site';
 
 const API = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -9,11 +12,8 @@ type Tab = 'dashboard' | 'users' | 'withdrawals' | 'purchases' | 'garages' | 'di
 export default function AdminPage() {
   const [token, setToken] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return localStorage.getItem('admin_token') || '';
+    return localStorage.getItem(WEB_TOKEN_KEY) || '';
   });
-  const [phone, setPhone] = useState('09160684552');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,6 +27,7 @@ export default function AdminPage() {
   const [wStatus, setWStatus] = useState('pending');
   const [garageForm, setGarageForm] = useState<any | null>(null);
   const [gSearch, setGSearch] = useState('');
+  const [notAdmin, setNotAdmin] = useState(false);
 
   const headers = useCallback(
     () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }),
@@ -42,47 +43,8 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab, wStatus]);
 
-  async function sendOtp() {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/account`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', phone }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'خطا در ارسال کد');
-      setOtpSent(true);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function login() {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/account`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', phone, code: otp }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'خطا در ورود');
-      localStorage.setItem('admin_token', data.token);
-      setToken(data.token);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function logout() {
-    localStorage.removeItem('admin_token');
+    localStorage.removeItem(WEB_TOKEN_KEY);
     setToken('');
     setDash(null);
   }
@@ -107,7 +69,12 @@ export default function AdminPage() {
       if (section === 'diagnostics') setDiagnostics(data.data);
     } catch (e: any) {
       setError(e.message);
-      if (String(e.message).includes('ادمین') || String(e.message).includes('401') || String(e.message).includes('توکن')) logout();
+      const msg = String(e.message);
+      if (msg.includes('ادمین') || msg.includes('مجاز')) {
+        setNotAdmin(true);
+        return;
+      }
+      if (msg.includes('401') || msg.includes('توکن')) logout();
     } finally {
       setLoading(false);
     }
@@ -244,28 +211,22 @@ export default function AdminPage() {
 
   const fmt = (n: number) => (n || 0).toLocaleString('fa-IR');
 
-  if (!token) {
+  if (!token || notAdmin) {
     return (
       <div style={s.shell} dir="rtl">
         <div style={s.loginCard}>
-          <div style={s.loginBadge}>ADMIN</div>
           <div style={s.logoCircle}>🔧</div>
           <h1 style={s.loginTitle}>پنل مدیریت</h1>
-          <p style={s.loginSub}>مکانیک هوشمند</p>
-          {error && <div style={s.alertError}>{error}</div>}
-          {!otpSent ? (
-            <>
-              <label style={s.label}>شماره موبایل ادمین</label>
-              <input style={s.input} value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
-              <button style={s.btnPrimary} disabled={loading} onClick={sendOtp}>{loading ? '...' : 'ارسال کد'}</button>
-            </>
+          {notAdmin ? (
+            <p style={s.loginSub}>این حساب ادمین نیست. ادمین فقط شماره {DEFAULT_ADMIN_PHONE} است.</p>
           ) : (
-            <>
-              <label style={s.label}>کد تأیید</label>
-              <input style={{ ...s.input, textAlign: 'center', letterSpacing: 6 }} value={otp} onChange={(e) => setOtp(e.target.value)} dir="ltr" />
-              <button style={s.btnPrimary} disabled={loading} onClick={login}>{loading ? '...' : 'ورود'}</button>
-            </>
+            <p style={s.loginSub}>ورود جدا ندارد. با شماره ادمین از صفحه عیب‌یابی وارد شو.</p>
           )}
+          {error && !notAdmin && <div style={s.alertError}>{error}</div>}
+          <p style={{ ...s.loginSub, direction: 'ltr' }}>{DEFAULT_ADMIN_PHONE}</p>
+          <Link href="/diagnose" style={{ ...s.btnPrimary, display: 'block', textDecoration: 'none', boxSizing: 'border-box' }}>
+            {notAdmin ? 'بازگشت به عیب‌یابی' : 'ورود از صفحه عیب‌یابی'}
+          </Link>
         </div>
       </div>
     );

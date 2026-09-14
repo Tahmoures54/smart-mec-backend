@@ -9,6 +9,9 @@ import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { UnauthorizedError, ForbiddenError } from './error-handler';
 import { JWTPayload, User } from '@/types';
+import { getAdminPhone, isAdminPhone } from '@/lib/admin-phone';
+
+export { getAdminPhone, isAdminPhone } from '@/lib/admin-phone';
 
 const getJwtSecretKey = () => {
   const secret = process.env.JWT_SECRET;
@@ -70,14 +73,6 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
     updatedAt: user.updatedAt ? new Date(user.updatedAt).toISOString() : null,
     goldenExpiresAt: user.goldenExpiresAt ? new Date(user.goldenExpiresAt).toISOString() : null,
   } as User;
-}
-
-export function getAdminPhone(): string {
-  return (process.env.ADMIN_PHONE || '09160684552').replace(/\s/g, '');
-}
-
-export function isAdminPhone(phone: string): boolean {
-  return phone === getAdminPhone();
 }
 
 export async function requireAdmin(req: NextRequest): Promise<User> {

@@ -14,14 +14,13 @@ const ENDPOINTS = [
   { path: '/api/account/credits', desc: 'پروفایل، اعتبار و سهمیه رایگان' },
   { path: '/api/diagnose', desc: 'عیب‌یابی متنی AI (سال ساخت + شرح)' },
   { path: '/api/diagnose/audio', desc: 'عیب‌یابی از صدای موتور' },
-  { path: '/api/purchase', desc: 'ایجاد تراکنش PayPing' },
-  { path: '/api/purchase/verify', desc: 'تأیید پرداخت (کال‌بک درگاه)' },
+  { path: '/api/purchase', desc: 'ایجاد تراکنش زیبال' },
+  { path: '/api/purchase/verify', desc: 'تأیید پرداخت (کال‌بک درگاه زیبال)' },
   { path: '/api/products', desc: 'لیست بسته‌های اعتبار و اشتراک طلایی' },
   { path: '/api/cars', desc: 'لیست خودروها با جستجو' },
   { path: '/api/garages/nearby', desc: 'تعمیرگاه‌های نزدیک روی نقشه' },
   { path: '/api/feedback', desc: 'امتیاز به نتیجه عیب‌یابی' },
   { path: '/cars.json', desc: 'فایل استاتیک خودروها برای اپ فلاتر' },
-  { path: '/admin', desc: 'پنل مدیریت' },
 ];
 
 export default function DevStatusPage() {
