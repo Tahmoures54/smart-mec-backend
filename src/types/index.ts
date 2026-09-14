@@ -14,14 +14,26 @@ import { PRODUCTS } from '@/types';
 import { logger } from '@/utils/logger';
 
 // ─── Zibal Config ───
-const ZIBAL_REQUEST_URL =
-  process.env.ZIBAL_REQUEST_URL || 'https://gateway.zibal.ir/v1/request';
-const ZIBAL_START_URL =
-  process.env.ZIBAL_START_URL || 'https://gateway.zibal.ir/start';
+const ZIBAL_GATEWAY_URL =
+  process.env.ZIBAL_GATEWAY_URL || 'https://gateway.zibal.ir';
+const ZIBAL_SANDBOX = process.env.ZIBAL_SANDBOX === 'true';
+const ZIBAL_REQUEST_URL = ZIBAL_SANDBOX
+  ? 'https://sandbox.zibal.ir/v1/request'
+  : `${ZIBAL_GATEWAY_URL}/v1/request`;
+const ZIBAL_START_URL = ZIBAL_SANDBOX
+  ? 'https://sandbox.zibal.ir/start'
+  : `${ZIBAL_GATEWAY_URL}/start`;
 const ZIBAL_TIMEOUT_MS = Number(process.env.ZIBAL_TIMEOUT_MS) || 15000;
 
 // قیمت‌ها در PRODUCTS به تومان هستند؛ زیبال فقط ریال می‌پذیرد.
 const TOMAN_TO_RIAL = 10;
+
+// ─── Types ───
+interface ZibalRequestResponse {
+  result: number;
+  trackId?: number;
+  message?: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,14 +52,14 @@ export async function POST(request: NextRequest) {
     const webQuery = fromWeb ? '&from=web' : '';
 
     // ─── Env ───
-    const zibalMerchant = process.env.ZIBAL_MERCHANT;
+    const zibalMerchant = process.env.ZIBAL_MERCHANT_ID;
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
     // ─────────────────────────────────────────────────────
     // MOCK MODE (بدون کد مرچنت درگاه)
     // ─────────────────────────────────────────────────────
     if (!zibalMerchant) {
-      logger.info('Creating MOCK payment (ZIBAL_MERCHANT not set)...');
+      logger.info('Creating MOCK payment (ZIBAL_MERCHANT_ID not set)...');
 
       const authority =
         'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -87,35 +99,47 @@ export async function POST(request: NextRequest) {
           amount: product.price * TOMAN_TO_RIAL, // ← تبدیل تومان به ریال
           callbackUrl,                           // آدرس بازگشت پس از پرداخت
           mobile: user.phone,                    // اختیاری
-          description: `خرید ${product.name}`,   // اختیاری
+          description: `خرید ${product.title}`,  // ← اصلاح شد: title به جای name
         }),
         signal: controller.signal,
       });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         logger.error('Zibal request timeout');
-        throw new Error('زمان پاسخ درگاه پرداخت به پایان رسید. لطفاً دوباره تلاش کنید.');
+        throw new Error(
+          'زمان پاسخ درگاه پرداخت به پایان رسید. لطفاً دوباره تلاش کنید.'
+        );
       }
       logger.error('Zibal fetch error:', err);
-      throw new Error('خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.');
+      throw new Error(
+        'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
+      );
     } finally {
       clearTimeout(timeout);
     }
 
     // ─── Parse Response ───
-    let zibalData: { result?: number; trackId?: number; message?: string };
+    let zibalData: ZibalRequestResponse;
     try {
-      zibalData = await zibalResponse.json();
+      zibalData = (await zibalResponse.json()) as ZibalRequestResponse;
     } catch (err) {
       logger.error('Zibal invalid JSON response:', err);
       throw new Error('پاسخ نامعتبر از درگاه پرداخت دریافت شد.');
     }
 
     // کد 100 = موفقیت در زیبال
-    if (!zibalResponse.ok || zibalData.result !== 100 || !zibalData.trackId) {
-      logger.error('Zibal create payment error:', zibalData);
+    if (
+      !zibalResponse.ok ||
+      zibalData.result !== 100 ||
+      !zibalData.trackId
+    ) {
+      logger.error('Zibal create payment error:', {
+        status: zibalResponse.status,
+        data: zibalData,
+      });
       throw new Error(
-        'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
+        zibalData.message ||
+          'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
       );
     }
 
