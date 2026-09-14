@@ -10,21 +10,21 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <SiteFooter />
 
       {/* ─── Enamad Trust Seal (Floating - فقط در دسکتاپ) ─── */}
-      <a
-        target="_blank"
-        rel="noopener noreferrer"
-        href="https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
-        className="hidden md:block fixed bottom-4 left-4 z-50 rounded-lg bg-white p-2 shadow-lg transition-transform hover:scale-105"
-        aria-label="نماد اعتماد الکترونیکی"
-      >
-        <img
-          referrerPolicy="no-referrer"
-          src="https://trustseal.enamad.ir/logo.aspx?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
-          alt="نماد اعتماد الکترونیکی"
-          className="h-20 w-auto cursor-pointer"
-          data-code="Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
-        />
-      </a>
+      <div className="hidden md:block fixed bottom-4 left-4 z-50">
+        <a
+          referrerPolicy="origin"
+          target="_blank"
+          href="https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
+        >
+          <img
+            referrerPolicy="origin"
+            src="https://trustseal.enamad.ir/logo.aspx?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
+            alt=""
+            style={{ cursor: 'pointer' }}
+            data-code="Q14UpKWtFFDXzZarnOhA5dzChbURT0br"
+          />
+        </a>
+      </div>
     </div>
   );
 }
