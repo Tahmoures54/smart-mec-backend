@@ -1,165 +1,140 @@
 // ═══════════════════════════════════════════════════════════
-// Types & Interfaces - Smart-MEC
+// Purchase (Create Payment) Route - Smart-MEC
+// Gateway: Zibal (https://zibal.ir)
 // ═══════════════════════════════════════════════════════════
 
-export interface User {
-  id: number;
-  phone: string;
-  credits: number;
-  isGolden: boolean;
-  goldenExpiresAt?: string | null;
-  monthlyLimit?: number | null;
-  referralCode?: string | null;
-  referredBy?: number | null;
-  earnings?: number;
-  createdAt: string;
-  updatedAt?: string;
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { purchases } from '@/db/schema';
+import { getUserFromRequest } from '@/lib/auth';
+import { validateProductId } from '@/lib/validation';
+import { handleError } from '@/lib/error-handler';
+import { RateLimiter } from '@/lib/rate-limiter';
+import { PRODUCTS } from '@/types';
+import { logger } from '@/utils/logger';
+
+// ─── Zibal Config ───
+const ZIBAL_REQUEST_URL =
+  process.env.ZIBAL_REQUEST_URL || 'https://gateway.zibal.ir/v1/request';
+const ZIBAL_START_URL =
+  process.env.ZIBAL_START_URL || 'https://gateway.zibal.ir/start';
+const ZIBAL_TIMEOUT_MS = Number(process.env.ZIBAL_TIMEOUT_MS) || 15000;
+
+// قیمت‌ها در PRODUCTS به تومان هستند؛ زیبال فقط ریال می‌پذیرد.
+const TOMAN_TO_RIAL = 10;
+
+export async function POST(request: NextRequest) {
+  try {
+    // ─── Rate Limit ───
+    const ip = RateLimiter.getIP(request);
+    RateLimiter.check(ip, 'create_purchase', 10, 15 * 60 * 1000);
+
+    // ─── Auth ───
+    const user = await getUserFromRequest(request);
+
+    // ─── Body ───
+    const body = await request.json();
+    const productId = validateProductId(body.productId);
+    const product = PRODUCTS[productId];
+    const fromWeb = body.from === 'web';
+    const webQuery = fromWeb ? '&from=web' : '';
+
+    // ─── Env ───
+    const zibalMerchant = process.env.ZIBAL_MERCHANT;
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
+    // ─────────────────────────────────────────────────────
+    // MOCK MODE (بدون کد مرچنت درگاه)
+    // ─────────────────────────────────────────────────────
+    if (!zibalMerchant) {
+      logger.info('Creating MOCK payment (ZIBAL_MERCHANT not set)...');
+
+      const authority =
+        'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+      await db.insert(purchases).values({
+        userId: user.id,
+        productId: product.id,
+        amount: product.price, // تومان
+        status: 'pending',
+        authority,
+      });
+
+      const mockVerifyUrl = `${appUrl}/api/purchase/verify?trackId=${authority}&productId=${productId}&success=1&status=2&refid=MOCK_REF${webQuery}`;
+
+      return NextResponse.json({
+        success: true,
+        paymentUrl: mockVerifyUrl,
+        mock: true,
+      });
+    }
+
+    // ─────────────────────────────────────────────────────
+    // PRODUCTION — Zibal Request
+    // ─────────────────────────────────────────────────────
+    const callbackUrl = `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);
+
+    let zibalResponse: Response;
+    try {
+      zibalResponse = await fetch(ZIBAL_REQUEST_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant: zibalMerchant,               // کد مرچنت زیبال (یا zibal برای sandbox)
+          amount: product.price * TOMAN_TO_RIAL, // ← تبدیل تومان به ریال
+          callbackUrl,                           // آدرس بازگشت پس از پرداخت
+          mobile: user.phone,                    // اختیاری
+          description: `خرید ${product.name}`,   // اختیاری
+        }),
+        signal: controller.signal,
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        logger.error('Zibal request timeout');
+        throw new Error('زمان پاسخ درگاه پرداخت به پایان رسید. لطفاً دوباره تلاش کنید.');
+      }
+      logger.error('Zibal fetch error:', err);
+      throw new Error('خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.');
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    // ─── Parse Response ───
+    let zibalData: { result?: number; trackId?: number; message?: string };
+    try {
+      zibalData = await zibalResponse.json();
+    } catch (err) {
+      logger.error('Zibal invalid JSON response:', err);
+      throw new Error('پاسخ نامعتبر از درگاه پرداخت دریافت شد.');
+    }
+
+    // کد 100 = موفقیت در زیبال
+    if (!zibalResponse.ok || zibalData.result !== 100 || !zibalData.trackId) {
+      logger.error('Zibal create payment error:', zibalData);
+      throw new Error(
+        'خطا در ارتباط با درگاه پرداخت. لطفاً دوباره تلاش کنید.'
+      );
+    }
+
+    // ─── ذخیره در دیتابیس (مبلغ به تومان) ───
+    await db.insert(purchases).values({
+      userId: user.id,
+      productId: product.id,
+      amount: product.price, // تومان — نه ریال
+      status: 'pending',
+      authority: String(zibalData.trackId),
+    });
+
+    // ─── لینک هدایت کاربر به درگاه زیبال ───
+    return NextResponse.json({
+      success: true,
+      paymentUrl: `${ZIBAL_START_URL}/${zibalData.trackId}`,
+      trackId: zibalData.trackId,
+    });
+  } catch (error) {
+    return handleError(error);
+  }
 }
-
-export interface GoldenUsage {
-  id: number;
-  userId: number;
-  yearMonth: string;
-  count: number;
-  updatedAt: string;
-}
-
-export interface MonthlyFreeUsage {
-  id: number;
-  userId: number;
-  yearMonth: string;
-  freeCount: number;
-  updatedAt: string;
-}
-
-export interface Diagnostic {
-  id: number;
-  userId: number;
-  carId: string;
-  description: string;
-  result: string;
-  audioUrl?: string | null;
-  createdAt: string;
-}
-
-export interface Purchase {
-  id: number;
-  userId: number;
-  productId: string;
-  amount: number;
-  status: 'pending' | 'completed' | 'failed';
-  authority: string;
-  refId?: string | null;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-/** خودرو — سال ساخت توسط کاربر وارد می‌شود، نه از لیست ثابت */
-export interface Car {
-  id: string | number;
-  brand: string;
-  model: string;
-  /** سال در JSON ممکن است بازه نمونه باشد؛ برای عیب‌یابی از ورودی کاربر استفاده می‌شود */
-  year?: number | string;
-  engine: string;
-  gearbox?: string;
-  commonIssues?: string | string[];
-}
-
-export interface JWTPayload {
-  userId: number;
-  phone: string;
-  isGolden?: boolean;
-}
-
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
-export interface SMSResponse {
-  return: {
-    status: number;
-    message: string;
-  };
-  entries?: any;
-}
-
-export interface PaymentResponse {
-  success: boolean;
-  paymentUrl?: string;
-  authority?: string;
-  error?: string;
-}
-
-export interface VerifyPaymentResponse {
-  success: boolean;
-  refId?: string;
-  amount?: number;
-  error?: string;
-}
-
-export type ProductId =
-  | 'credit_1'
-  | 'credit_5'
-  | 'credit_10'
-  | 'golden_30'
-  | 'golden_90'
-  | 'golden_365';
-
-export interface Product {
-  id: ProductId;
-  name: string;
-  price: number;
-  credits?: number;
-  goldenDays?: number;
-  monthlyLimit?: number;
-  discount?: number;
-  popular?: boolean;
-}
-
-export interface RateLimitInfo {
-  ip: string;
-  endpoint: string;
-  count: number;
-  resetAt: number;
-}
-
-export const PRODUCTS: Record<ProductId, Product> = {
-  credit_1: { id: 'credit_1', name: '۱ اعتبار عیب‌یابی', price: 15000, credits: 1 },
-  credit_5: { id: 'credit_5', name: '۵ اعتبار عیب‌یابی', price: 65000, credits: 5, discount: 13 },
-  credit_10: {
-    id: 'credit_10',
-    name: '۱۰ اعتبار عیب‌یابی',
-    price: 120000,
-    credits: 10,
-    discount: 20,
-    popular: true,
-  },
-  golden_30: {
-    id: 'golden_30',
-    name: 'اشتراک طلایی ۳۰ روزه',
-    price: 199000,
-    goldenDays: 30,
-    monthlyLimit: 200,
-  },
-  golden_90: {
-    id: 'golden_90',
-    name: 'اشتراک طلایی ۹۰ روزه',
-    price: 499000,
-    goldenDays: 90,
-    discount: 16,
-    popular: true,
-    monthlyLimit: 600,
-  },
-  golden_365: {
-    id: 'golden_365',
-    name: 'اشتراک طلایی سالانه',
-    price: 1499000,
-    goldenDays: 365,
-    discount: 25,
-    monthlyLimit: 2400,
-  },
-};
