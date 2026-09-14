@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Purchase Verify Route - Smart-MEC
+// Gateway: Zibal (https://zibal.ir)
 // ═══════════════════════════════════════════════════════════
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
@@ -14,6 +15,11 @@ import {
   isMockAuthority,
 } from '@/lib/payment';
 import { referralPercentage } from '@/lib/constants';
+
+// ─── Zibal Config ───
+const ZIBAL_VERIFY_URL =
+  process.env.ZIBAL_VERIFY_URL || 'https://gateway.zibal.ir/v1/verify';
+const ZIBAL_TIMEOUT_MS = Number(process.env.ZIBAL_TIMEOUT_MS) || 15000;
 
 const renderHTML = (
   title: string,
@@ -125,19 +131,79 @@ async function grantProduct(
   }
 }
 
+// ─── Zibal Verify Helper ───
+async function verifyZibalPayment(
+  trackId: string
+): Promise<{ success: boolean; refNumber?: string; error?: string }> {
+  const merchant = process.env.ZIBAL_MERCHANT;
+  if (!merchant) {
+    return { success: false, error: 'ZIBAL_MERCHANT_CONFIG_MISSING' };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(ZIBAL_VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchant,
+        trackId: Number(trackId),
+      }),
+      signal: controller.signal,
+    });
+
+    const data = await res.json();
+
+    // کد 100 = موفقیت در زیبال
+    // کد 201 = تراکنش قبلاً تأیید شده (processed before)
+    if (data.result === 100) {
+      return { success: true, refNumber: String(data.refNumber || '') };
+    }
+
+    if (data.result === 201) {
+      // قبلاً verify شده — باز هم موفق در نظر گرفته می‌شود
+      return { success: true, refNumber: String(data.refNumber || '') };
+    }
+
+    logger.error('Zibal verify failed:', data);
+    return {
+      success: false,
+      error: data.message || `ZIBAL_RESULT_${data.result}`,
+    };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { success: false, error: 'ZIBAL_TIMEOUT' };
+    }
+    logger.error('Zibal verify fetch error:', err);
+    return { success: false, error: 'ZIBAL_NETWORK_ERROR' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const refId =
-      url.searchParams.get('refid') ||
-      url.searchParams.get('refId') ||
-      url.searchParams.get('Authority');
-    const productId = url.searchParams.get('productId') as ProductId;
-    const code =
+
+    // ─── پارامترهای callback زیبال ───
+    // زیبال این پارامترها را برمی‌گرداند:
+    // trackId=10000&success=1&status=2&orderId=1
+    const trackId =
+      url.searchParams.get('trackId') ||
+      url.searchParams.get('trackid') ||
       url.searchParams.get('code') ||
-      url.searchParams.get('authority') ||
-      url.searchParams.get('Authority');
+      url.searchParams.get('authority');
+    const zibalSuccess = url.searchParams.get('success');
+    const zibalStatus = url.searchParams.get('status');
+    const productId = url.searchParams.get('productId') as ProductId;
     const fromWeb = url.searchParams.get('from') === 'web';
+
+    // refid/refId برای سازگاری با کد قدیمی (mock)
+    const refIdParam =
+      url.searchParams.get('refid') || url.searchParams.get('refId');
+
     const page = (title: string, message: string, ok: boolean, status = 200) =>
       html(title, message, ok, status, fromWeb);
 
@@ -146,15 +212,14 @@ export async function GET(request: NextRequest) {
     }
 
     const product = PRODUCTS[productId];
-    const paypingToken = process.env.PAYPING_TOKEN;
-    const mock = isMockAuthority(code);
+    const mock = isMockAuthority(trackId);
 
-    if (!code) {
+    if (!trackId) {
       return page('تراکنش نامعتبر', 'کد رهگیری پرداخت ارسال نشده است.', false, 400);
     }
 
     const purchase = await db.query.purchases.findFirst({
-      where: eq(purchases.authority, code),
+      where: eq(purchases.authority, trackId),
     });
 
     if (!purchase) {
@@ -187,40 +252,18 @@ export async function GET(request: NextRequest) {
       return page('محصول نامعتبر', 'محصول با تراکنش مطابقت ندارد.', false, 400);
     }
 
-    if (!mock) {
-      if (!paypingToken) {
-        logger.error('PayPing token missing while verifying live payment');
-        return page(
-          'خطای پیکربندی',
-          'درگاه پرداخت پیکربندی نشده است.',
-          false,
-          503
-        );
-      }
-      if (!refId) {
-        return page(
-          'پرداخت ناموفق',
-          'رسید درگاه دریافت نشد. اگر مبلغ از حساب شما کم شده با پشتیبانی تماس بگیرید.',
-          false,
-          400
-        );
-      }
+    // ─── بخش تأیید واقعی (غیر MOCK) ───
+    let finalRefNumber: string | null = null;
 
-      const verifyRes = await fetch('https://api.payping.ir/v2/pay/verify', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${paypingToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refId, amount: purchase.amount }),
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok || verifyData.status !== 200) {
+    if (!mock) {
+      // بررسی پارامترهای callback زیبال
+      if (zibalSuccess !== '1' || zibalStatus !== '2') {
+        // کاربر پرداخت را لغو کرده یا تراکنش ناموفق بوده
         await db
           .update(purchases)
           .set({
             status: 'failed',
-            refId: refId || null,
+            refId: refIdParam || null,
             updatedAt: new Date(),
           })
           .where(
@@ -228,19 +271,71 @@ export async function GET(request: NextRequest) {
           );
         return page(
           'پرداخت ناموفق',
-          'تراکنش توسط درگاه بانکی تایید نشد.',
+          'تراکنش توسط درگاه بانکی تایید نشد. اگر مبلغ از حساب شما کم شده با پشتیبانی تماس بگیرید.',
           false,
           402
         );
       }
+
+      // فراخوانی verify زیبال
+      const verifyResult = await verifyZibalPayment(trackId);
+
+      if (!verifyResult.success) {
+        logger.error(
+          `Zibal verify failed for trackId ${trackId}:`,
+          verifyResult.error
+        );
+        await db
+          .update(purchases)
+          .set({
+            status: 'failed',
+            refId: refIdParam || null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending'))
+          );
+
+        // پیام خطای متناسب با نوع خطا
+        if (verifyResult.error === 'ZIBAL_TIMEOUT') {
+          return page(
+            'خطا در تأیید پرداخت',
+            'زمان پاسخ درگاه به پایان رسید. لطفاً چند دقیقه بعد دوباره بررسی کنید.',
+            false,
+            504
+          );
+        }
+
+        if (verifyResult.error === 'ZIBAL_MERCHANT_CONFIG_MISSING') {
+          return page(
+            'خطای پیکربندی',
+            'درگاه پرداخت پیکربندی نشده است.',
+            false,
+            503
+          );
+        }
+
+        return page(
+          'پرداخت ناموفق',
+          'تراکنش توسط درگاه بانکی تایید نشد. اگر مبلغ از حساب شما کم شده با پشتیبانی تماس بگیرید.',
+          false,
+          402
+        );
+      }
+
+      finalRefNumber = verifyResult.refNumber || null;
+    } else {
+      // MOCK mode
+      finalRefNumber = refIdParam || 'MOCK_REF';
     }
 
+    // ─── به‌روزرسانی اتمی دیتابیس ───
     const claimed = await db.transaction(async (tx) => {
       const rows = await tx
         .update(purchases)
         .set({
           status: 'completed',
-          refId: refId || (mock ? 'MOCK_REF' : null),
+          refId: finalRefNumber,
           updatedAt: new Date(),
         })
         .where(and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending')))
@@ -264,11 +359,14 @@ export async function GET(request: NextRequest) {
     }
 
     logger.info(
-      `✅ Payment Success: User ${purchase.userId} bought ${product.name}`
+      `✅ Payment Success (Zibal): User ${purchase.userId} bought ${product.name} | trackId: ${trackId} | refNumber: ${finalRefNumber}`
     );
+
     return page(
       'پرداخت موفق',
-      `${product.name} با موفقیت به حساب شما اضافه شد.`,
+      `${product.name} با موفقیت به حساب شما اضافه شد.${
+        finalRefNumber ? ` کد رهگیری: ${escapeHtml(finalRefNumber)}` : ''
+      }`,
       true
     );
   } catch (error) {
