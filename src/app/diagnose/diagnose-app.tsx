@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { markdownToHtml } from '@/lib/markdown';
+import { clearWebToken, getTokenKey, readWebToken, saveWebToken } from '@/lib/web-auth';
 
-const TOKEN_KEY = 'smartmec_web_token';
+const TOKEN_KEY = getTokenKey();
+
+function readToken(): string | null {
+  return readWebToken();
+}
 
 type Car = {
   id: string | number;
@@ -71,10 +76,7 @@ function formatToman(n: number) {
 }
 
 export function DiagnoseApp() {
-  const [token, setToken] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
-  });
+  const [token, setToken] = useState<string | null>(() => readToken());
   const [profile, setProfile] = useState<Profile | null>(null);
   const [cars, setCars] = useState<Car[]>([]);
   const [query, setQuery] = useState('');
@@ -121,9 +123,10 @@ export function DiagnoseApp() {
   const loadProfile = useCallback(async (t: string) => {
     const { ok, status, body } = await api<{ data?: Profile }>('/api/account/credits', { token: t });
     if (status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
+      clearWebToken();
       setToken(null);
       setProfile(null);
+      setHistory([]);
       return false;
     }
     if (ok && body.data) setProfile(body.data);
@@ -152,15 +155,17 @@ export function DiagnoseApp() {
   }, [query, loadCars]);
 
   function persistToken(next: string) {
-    localStorage.setItem(TOKEN_KEY, next);
+    saveWebToken(next);
     setToken(next);
   }
 
   function logout() {
-    localStorage.removeItem(TOKEN_KEY);
+    clearWebToken();
     setToken(null);
     setProfile(null);
     setHistory([]);
+    setResult(null);
+    setFollowUp('');
   }
 
   function pickCar(car: Car) {
@@ -252,6 +257,13 @@ export function DiagnoseApp() {
   }
 
   async function runDiagnose(authToken: string, followUpText?: string) {
+    const t = (authToken || '').trim();
+    if (!t || t.length < 10) {
+      pendingSubmit.current = true;
+      setShowLogin(true);
+      setError('برای عیب‌یابی باید وارد شوید.');
+      return;
+    }
     const problem = followUpText ?? description;
     setError('');
     setNeedCredits(false);
@@ -270,7 +282,7 @@ export function DiagnoseApp() {
           remainingCredits?: number | null;
           remainingFreeQuestions?: number | null;
           error?: string;
-        }>('/api/diagnose/audio', { method: 'POST', token: authToken, form });
+        }>('/api/diagnose/audio', { method: 'POST', token: t, form });
         if (status === 401) {
           pendingSubmit.current = true;
           setShowLogin(true);
@@ -298,7 +310,7 @@ export function DiagnoseApp() {
           error?: string;
         }>('/api/diagnose', {
           method: 'POST',
-          token: authToken,
+          token: t,
           json: {
             carId,
             year,
@@ -327,8 +339,8 @@ export function DiagnoseApp() {
         });
         if (followUpText) setFollowUp('');
       }
-      await loadProfile(authToken);
-      await loadHistory(authToken);
+      await loadProfile(t);
+      await loadHistory(t);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در عیب‌یابی');
     } finally {
@@ -343,12 +355,14 @@ export function DiagnoseApp() {
       setError(invalid);
       return;
     }
-    if (!token) {
+    const auth = (token || readToken() || '').trim();
+    if (!auth || auth.length < 10) {
       pendingSubmit.current = true;
       setShowLogin(true);
+      setError('لطفاً ابتدا با شماره موبایل وارد شوید.');
       return;
     }
-    await runDiagnose(token);
+    await runDiagnose(auth);
   }
 
   async function loadProducts() {
@@ -357,8 +371,10 @@ export function DiagnoseApp() {
   }
 
   async function buy(productId: string) {
-    if (!token) {
+    const auth = (token || readToken() || '').trim();
+    if (!auth || auth.length < 10) {
       setShowLogin(true);
+      setError('برای خرید باید وارد شوید.');
       return;
     }
     setLoading(true);
@@ -366,7 +382,7 @@ export function DiagnoseApp() {
     try {
       const { ok, body } = await api<{ paymentUrl?: string; error?: string }>('/api/purchase', {
         method: 'POST',
-        token,
+        token: auth,
         json: { productId, from: 'web' },
       });
       if (!ok || !body.paymentUrl) throw new Error(body.error || 'ساخت تراکنش ناموفق بود');
@@ -570,15 +586,17 @@ export function DiagnoseApp() {
                   className="mt-6 border-t border-white/10 pt-4"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (!token) {
+                    const auth = (token || readToken() || '').trim();
+                    if (!auth || auth.length < 10) {
                       setShowLogin(true);
+                      setError('برای ادامه گفتگو باید وارد شوید.');
                       return;
                     }
                     if (followUp.trim().length < 10) {
                       setError('سوال پیگیری باید حداقل ۱۰ کاراکتر باشد.');
                       return;
                     }
-                    void runDiagnose(token, followUp.trim());
+                    void runDiagnose(auth, followUp.trim());
                   }}
                 >
                   <label className="block text-sm">
@@ -590,7 +608,11 @@ export function DiagnoseApp() {
                       className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-orange-400"
                     />
                   </label>
-                  <button type="submit" className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-sm">
+                  <button
+                    type="submit"
+                    disabled={!token || loading}
+                    className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-sm disabled:opacity-50"
+                  >
                     بپرس
                   </button>
                 </form>
