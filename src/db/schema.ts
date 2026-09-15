@@ -106,6 +106,8 @@ export const purchases = pgTable(
     status: text('status').default('pending').notNull(),
     authority: text('authority').unique(),
     refId: text('ref_id'),
+    /** برای پکیج معرفی تعمیرگاه در چت */
+    garageId: integer('garage_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -134,10 +136,6 @@ export const withdrawals = pgTable(
   })
 );
 
-/**
- * تعمیرگاه‌ها — دیتابیس خود اپ
- * subscriptionTier: free | silver | gold
- */
 export const garages = pgTable(
   'garages',
   {
@@ -160,6 +158,14 @@ export const garages = pgTable(
     subscriptionTier: text('subscription_tier').default('free').notNull(),
     subscriptionExpiresAt: text('subscription_expires_at'),
     city: text('city'),
+    /** کاربر تعمیرکاری که خودش ثبت کرده */
+    ownerUserId: integer('owner_user_id').references(() => users.id),
+    /**
+     * none | pending_payment | pending_review | approved | rejected
+     */
+    chatStatus: text('chat_status').default('none').notNull(),
+    /** فقط بعد از تأیید ادمین true می‌شود — شرط نمایش در چت */
+    showInChat: boolean('show_in_chat').default(false).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -168,6 +174,8 @@ export const garages = pgTable(
     activeIdx: index('idx_garages_active').on(t.isActive),
     featuredIdx: index('idx_garages_featured').on(t.isFeatured),
     cityIdx: index('idx_garages_city').on(t.city),
+    ownerIdx: index('idx_garages_owner').on(t.ownerUserId),
+    chatIdx: index('idx_garages_show_chat').on(t.showInChat),
   })
 );
 
