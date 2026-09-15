@@ -6,7 +6,7 @@ import {
   tierFromGarageProduct,
 } from '@/lib/chat-garages';
 
-/** بعد از پرداخت موفق — وضعیت pending_review تا ادمین تأیید کند (showInChat هنوز false) */
+/** بعد از پرداخت موفق — pending_review تا ادمین تأیید کند */
 export async function applyGaragePromoAfterPayment(
   tx: any,
   purchase: { userId: number; productId: string; garageId?: number | null }
