@@ -27,6 +27,10 @@ import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagno
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
 import { SYSTEM_PROMPT_FREE, SYSTEM_PROMPT_PREMIUM } from '@/lib/prompts';
+import {
+  formatGaragesForChat,
+  getChatApprovedGaragesNearby,
+} from '@/lib/chat-garages';
 
 export const maxDuration = 60;
 
@@ -100,11 +104,28 @@ export async function POST(request: NextRequest) {
 
     logger.info('Diagnose requested', { userId: user.id, carId, year, ip });
 
-    const { text: resultText } = await chatCompletion({
+    const { text: resultTextRaw } = await chatCompletion({
       systemPrompt: golden ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE,
       userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی کاربر]\n${description}`,
       userId: user.id,
     });
+
+    // فقط تعمیرگاه‌هایی که پرداخت کرده و ادمین تأیید کرده در چت می‌آیند
+    const cityHint = typeof body.city === 'string' ? body.city : undefined;
+    const userLat = Number(body.lat);
+    const userLng = Number(body.lng);
+    let resultText = resultTextRaw;
+    try {
+      const promo = await getChatApprovedGaragesNearby({
+        lat: Number.isFinite(userLat) ? userLat : null,
+        lng: Number.isFinite(userLng) ? userLng : null,
+        city: cityHint || null,
+        limit: 3,
+      });
+      resultText = resultTextRaw + formatGaragesForChat(promo);
+    } catch (e) {
+      logger.warn('chat garage promo append failed', e);
+    }
 
     let remainingFree: number | null = null;
     let remainingCredits: number | null = null;
