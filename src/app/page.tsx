@@ -124,6 +124,8 @@ export default function Home() {
                   همراه ماشینت
                 </span>
               </p>
+              <p className="mt-3 text-base font-semibold text-orange-300/95 md:text-lg">{SITE.tagline}</p>
+              <p className="mt-1 text-sm text-amber-100/55">{SITE.subtitle}</p>
               <p className="mt-5 max-w-xl text-lg leading-8 text-amber-100/80">{SITE.description}</p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -171,7 +173,8 @@ export default function Home() {
                     />
                     <div>
                       <p className="font-bold">{SITE.nameFa}</p>
-                      <p className="text-xs text-amber-100/60">{SITE.tagline}</p>
+                      <p className="text-xs text-amber-100/80">{SITE.tagline}</p>
+                      <p className="text-[11px] text-amber-100/50">{SITE.subtitle}</p>
                     </div>
                   </div>
                   <div className="space-y-3 text-sm">
