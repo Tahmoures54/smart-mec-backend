@@ -38,7 +38,7 @@ export interface Car {
   createdAt?: string | Date;
 }
 
-// ─── Products (Credit Packs) ───
+// ─── Products (Credit Packs + Garage chat promo) ───
 export type ProductId =
   | 'credit_5'
   | 'credit_10'
@@ -48,17 +48,19 @@ export type ProductId =
   | 'gold_monthly'
   | 'gold_quarterly'
   | 'gold_yearly'
-  | 'blue_tick';
+  | 'blue_tick'
+  | 'garage_silver_30'
+  | 'garage_gold_30';
 
 export interface Product {
   id: ProductId;
   name: string;
   title: string;
-  price: number;         // تومان
-  credits: number;       // تعداد اعتبار اضافه‌شده
-  goldenDays: number;    // مدت طلایی (اگر 0 باشه، طلایی نمی‌شه)
-  monthlyLimit: number;  // سقف ماهانه (0 = تغییر نده)
-  days: number;          // alias برای goldenDays
+  price: number; // تومان
+  credits: number;
+  goldenDays: number;
+  monthlyLimit: number;
+  days: number;
 }
 
 export const PRODUCTS: Record<ProductId, Product> = {
@@ -126,7 +128,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'gold_quarterly',
     name: 'اشتراک طلایی سه‌ماهه',
     title: 'اشتراک طلایی سه‌ماهه',
-    price: 270000,
+    price: 249000,
     credits: 0,
     goldenDays: 90,
     monthlyLimit: 100,
@@ -147,6 +149,26 @@ export const PRODUCTS: Record<ProductId, Product> = {
     name: 'تیک آبی',
     title: 'تیک آبی',
     price: 49000,
+    credits: 0,
+    goldenDays: 0,
+    monthlyLimit: 0,
+    days: 0,
+  },
+  garage_silver_30: {
+    id: 'garage_silver_30',
+    name: 'معرفی تعمیرگاه نقره‌ای (۳۰ روز)',
+    title: 'معرفی در چت — نقره‌ای ۳۰ روز',
+    price: 299000,
+    credits: 0,
+    goldenDays: 0,
+    monthlyLimit: 0,
+    days: 30,
+  },
+  garage_gold_30: {
+    id: 'garage_gold_30',
+    name: 'معرفی تعمیرگاه طلایی (۳۰ روز)',
+    title: 'معرفی در چت — طلایی ۳۰ روز',
+    price: 599000,
     credits: 0,
     goldenDays: 0,
     monthlyLimit: 0,
@@ -182,6 +204,7 @@ export interface Purchase {
   authority?: string | null;
   trackId?: string | null;
   refId?: string | null;
+  garageId?: number | null;
   createdAt?: Date;
   paidAt?: Date | null;
 }
