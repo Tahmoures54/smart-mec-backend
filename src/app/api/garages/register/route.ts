@@ -6,14 +6,13 @@ import { getUserFromRequest } from '@/lib/auth';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
 import { toPublicGarage } from '@/lib/garage-dto';
+import { ensureGarageChatColumns } from '@/lib/ensure-garage-chat-columns';
 
-/**
- * ثبت تعمیرگاه توسط خود تعمیرکار (بعد از ورود OTP).
- * تا وقتی پرداخت + تأیید ادمین نباشد، در چت نشان داده نمی‌شود.
- */
+/** ثبت تعمیرگاه توسط خود تعمیرکار — تا پرداخت+تأیید ادمین در چت نمی‌آید */
 export async function POST(request: NextRequest) {
   try {
     await ensureDbReady();
+    await ensureGarageChatColumns();
     const user = await getUserFromRequest(request);
     const ip = RateLimiter.getIP(request);
     RateLimiter.check(ip, 'garage_register', 8, 30 * 60 * 1000);
@@ -84,10 +83,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** لیست تعمیرگاه‌های ثبت‌شده توسط کاربر جاری */
 export async function GET(request: NextRequest) {
   try {
     await ensureDbReady();
+    await ensureGarageChatColumns();
     const user = await getUserFromRequest(request);
 
     const rows = await db
