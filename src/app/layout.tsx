@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Vazirmatn } from 'next/font/google';
+import { ENAMAD_VERIFY_CODE } from '@/lib/enamad';
 import { SITE } from '@/lib/site';
 import './globals.css';
 
@@ -45,7 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fa" dir="rtl">
       <head>
-        <meta name="enamad" content="24876525" />
+        <meta name="enamad" content={ENAMAD_VERIFY_CODE} />
       </head>
       <body className={`${vazirmatn.className} bg-[#140C08] text-slate-100 antialiased`}>{children}</body>
     </html>

@@ -1,19 +1,34 @@
-export const ENAMAD_CODE = '24876525';
+/**
+ * Enamad configuration — keep seal + domain verification consistent.
+ *
+ * - VERIFY_CODE (24876525): domain verification meta + /24876525.txt
+ * - SEAL_ID / SEAL_CODE: official trust-seal logo from enamad panel
+ */
+export const ENAMAD_VERIFY_CODE = '24876525';
 
-export const ENAMAD_FILE_NAME = `${ENAMAD_CODE}.txt`;
+/** @deprecated use ENAMAD_VERIFY_CODE — kept for page title / crawler h1 */
+export const ENAMAD_CODE = ENAMAD_VERIFY_CODE;
+
+export const ENAMAD_SEAL_ID = '7731207';
+export const ENAMAD_SEAL_CODE = 'Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
+
+export const ENAMAD_LOGO_SRC = `https://trustseal.enamad.ir/logo.aspx?id=${ENAMAD_SEAL_ID}&Code=${ENAMAD_SEAL_CODE}`;
+export const ENAMAD_PROFILE_HREF = `https://trustseal.enamad.ir/?id=${ENAMAD_SEAL_ID}&Code=${ENAMAD_SEAL_CODE}`;
+
+export const ENAMAD_FILE_NAME = `${ENAMAD_VERIFY_CODE}.txt`;
 export const ENAMAD_FILE_PATH = `/${ENAMAD_FILE_NAME}`;
 /**
  * Enamad’s UI says «فایل خالی», but its checker treats an empty body as
  * «صفحه بارگذاری نشده». Serve the verification code at /24876525.txt.
  */
-export const ENAMAD_FILE_BODY = ENAMAD_CODE;
+export const ENAMAD_FILE_BODY = ENAMAD_VERIFY_CODE;
 export const ENAMAD_FILE_CONTENT_TYPE = 'text/plain; charset=utf-8';
 
 /** Exact markup from Enamad’s rejection message. */
-export const ENAMAD_META_TAG = `<meta name="enamad" content ="${ENAMAD_CODE}"/>`;
+export const ENAMAD_META_TAG = `<meta name="enamad" content ="${ENAMAD_VERIFY_CODE}"/>`;
 
 /** Guide markup (no space before =, space before />). */
-export const ENAMAD_META_GUIDE = `<meta name="enamad" content="${ENAMAD_CODE}" />`;
+export const ENAMAD_META_GUIDE = `<meta name="enamad" content="${ENAMAD_VERIFY_CODE}" />`;
 
 export const ENAMAD_META_SNIPPET = `${ENAMAD_META_GUIDE}\n${ENAMAD_META_TAG}`;
 
@@ -73,10 +88,10 @@ export function enamadVerifyHtml(): string {
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 ${ENAMAD_META_GUIDE}
-<title>${ENAMAD_CODE}</title>
+<title>${ENAMAD_VERIFY_CODE}</title>
 </head>
 <body>
-<h1>${ENAMAD_CODE}</h1>
+<h1>${ENAMAD_VERIFY_CODE}</h1>
 </body>
 </html>
 `;

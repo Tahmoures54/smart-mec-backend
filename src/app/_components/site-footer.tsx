@@ -1,9 +1,6 @@
 import Link from 'next/link';
 import { SITE } from '@/lib/site';
-
-// ─── Enamad Config ───
-const ENAMAD_ID = '7731207';
-const ENAMAD_CODE = 'Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
+import { ENAMAD_LOGO_SRC, ENAMAD_PROFILE_HREF, ENAMAD_SEAL_CODE } from '@/lib/enamad';
 
 export function SiteFooter() {
   return (
@@ -12,6 +9,7 @@ export function SiteFooter() {
         <div>
           <p className="font-bold text-white">{SITE.nameFa}</p>
           <p className="mt-1 text-sm text-amber-100/70">{SITE.tagline}</p>
+          <p className="mt-0.5 text-xs text-amber-100/50">{SITE.subtitle}</p>
           <a
             href={`mailto:${SITE.supportEmail}`}
             className="mt-3 inline-block text-sm text-orange-300 hover:text-orange-200"
@@ -42,22 +40,25 @@ export function SiteFooter() {
         </div>
       </div>
 
-      {/* ─── Enamad Trust Seal ─── */}
+      {/* Enamad Trust Seal — پس‌زمینه سفید تا روی تم تیره دیده شود */}
       <div className="mx-auto flex max-w-6xl justify-center px-4 pb-6">
         <a
           referrerPolicy="origin"
           target="_blank"
           rel="noopener noreferrer"
-          href={`https://trustseal.enamad.ir/?id=${ENAMAD_ID}&Code=${ENAMAD_CODE}`}
+          href={ENAMAD_PROFILE_HREF}
           aria-label="نماد اعتماد الکترونیکی"
-          className="inline-block transition-transform hover:scale-105"
+          className="inline-flex h-[125px] w-[125px] items-center justify-center rounded-xl bg-white p-2 shadow-lg transition-transform hover:scale-105"
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             referrerPolicy="origin"
-            src={`https://trustseal.enamad.ir/logo.aspx?id=${ENAMAD_ID}&Code=${ENAMAD_CODE}`}
+            src={ENAMAD_LOGO_SRC}
             alt="نماد اعتماد الکترونیکی"
-            className="h-24 w-auto cursor-pointer"
-            data-code={ENAMAD_CODE}
+            width={125}
+            height={125}
+            className="h-[110px] w-[110px] cursor-pointer object-contain"
+            data-code={ENAMAD_SEAL_CODE}
           />
         </a>
       </div>

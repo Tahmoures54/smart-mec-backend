@@ -19,7 +19,8 @@ export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
           />
           <span className="leading-tight">
             <span className="block text-sm font-bold text-white">{SITE.nameFa}</span>
-            <span className="block text-xs text-amber-200/70">{SITE.tagline}</span>
+            <span className="block text-xs text-amber-200/80">{SITE.tagline}</span>
+            <span className="mt-0.5 block text-[11px] text-amber-100/50">{SITE.subtitle}</span>
           </span>
         </Link>
 

@@ -1,9 +1,12 @@
 export const SITE = {
   nameFa: 'مکانیک هوشمند',
   nameEn: 'Smart Mechanic',
-  tagline: 'عیب‌یابی هوشمند خودرو',
+  /** زیر نام برند در هدر و صفحه اصلی */
+  tagline: 'بزرگترین بانک اطلاعات فنی خودرویی کشور',
+  /** خط دوم کوتاه زیر تگ‌لاین */
+  subtitle: 'تشخیص هوشمند، بدون گمراهی تعمیرگاه',
   description:
-    'عیب‌یابی خودرو با هوش مصنوعی در نسخه وب یا اپ اندروید؛ از روی شرح مشکل یا صدای موتور.',
+    'عیب‌یابی خودرو با هوش مصنوعی در نسخه وب یا اپ اندروید؛ از روی شرح مشکل یا صدای موتور — با دسترسی به بانک فنی گسترده خودروهای ایران.',
   supportEmail: 'support@smart-mec.ir',
   packageId: 'ir.smartmec.app',
   githubApp: 'https://github.com/Tahmoures54/smart-mechanic-flutter',
