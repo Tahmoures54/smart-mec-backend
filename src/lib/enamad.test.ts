@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  ENAMAD_FILE_BODY,
-  ENAMAD_FILE_NAME,
   ENAMAD_META_GUIDE,
   ENAMAD_META_TAG,
   ENAMAD_VERIFY_CODE,
@@ -59,14 +57,6 @@ describe('Enamad homepage meta tag', () => {
     expect(html.indexOf(ENAMAD_META_GUIDE)).toBeLessThan(
       html.indexOf('<title>')
     );
-  });
-
-  it('exposes the Enamad verification file at the site root', () => {
-    const filePath = path.join(process.cwd(), 'public', ENAMAD_FILE_NAME);
-    const body = readFileSync(filePath, 'utf8');
-
-    expect(body).toBe(ENAMAD_VERIFY_CODE);
-    expect(ENAMAD_FILE_BODY).toBe(ENAMAD_VERIFY_CODE);
   });
 
   it('returns HTTP 200 with the verification code as the file body', async () => {
