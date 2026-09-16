@@ -6,6 +6,7 @@ import {
   ENAMAD_FILE_NAME,
   ENAMAD_META_GUIDE,
   ENAMAD_META_TAG,
+  ENAMAD_VERIFY_CODE,
   enamadFileResponse,
   enamadVerifyHtml,
   injectEnamadMeta,
@@ -14,8 +15,13 @@ import {
 
 describe('Enamad homepage meta tag', () => {
   it('embeds the Enamad meta tag in the root layout', () => {
-    const layout = readFileSync(path.join(process.cwd(), 'src/app/layout.tsx'), 'utf8');
-    expect(layout).toContain('<meta name="enamad" content="24876525" />');
+    const layout = readFileSync(
+      path.join(process.cwd(), 'src/app/layout.tsx'),
+      'utf8'
+    );
+
+    expect(layout).toContain('name="enamad"');
+    expect(layout).toContain('content={ENAMAD_VERIFY_CODE}');
     expect(layout).toContain('<head>');
   });
 
@@ -37,6 +43,7 @@ describe('Enamad homepage meta tag', () => {
   it('inserts the guide tag first in head', () => {
     const html = '<html><head><meta charset="utf-8"></head></html>';
     const injected = injectEnamadMeta(html);
+
     expect(injected.startsWith(`<html><head>${ENAMAD_META_GUIDE}`)).toBe(true);
     expect(injected).toContain(ENAMAD_META_TAG);
     expect(injectEnamadMeta(injected).split(ENAMAD_META_GUIDE)).toHaveLength(2);
@@ -44,10 +51,11 @@ describe('Enamad homepage meta tag', () => {
 
   it('builds a tiny HTML page Enamad can parse', () => {
     const html = enamadVerifyHtml();
+
     expect(html).toContain('http-equiv="Content-Type"');
     expect(html).toContain(ENAMAD_META_GUIDE);
-    expect(html).toContain(`<title>${'24876525'}</title>`);
-    expect(html).toContain(`<h1>${'24876525'}</h1>`);
+    expect(html).toContain(`<title>${ENAMAD_VERIFY_CODE}</title>`);
+    expect(html).toContain(`<h1>${ENAMAD_VERIFY_CODE}</h1>`);
     expect(html.indexOf(ENAMAD_META_GUIDE)).toBeLessThan(html.indexOf('<title>'));
   });
 
@@ -55,15 +63,18 @@ describe('Enamad homepage meta tag', () => {
     const filePath = path.join(process.cwd(), 'public', ENAMAD_FILE_NAME);
     const body = readFileSync(filePath, 'utf8');
 
-    expect(body).toBe('24876525');
-    expect(ENAMAD_FILE_BODY).toBe('24876525');
+    expect(body).toBe(ENAMAD_VERIFY_CODE);
+    expect(ENAMAD_FILE_BODY).toBe(ENAMAD_VERIFY_CODE);
   });
 
   it('returns HTTP 200 with the verification code as the file body', async () => {
     const response = enamadFileResponse();
+
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
-    expect(response.headers.get('Content-Length')).toBe('8');
-    expect(await response.text()).toBe('24876525');
+    expect(response.headers.get('Content-Length')).toBe(
+      String(ENAMAD_VERIFY_CODE.length)
+    );
+    expect(await response.text()).toBe(ENAMAD_VERIFY_CODE);
   });
 });
