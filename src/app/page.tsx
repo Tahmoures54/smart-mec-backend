@@ -6,16 +6,36 @@ import { ENAMAD_CODE } from '@/lib/enamad';
 import { SITE, getDownloadLinks } from '@/lib/site';
 import { SiteShell } from './_components/site-shell';
 
+/* ------------------------------------------------------------------ */
+/*  Metadata — درست، کامل و بدون ENAMAD_CODE به‌عنوان title             */
+/* ------------------------------------------------------------------ */
 export const metadata: Metadata = {
-  title: {
-    absolute: ENAMAD_CODE,
+  title: `${SITE.nameFa} | عیب‌یابی هوشمند خودرو در ایران`,
+  description: SITE.description,
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: `${SITE.nameFa} — ${SITE.tagline}`,
+    description: SITE.description,
+    type: 'website',
+    locale: 'fa_IR',
+    siteName: SITE.nameFa,
+    url: '/',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${SITE.nameFa} — ${SITE.tagline}`,
+    description: SITE.description,
+  },
+  robots: { index: true, follow: true },
 };
 
+/* ------------------------------------------------------------------ */
+/*  داده‌های صفحه                                                       */
+/* ------------------------------------------------------------------ */
 const FEATURES = [
   {
     title: 'عیب‌یابی با هوش مصنوعی',
-    body: 'شرح مشکل را بنویس؛ علت‌های محتمل، هشدار کلاهبرداری و توصیه عملی می‌گیری.',
+    body: 'شرح مشکل را بنویس؛ علت‌های محتمل، هشدار کلاهبرداری و توصیه‌ی عملی می‌گیری.',
     icon: '🧠',
   },
   {
@@ -63,6 +83,9 @@ const STEPS = [
   },
 ];
 
+/* ------------------------------------------------------------------ */
+/*  آیکن‌ها                                                            */
+/* ------------------------------------------------------------------ */
 function StoreIcon({ id }: { id: 'apk' | 'bazaar' | 'play' }) {
   if (id === 'bazaar') {
     return (
@@ -91,42 +114,70 @@ function StoreIcon({ id }: { id: 'apk' | 'bazaar' | 'play' }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  صفحه اصلی                                                          */
+/* ------------------------------------------------------------------ */
 export default function Home() {
   const carCount = Array.isArray(carsData) ? carsData.length : 0;
   const downloads = getDownloadLinks();
 
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'MobileApplication',
-    name: SITE.nameFa,
-    alternateName: SITE.nameEn,
-    operatingSystem: 'Android',
-    applicationCategory: 'UtilitiesApplication',
-    description: SITE.description,
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'IRR' },
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        name: SITE.nameFa,
+        alternateName: SITE.nameEn,
+        url: '/',
+        inLanguage: 'fa-IR',
+      },
+      {
+        '@type': 'MobileApplication',
+        name: SITE.nameFa,
+        alternateName: SITE.nameEn,
+        operatingSystem: 'Android',
+        applicationCategory: 'UtilitiesApplication',
+        description: SITE.description,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'IRR' },
+        inLanguage: 'fa-IR',
+      },
+    ],
   };
 
   return (
     <SiteShell>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {/* eNamad فقط به‌عنوان متا، نه عنوان و نه h1 */}
+      {ENAMAD_CODE ? <meta name="enamad" content={ENAMAD_CODE} /> : null}
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       <main>
-        <h1 className="sr-only">{ENAMAD_CODE}</h1>
-        <section className="hero-grid relative overflow-hidden">
+        {/* ---------------- HERO ---------------- */}
+        <section className="relative overflow-hidden">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 md:grid-cols-2 md:py-24">
             <div>
               <p className="mb-4 inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-sm text-amber-200">
                 نسخه وب + اپ اندروید · {SITE.nameEn}
               </p>
-              <p className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
+
+              {/* h1 واقعی و قابل‌مشاهده */}
+              <h1 className="text-4xl font-extrabold leading-tight text-white md:text-5xl">
                 مکانیک همیشه
                 <span className="block bg-gradient-to-l from-amber-200 via-orange-400 to-amber-500 bg-clip-text text-transparent">
                   همراه ماشینت
                 </span>
+              </h1>
+
+              <p className="mt-3 text-base font-semibold text-orange-300/95 md:text-lg">
+                {SITE.tagline}
               </p>
-              <p className="mt-3 text-base font-semibold text-orange-300/95 md:text-lg">{SITE.tagline}</p>
               <p className="mt-1 text-sm text-amber-100/55">{SITE.subtitle}</p>
-              <p className="mt-5 max-w-xl text-lg leading-8 text-amber-100/80">{SITE.description}</p>
+              <p className="mt-5 max-w-xl text-lg leading-8 text-amber-100/80">
+                {SITE.description}
+              </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link
@@ -135,12 +186,12 @@ export default function Home() {
                 >
                   شروع عیب‌یابی آنلاین
                 </Link>
-                <a
+                <Link
                   href="/download"
                   className="inline-flex items-center justify-center rounded-2xl border border-white/15 px-6 py-3.5 text-base font-semibold text-amber-100 hover:border-orange-400/50 hover:text-white"
                 >
                   دانلود اپ اندروید
-                </a>
+                </Link>
               </div>
 
               <dl className="mt-10 grid grid-cols-3 gap-4 text-center sm:text-right">
@@ -159,6 +210,7 @@ export default function Home() {
               </dl>
             </div>
 
+            {/* موبایل موکاپ */}
             <div className="relative mx-auto w-full max-w-sm">
               <div className="absolute inset-8 rounded-full bg-orange-500/20 blur-3xl" />
               <div className="relative rounded-[2.2rem] border border-white/12 bg-[#1A120E] p-3 shadow-2xl">
@@ -166,10 +218,11 @@ export default function Home() {
                   <div className="mb-6 flex items-center gap-3">
                     <Image
                       src="/branding/app_icon.png"
-                      alt=""
+                      alt={`${SITE.nameFa} app icon`}
                       width={56}
                       height={56}
                       className="h-14 w-14 rounded-2xl"
+                      priority
                     />
                     <div>
                       <p className="font-bold">{SITE.nameFa}</p>
@@ -199,6 +252,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ---------------- FEATURES ---------------- */}
         <section id="features" className="mx-auto max-w-6xl px-4 py-16">
           <h2 className="text-3xl font-bold">این اپ چه کمکی بهت می‌کند؟</h2>
           <p className="mt-3 max-w-2xl text-amber-100/70">
@@ -208,9 +262,11 @@ export default function Home() {
             {FEATURES.map((item) => (
               <article
                 key={item.title}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 hover:border-orange-400/40"
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-orange-400/40"
               >
-                <div className="mb-3 text-2xl">{item.icon}</div>
+                <div className="mb-3 text-2xl" aria-hidden>
+                  {item.icon}
+                </div>
                 <h3 className="text-lg font-semibold text-amber-100">{item.title}</h3>
                 <p className="mt-2 text-sm leading-7 text-amber-100/70">{item.body}</p>
               </article>
@@ -218,13 +274,16 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ---------------- STEPS ---------------- */}
         <section id="how" className="border-y border-white/10 bg-black/20">
           <div className="mx-auto max-w-6xl px-4 py-16">
             <h2 className="text-3xl font-bold">از نصب تا نتیجه، سه قدم</h2>
             <ol className="mt-10 grid gap-6 md:grid-cols-3">
               {STEPS.map((step) => (
                 <li key={step.n} className="rounded-2xl border border-orange-400/20 bg-[#1A120E] p-6">
-                  <span className="text-3xl font-black text-orange-400">{step.n}</span>
+                  <span className="text-3xl font-black text-orange-400" aria-hidden>
+                    {step.n}
+                  </span>
                   <h3 className="mt-3 text-xl font-bold">{step.title}</h3>
                   <p className="mt-2 text-sm leading-7 text-amber-100/70">{step.body}</p>
                 </li>
@@ -233,6 +292,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ---------------- DOWNLOAD ---------------- */}
         <section id="download" className="mx-auto max-w-6xl px-4 py-16">
           <h2 className="text-3xl font-bold">دانلود اپ مکانیک هوشمند</h2>
           <p className="mt-3 max-w-2xl text-amber-100/70">
@@ -241,11 +301,13 @@ export default function Home() {
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {downloads.map((item) => {
               const ready = Boolean(item.href);
+              const baseClass = 'flex h-full flex-col rounded-2xl border p-5 transition-colors ';
               const className =
-                'flex h-full flex-col rounded-2xl border p-5 ' +
+                baseClass +
                 (ready
                   ? 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15'
                   : 'border-white/10 bg-white/[0.02] opacity-80');
+
               const inner = (
                 <>
                   <StoreIcon id={item.id} />
@@ -256,6 +318,7 @@ export default function Home() {
                   </span>
                 </>
               );
+
               return ready ? (
                 <a
                   key={item.id}
@@ -268,7 +331,7 @@ export default function Home() {
                   {inner}
                 </a>
               ) : (
-                <div key={item.id} className={className}>
+                <div key={item.id} className={className} aria-disabled="true">
                   {inner}
                 </div>
               );
@@ -280,6 +343,7 @@ export default function Home() {
           </p>
         </section>
 
+        {/* ---------------- هشدار ---------------- */}
         <section className="mx-auto max-w-6xl px-4 pb-20">
           <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-6 leading-8 text-amber-100/80">
             <p className="font-bold text-amber-200">یک نکته مهم</p>
