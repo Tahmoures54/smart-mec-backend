@@ -56,7 +56,9 @@ describe('Enamad homepage meta tag', () => {
     expect(html).toContain(ENAMAD_META_GUIDE);
     expect(html).toContain(`<title>${ENAMAD_VERIFY_CODE}</title>`);
     expect(html).toContain(`<h1>${ENAMAD_VERIFY_CODE}</h1>`);
-    expect(html.indexOf(ENAMAD_META_GUIDE)).toBeLessThan(html.indexOf('<title>'));
+    expect(html.indexOf(ENAMAD_META_GUIDE)).toBeLessThan(
+      html.indexOf('<title>')
+    );
   });
 
   it('exposes the Enamad verification file at the site root', () => {
@@ -71,7 +73,9 @@ describe('Enamad homepage meta tag', () => {
     const response = enamadFileResponse();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
+    expect(response.headers.get('Content-Type')).toBe(
+      'text/plain; charset=utf-8'
+    );
     expect(response.headers.get('Content-Length')).toBe(
       String(ENAMAD_VERIFY_CODE.length)
     );
