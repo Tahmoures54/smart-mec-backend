@@ -26,14 +26,42 @@ export interface JWTPayload {
   exp?: number;
 }
 
-// ─── Car ───
+// ─── Car (aligned with src/data/cars.json) ───
+export type CarCategory =
+  | 'sedan'
+  | 'suv'
+  | 'hatchback'
+  | 'pickup'
+  | 'coupe'
+  | 'wagon'
+  | 'van'
+  | 'minibus'
+  | 'bus'
+  | 'truck'
+  | 'heavy'
+  | 'tractor'
+  | 'motorcycle'
+  | 'scooter'
+  | 'atv'
+  | string;
+
 export interface Car {
   id: string;
   brand: string;
   model: string;
   engine?: string;
-  gearbox?: string;
+  category?: CarCategory;
+  fuelType?: string;
+  isElectric?: boolean;
+  isHybrid?: boolean;
+  transmission?: string;
+  region?: string;
+  countryOfOrigin?: string;
+  isPopular?: boolean;
+  isActive?: boolean;
   commonIssues?: string[];
+  dataQuality?: string;
+  gearbox?: string;
   userId?: number;
   createdAt?: string | Date;
 }
@@ -56,7 +84,7 @@ export interface Product {
   id: ProductId;
   name: string;
   title: string;
-  price: number; // تومان
+  price: number;
   credits: number;
   goldenDays: number;
   monthlyLimit: number;
@@ -176,20 +204,46 @@ export const PRODUCTS: Record<ProductId, Product> = {
   },
 };
 
-// ─── Diagnose ───
+// ─── Diagnose (aligned with real API) ───
 export interface DiagnoseRequest {
   carId?: string;
+  year?: string | number;
   description: string;
+  carName?: string;
+  previousDiagnosticId?: number;
   audioUrl?: string;
 }
 
+export interface StructuredCause {
+  title: string;
+  probability: 'high' | 'medium' | 'low' | string;
+  why?: string;
+  costBand: 'low' | 'medium' | 'high' | string;
+  costEstimate?: string | null;
+  diyCheck?: string | null;
+}
+
+export interface StructuredDiagnose {
+  urgency: 'green' | 'yellow' | 'red' | string;
+  statusSummary: string;
+  causes: StructuredCause[];
+  mechanicQuestions: string[];
+  warnings: string[];
+  nextStep: string;
+  footer?: string;
+}
+
 export interface DiagnoseResult {
-  id: number;
-  userId: number;
-  problem: string;
-  solution: string;
-  confidence: number;
-  createdAt: Date;
+  id?: number;
+  diagnosticId?: number;
+  userId?: number;
+  carId?: string;
+  description?: string;
+  result: string;
+  structured?: StructuredDiagnose | null;
+  remainingCredits?: number | null;
+  remainingFreeQuestions?: number | null;
+  createdAt?: string | Date;
 }
 
 // ─── Purchase ───
