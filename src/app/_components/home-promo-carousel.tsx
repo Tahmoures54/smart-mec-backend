@@ -12,7 +12,42 @@ type Slide = {
   icon: string;
 };
 
-const BASE_SLIDES: Slide[] = [
+const VALUE_SLIDES: Slide[] = [
+  {
+    eyebrow: 'اپلیکیشن مکانیک هوشمند',
+    title: 'مکانیک هوشمند، همیشه همراه شما',
+    body: 'عیب‌یابی و راهنمایی فنی را روی موبایل در دسترس داشته باش؛ سریع، ساده و کاربردی.',
+    cta: 'دانلود اپ',
+    href: '/diagnose',
+    icon: '📱',
+  },
+  {
+    eyebrow: 'عیب‌یابی با صدا',
+    title: 'صدای موتور را بفرست',
+    body: 'نشانه‌های صوتی را ثبت کن تا علت‌های محتمل را سریع‌تر و منظم‌تر بررسی کنی.',
+    cta: 'شروع عیب‌یابی',
+    href: '/diagnose',
+    icon: '🎙️',
+  },
+  {
+    eyebrow: 'کنترل هزینه',
+    title: 'قبل از تعمیرگاه، آگاه‌تر تصمیم بگیر',
+    body: 'مشکل احتمالی و هزینه‌های مرتبط را بهتر بشناس و با آمادگی بیشتری درباره تعمیر تصمیم بگیر.',
+    cta: 'بررسی مشکل',
+    href: '/diagnose',
+    icon: '💰',
+  },
+  {
+    eyebrow: 'دانش خودرویی',
+    title: 'یک گنجینه برای خودرو',
+    body: 'اطلاعات فنی و راهنمایی‌های کاربردی را برای شناخت بهتر علائم و مشکلات خودرو در دسترس داشته باش.',
+    cta: 'کشف دانش فنی',
+    href: '/diagnose',
+    icon: '🧠',
+  },
+];
+
+const CATEGORY_SLIDES: Slide[] = [
   {
     eyebrow: 'خودروهای سبک و سواری',
     title: 'برای خودروهای روزمره، دقیق‌تر تصمیم بگیر',
@@ -54,14 +89,6 @@ const BASE_SLIDES: Slide[] = [
     icon: '⚡',
   },
   {
-    eyebrow: 'تحلیل صدای موتور',
-    title: 'صدای غیرعادی را جدی بگیر',
-    body: 'صدای موتور را ضبط کن تا برای پیدا کردن علت‌های محتمل، راهنمایی اولیه بگیری.',
-    cta: 'تحلیل صدا',
-    href: '/diagnose',
-    icon: '🎙️',
-  },
-  {
     eyebrow: 'آمادگی برای تعمیرگاه',
     title: 'با اطلاعات بیشتر وارد تعمیرگاه شو',
     body: 'قبل از تعویض قطعه، سؤال‌های درست را بشناس و تصمیم آگاهانه‌تری بگیر.',
@@ -73,18 +100,8 @@ const BASE_SLIDES: Slide[] = [
 
 export function HomePromoCarousel({ appHref }: { appHref: string | null }) {
   const slides = appHref
-    ? [
-        {
-          eyebrow: 'اپلیکیشن مکانیک هوشمند',
-          title: 'مکانیک هوشمند را همیشه همراهت داشته باش',
-          body: 'عیب‌یابی و راهنمایی خودرو را روی موبایل در دسترس داشته باش؛ سریع و ساده.',
-          cta: 'دانلود اپ',
-          href: appHref,
-          icon: '📱',
-        },
-        ...BASE_SLIDES,
-      ]
-    : BASE_SLIDES;
+    ? [{ ...VALUE_SLIDES[0], href: appHref }, ...VALUE_SLIDES.slice(1), ...CATEGORY_SLIDES]
+    : [...VALUE_SLIDES.slice(1), ...CATEGORY_SLIDES];
 
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -138,16 +155,16 @@ export function HomePromoCarousel({ appHref }: { appHref: string | null }) {
 
         <div className="relative flex items-center justify-between border-t border-white/[0.06] px-5 py-3 sm:px-8">
           <span className="text-[11px] text-amber-100/35">{paused ? 'توقف موقت' : 'معرفی کوتاه امکانات'}</span>
-          <div className="flex items-center gap-1.5" role="tablist" aria-label="اسلایدهای معرفی">
+          <div className="flex max-w-[70%] items-center gap-1.5 overflow-x-auto py-1" role="tablist" aria-label="اسلایدهای معرفی">
             {slides.map((item, index) => (
               <button
-                key={item.title}
+                key={`${item.eyebrow}-${item.title}`}
                 type="button"
                 role="tab"
                 aria-selected={index === active}
                 aria-label={`اسلاید ${index + 1}: ${item.eyebrow}`}
                 onClick={() => setActive(index)}
-                className={`h-1.5 rounded-full transition-all ${index === active ? 'w-7 bg-orange-400' : 'w-1.5 bg-white/20 hover:bg-white/40'}`}
+                className={`h-1.5 shrink-0 rounded-full transition-all ${index === active ? 'w-7 bg-orange-400' : 'w-1.5 bg-white/20 hover:bg-white/40'}`}
               />
             ))}
           </div>
