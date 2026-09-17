@@ -6,9 +6,11 @@ import {
   extractCostHints,
   extractMechanicQuestions,
   parseDiagnoseSections,
+  structuredToMarkdown,
   type DiagnoseSection,
   type SectionKind,
 } from '@/lib/diagnose-result';
+import type { StructuredDiagnose } from '@/types';
 
 const KIND_STYLES: Record<
   SectionKind,
@@ -100,14 +102,31 @@ function SectionCard({
   );
 }
 
-export function DiagnoseResultView({ text }: { text: string }) {
-  const sections = useMemo(() => parseDiagnoseSections(text), [text]);
-  const costHints = useMemo(() => extractCostHints(text), [text]);
+export function DiagnoseResultView({
+  text,
+  structured,
+}: {
+  text: string;
+  structured?: StructuredDiagnose | null;
+}) {
+  const displayText = useMemo(() => {
+    if (structured?.causes?.length) return structuredToMarkdown(structured);
+    return text;
+  }, [text, structured]);
+  const sections = useMemo(() => parseDiagnoseSections(displayText), [displayText]);
+  const costHints = useMemo(() => {
+    const fromStruct =
+      structured?.causes
+        ?.map((c) => c.costEstimate)
+        .filter((x): x is string => !!x && x.length > 2) ?? [];
+    if (fromStruct.length) return fromStruct;
+    return extractCostHints(displayText);
+  }, [displayText, structured]);
   const questionSection = sections.find((s) => s.kind === 'questions');
-  const questions = useMemo(
-    () => (questionSection ? extractMechanicQuestions(questionSection.body) : []),
-    [questionSection]
-  );
+  const questions = useMemo(() => {
+    if (structured?.mechanicQuestions?.length) return structured.mechanicQuestions;
+    return questionSection ? extractMechanicQuestions(questionSection.body) : [];
+  }, [questionSection, structured]);
   const [copied, setCopied] = useState<string | null>(null);
 
   async function handleCopy(key: string, value: string) {
@@ -124,7 +143,7 @@ export function DiagnoseResultView({ text }: { text: string }) {
     return (
       <div
         className="diagnose-result text-sm leading-8 text-amber-50/90"
-        dangerouslySetInnerHTML={{ __html: markdownToHtml(text) }}
+        dangerouslySetInnerHTML={{ __html: markdownToHtml(displayText) }}
       />
     );
   }
