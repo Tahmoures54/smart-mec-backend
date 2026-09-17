@@ -10,5 +10,9 @@ RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 RUN npm run build
 
+ENV NODE_ENV=production
+ENV PORT=3000
+
 EXPOSE 3000
+
 CMD ["npm", "start"]
