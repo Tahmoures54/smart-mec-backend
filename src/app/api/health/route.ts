@@ -8,9 +8,7 @@ export async function GET() {
   let latencyMs: number | undefined;
 
   try {
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL is not set');
-    }
+    // The application uses SQLite (DATABASE_PATH), not PostgreSQL/DATABASE_URL.
     latencyMs = await pingDb();
     dbOk = true;
   } catch (error) {
