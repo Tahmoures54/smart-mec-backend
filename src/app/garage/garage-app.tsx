@@ -83,6 +83,7 @@ export function GarageApp() {
 
   useEffect(() => {
     if (!token) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMine(token);
   }, [token, loadMine]);
 
@@ -204,7 +205,7 @@ export function GarageApp() {
         json: { productId, garageId, from: 'web' },
       });
       if (!ok || !body.paymentUrl) throw new Error(body.error || 'ساخت تراکنش ناموفق');
-      window.location.href = body.paymentUrl;
+      window.location.assign(body.paymentUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطا در پرداخت');
       setBuyingId(null);
