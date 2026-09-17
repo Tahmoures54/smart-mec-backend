@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ENAMAD_LOGO_SRC, ENAMAD_PROFILE_HREF, ENAMAD_SEAL_CODE } from '@/lib/enamad';
 import { getDownloadLinks } from '@/lib/site';
 import { AppDownloadPrompt } from './app-download-prompt';
+import { HomePromoCarousel } from './home-promo-carousel';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 
@@ -11,6 +12,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col text-white">
       <SiteHeader />
+      <HomePromoCarousel appHref={appDownload} />
       <div className="flex-1">{children}</div>
       <SiteFooter />
 
