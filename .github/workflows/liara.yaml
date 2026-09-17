@@ -13,25 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Generate package-lock.json
-        run: npm install --package-lock-only
-
-      # ★ مرحله جدید: build پروژه
-      - name: Build Next.js
-        run: |
-          npm ci
-          npm run build
-
-      # ★ مرحله جدید: کپی فایل‌های استاتیک به پوشه standalone
-      - name: Copy static assets to standalone
-        run: |
-          cp -r public .next/standalone/
-          cp -r .next/static .next/standalone/.next/
-
       - name: Deploy to Liara
         env:
           LIARA_API_TOKEN: ${{ secrets.LIARA_API_TOKEN }}
