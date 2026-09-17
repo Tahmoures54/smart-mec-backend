@@ -20,11 +20,22 @@ const ZIBAL_TIMEOUT_MS = 15000;
 function page(title: string, message: string, ok: boolean, fromWeb = false) {
   const backHref = fromWeb ? '/diagnose' : ok ? 'smartmec://success' : 'smartmec://failed';
   const backLabel = fromWeb ? 'بازگشت به عیب‌یابی' : 'بازگشت به اپلیکیشن';
-  const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtml(title)}</title>
+  const autoJs = fromWeb
+    ? ''
+    : `<script>setTimeout(function(){try{location.replace(${JSON.stringify(
+        ok ? 'smartmec://success' : 'smartmec://failed'
+      )});}catch(e){}},400);</script>`;
+  const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtml(
+    title
+  )}</title>
+  <meta http-equiv="refresh" content="${fromWeb ? '2' : '1'};url=${backHref}" />
+  ${autoJs}
   <style>body{font-family:Tahoma,sans-serif;background:#140C08;color:#f5e6d3;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px;text-align:center}
   .card{max-width:420px;background:#1A120E;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:28px}
   .ok{color:#66bb6a}.bad{color:#e57373}a{display:inline-block;margin-top:18px;padding:12px 20px;border-radius:12px;background:#ff9800;color:#111;text-decoration:none;font-weight:700}</style></head>
-  <body><div class="card"><h1 class="${ok ? 'ok' : 'bad'}">${escapeHtml(title)}</h1><p>${message}</p><a href="${backHref}">${backLabel}</a></div></body></html>`;
+  <body><div class="card"><h1 class="${ok ? 'ok' : 'bad'}">${escapeHtml(
+    title
+  )}</h1><p>${message}</p><a href="${backHref}">${backLabel}</a></div></body></html>`;
   return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
@@ -32,58 +43,88 @@ async function grantProduct(tx: any, userId: number, product: (typeof PRODUCTS)[
   const user = await tx.query.users.findFirst({ where: eq(users.id, userId) });
   if (!user) return;
   if (product.goldenDays) {
-    await tx.update(users).set({
-      isGolden: true,
-      goldenExpiresAt: computeGoldenExpiry(user.goldenExpiresAt, product.goldenDays),
-      monthlyLimit: product.monthlyLimit ?? user.monthlyLimit,
-      updatedAt: new Date(),
-    }).where(eq(users.id, userId));
+    await tx
+      .update(users)
+      .set({
+        isGolden: true,
+        goldenExpiresAt: computeGoldenExpiry(user.goldenExpiresAt, product.goldenDays),
+        monthlyLimit: product.monthlyLimit ?? user.monthlyLimit,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   } else if (product.credits) {
-    await tx.update(users).set({
-      credits: sql`${users.credits} + ${product.credits}`,
-      updatedAt: new Date(),
-    }).where(eq(users.id, userId));
+    await tx
+      .update(users)
+      .set({
+        credits: sql`${users.credits} + ${product.credits}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 }
 
 async function creditReferrerCommission(tx: any, userId: number, amount: number) {
   const user = await tx.query.users.findFirst({ where: eq(users.id, userId) });
   if (!user?.referredBy) return;
-  const commission = computeReferralCommission(amount, referralPercentage);
+  const pct =
+    typeof referralPercentage === 'function' ? referralPercentage() : Number(referralPercentage);
+  const commission = computeReferralCommission(amount, pct);
   if (commission <= 0) return;
-  await tx.update(users).set({
-    earnings: sql`${users.earnings} + ${commission}`,
-    updatedAt: new Date(),
-  }).where(eq(users.id, user.referredBy));
+  await tx
+    .update(users)
+    .set({
+      earnings: sql`${users.earnings} + ${commission}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.referredBy));
 }
 
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const trackId = url.searchParams.get('trackId') || url.searchParams.get('authority') || '';
-    const productId = (url.searchParams.get('productId') || '') as ProductId;
+    let productId = (url.searchParams.get('productId') || '') as ProductId;
     const fromWeb = url.searchParams.get('from') === 'web';
-    const product = PRODUCTS[productId];
-    if (!product || !trackId) {
+    const zibalSuccess = url.searchParams.get('success');
+
+    if (zibalSuccess === '0') {
+      return page('ناموفق', 'پرداخت لغو شد یا انجام نشد.', false, fromWeb);
+    }
+
+    if (!trackId) {
       return page('خطا', 'اطلاعات پرداخت ناقص است.', false, fromWeb);
     }
 
-    const found = await db.select().from(purchases).where(eq(purchases.authority, trackId)).limit(1);
+    const found = await db
+      .select()
+      .from(purchases)
+      .where(eq(purchases.authority, trackId))
+      .limit(1);
     const purchase = found[0];
     if (!purchase) {
       return page('یافت نشد', 'تراکنش پیدا نشد.', false, fromWeb);
     }
+
+    if (!productId || !(productId in PRODUCTS)) {
+      productId = purchase.productId as ProductId;
+    }
+    const product = PRODUCTS[productId];
+    if (!product) {
+      return page('خطا', 'محصول نامعتبر است.', false, fromWeb);
+    }
+
     if (purchase.status === 'completed') {
       return page('پرداخت موفق', `${product.name} قبلاً فعال شده است.`, true, fromWeb);
     }
 
     let finalRefNumber = '';
-    if (isMockAuthority(trackId) || process.env.NODE_ENV !== 'production') {
+    const merchant = process.env.ZIBAL_MERCHANT_ID;
+    // فقط MOCK واقعی یا محیط بدون merchant در غیرپروداکشن → شبیه‌سازی
+    if (isMockAuthority(trackId) || (!merchant && process.env.NODE_ENV !== 'production')) {
       finalRefNumber = `MOCK-${Date.now()}`;
     } else {
-      const merchant = process.env.ZIBAL_MERCHANT_ID;
       if (!merchant) {
-        return page('خطا', 'پیکربندی درگاه ناقص است.', false, fromWeb);
+        return page('خطا', 'پیکربندی درگاه ناقص است (ZIBAL_MERCHANT_ID).', false, fromWeb);
       }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);
@@ -95,9 +136,11 @@ export async function GET(request: NextRequest) {
           signal: controller.signal,
         });
         const data = await res.json();
-        // 100 = success, 201 = already verified
         if (data.result !== 100 && data.result !== 201) {
-          await db.update(purchases).set({ status: 'failed', updatedAt: new Date() }).where(eq(purchases.id, purchase.id));
+          await db
+            .update(purchases)
+            .set({ status: 'failed', updatedAt: new Date() })
+            .where(eq(purchases.id, purchase.id));
           return page('ناموفق', 'پرداخت تأیید نشد.', false, fromWeb);
         }
         finalRefNumber = String(data.refNumber || '');
