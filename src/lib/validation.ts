@@ -69,9 +69,9 @@ export function validateDescription(description: string): string {
 
   const trimmed = description.trim();
 
-  if (trimmed.length < 10) {
+  if (trimmed.length < 5) {
     throw new ValidationError(
-      'توضیحات باید حداقل ۱۰ کاراکتر باشد',
+      'توضیحات را کمی بیشتر بنویس (حداقل چند کلمه)',
       'description'
     );
   }
@@ -101,11 +101,25 @@ export function validateCarId(carId: string): string {
     return trimmed;
   }
 
+  // شناسه کاتالوگ فقط حروف/عدد/خط تیره
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-    throw new ValidationError('شناسه خودرو نامعتبر است', 'carId');
+    // اگر کاربر نام فارسی فرستاده، به‌جای خطای مبهم، به caller بگوییم custom کند
+    // (route تشخیص آن را به custom نگاشت می‌کند)
+    throw new ValidationError(
+      'خودرو را از لیست انتخاب کن یا گزینه «خارج از لیست» را بزن',
+      'carId'
+    );
   }
 
   return trimmed;
+}
+
+/** اگر carId نام نمایشی/فارسی باشد، برای تبدیل به custom استفاده می‌شود */
+export function looksLikeCustomCarLabel(carId: unknown): boolean {
+  if (typeof carId !== 'string') return false;
+  const t = carId.trim();
+  if (!t || t === 'custom') return false;
+  return !/^[a-zA-Z0-9_-]+$/.test(t);
 }
 
 /**
@@ -114,10 +128,12 @@ export function validateCarId(carId: string): string {
  */
 export function validateYear(year: string | number | undefined | null): string {
   if (year === undefined || year === null || year === '') {
-    throw new ValidationError('سال ساخت خودرو الزامی است', 'year');
+    return ''; // سال اختیاری
   }
 
   const cleaned = String(year).trim().replace(/[^0-9]/g, '');
+  if (!cleaned) return '';
+
   const num = parseInt(cleaned, 10);
 
   if (!Number.isFinite(num)) {
@@ -206,9 +222,9 @@ export function validateToken(token: string): string {
  */
 export function sanitizeText(text: string): string {
   return text
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
     .replace(/'/g, '&#x27;')
     .replace(/\//g, '&#x2F;');
 }
