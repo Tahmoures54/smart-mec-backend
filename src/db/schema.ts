@@ -7,6 +7,7 @@ import {
   timestamp,
   bigint,
   doublePrecision,
+  jsonb,
   AnyPgColumn,
   uniqueIndex,
   index,
@@ -24,6 +25,9 @@ export const users = pgTable(
     referralCode: text('referral_code').unique(),
     referredBy: integer('referred_by').references((): AnyPgColumn => users.id),
     earnings: integer('earnings').default(0).notNull(),
+    /** رضایت پیامک‌های بازیابی/پیشنهاد — فقط با رضایت کاربر */
+    marketingOptIn: boolean('marketing_opt_in').default(false).notNull(),
+    recoverySmsAt: timestamp('recovery_sms_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -87,12 +91,11 @@ export const diagnostics = pgTable(
     carId: text('car_id').notNull(),
     description: text('description').notNull(),
     result: text('result').notNull(),
-    audioUrl: text('audio_url'),
+    year: integer('year'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
     userIdx: index('idx_diagnostics_user_id').on(t.userId),
-    createdIdx: index('idx_diagnostics_created_at').on(t.createdAt),
   })
 );
 
@@ -104,16 +107,15 @@ export const purchases = pgTable(
     productId: text('product_id').notNull(),
     amount: integer('amount').notNull(),
     status: text('status').default('pending').notNull(),
-    authority: text('authority').unique(),
+    authority: text('authority'),
     refId: text('ref_id'),
-    /** برای پکیج معرفی تعمیرگاه در چت */
     garageId: integer('garage_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
     userIdx: index('idx_purchases_user_id').on(t.userId),
-    statusIdx: index('idx_purchases_status').on(t.status),
+    authorityIdx: index('idx_purchases_authority').on(t.authority),
   })
 );
 
@@ -123,8 +125,6 @@ export const withdrawals = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id).notNull(),
     amount: integer('amount').notNull(),
-    cardNumber: text('card_number').notNull(),
-    fullName: text('full_name').notNull(),
     status: text('status').default('pending').notNull(),
     adminNote: text('admin_note'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -158,13 +158,8 @@ export const garages = pgTable(
     subscriptionTier: text('subscription_tier').default('free').notNull(),
     subscriptionExpiresAt: text('subscription_expires_at'),
     city: text('city'),
-    /** کاربر تعمیرکاری که خودش ثبت کرده */
     ownerUserId: integer('owner_user_id').references(() => users.id),
-    /**
-     * none | pending_payment | pending_review | approved | rejected
-     */
     chatStatus: text('chat_status').default('none').notNull(),
-    /** فقط بعد از تأیید ادمین true می‌شود — شرط نمایش در چت */
     showInChat: boolean('show_in_chat').default(false).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -192,5 +187,22 @@ export const feedbacks = pgTable(
   (t) => ({
     userIdx: index('idx_feedbacks_user_id').on(t.userId),
     diagnosticIdx: index('idx_feedbacks_diagnostic_id').on(t.diagnosticId),
+  })
+);
+
+export const analyticsEvents = pgTable(
+  'analytics_events',
+  {
+    id: serial('id').primaryKey(),
+    event: text('event').notNull(),
+    sessionId: text('session_id'),
+    userId: integer('user_id'),
+    path: text('path'),
+    props: jsonb('props').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    eventIdx: index('idx_analytics_event').on(t.event),
+    createdIdx: index('idx_analytics_created').on(t.createdAt),
   })
 );
