@@ -9,10 +9,9 @@ import {
   feedbacks,
   analyticsEvents,
 } from '@/db/schema';
-import { eq, desc, sql, like, or, and } from 'drizzle-orm';
+import { eq, desc, sql, like, or } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/auth';
 import { handleError, BadRequestError, NotFoundError } from '@/lib/error-handler';
-import { logger } from '@/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,6 +61,95 @@ export async function GET(request: NextRequest) {
         funnel = {};
       }
 
+      let seriesDiagnostics: { day: string; count: number }[] = [];
+      try {
+        const drows = await db
+          .select({
+            day: sql<string>`to_char(date_trunc('day', ${diagnostics.createdAt}), 'YYYY-MM-DD')`,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(diagnostics)
+          .where(sql`${diagnostics.createdAt} >= NOW() - INTERVAL '14 days'`)
+          .groupBy(sql`date_trunc('day', ${diagnostics.createdAt})`)
+          .orderBy(sql`date_trunc('day', ${diagnostics.createdAt})`);
+        seriesDiagnostics = drows.map((r) => ({ day: String(r.day), count: Number(r.count) }));
+      } catch {
+        seriesDiagnostics = [];
+      }
+
+      let seriesRevenue: { day: string; amount: number; count: number }[] = [];
+      try {
+        const prows = await db
+          .select({
+            day: sql<string>`to_char(date_trunc('day', ${purchases.createdAt}), 'YYYY-MM-DD')`,
+            amount: sql<number>`coalesce(sum(case when ${purchases.status} = 'completed' then ${purchases.amount} else 0 end),0)::int`,
+            count: sql<number>`count(*) FILTER (WHERE ${purchases.status} = 'completed')::int`,
+          })
+          .from(purchases)
+          .where(sql`${purchases.createdAt} >= NOW() - INTERVAL '14 days'`)
+          .groupBy(sql`date_trunc('day', ${purchases.createdAt})`)
+          .orderBy(sql`date_trunc('day', ${purchases.createdAt})`);
+        seriesRevenue = prows.map((r) => ({
+          day: String(r.day),
+          amount: Number(r.amount || 0),
+          count: Number(r.count || 0),
+        }));
+      } catch {
+        seriesRevenue = [];
+      }
+
+      let purchaseStatus: { status: string; count: number }[] = [];
+      try {
+        const srows = await db
+          .select({
+            status: purchases.status,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(purchases)
+          .groupBy(purchases.status);
+        purchaseStatus = srows.map((r) => ({ status: String(r.status), count: Number(r.count) }));
+      } catch {
+        purchaseStatus = [];
+      }
+
+      let topProducts: { productId: string; count: number; revenue: number }[] = [];
+      try {
+        const trows = await db
+          .select({
+            productId: purchases.productId,
+            count: sql<number>`count(*)::int`,
+            revenue: sql<number>`coalesce(sum(${purchases.amount}),0)::int`,
+          })
+          .from(purchases)
+          .where(eq(purchases.status, 'completed'))
+          .groupBy(purchases.productId)
+          .orderBy(sql`count(*) desc`)
+          .limit(8);
+        topProducts = trows.map((r) => ({
+          productId: String(r.productId),
+          count: Number(r.count),
+          revenue: Number(r.revenue),
+        }));
+      } catch {
+        topProducts = [];
+      }
+
+      let seriesUsers: { day: string; count: number }[] = [];
+      try {
+        const urows = await db
+          .select({
+            day: sql<string>`to_char(date_trunc('day', ${users.createdAt}), 'YYYY-MM-DD')`,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(users)
+          .where(sql`${users.createdAt} >= NOW() - INTERVAL '14 days'`)
+          .groupBy(sql`date_trunc('day', ${users.createdAt})`)
+          .orderBy(sql`date_trunc('day', ${users.createdAt})`);
+        seriesUsers = urows.map((r) => ({ day: String(r.day), count: Number(r.count) }));
+      } catch {
+        seriesUsers = [];
+      }
+
       return NextResponse.json({
         success: true,
         data: {
@@ -76,6 +164,11 @@ export async function GET(request: NextRequest) {
           garagesActive: Number(garageStats[0]?.active ?? 0),
           feedback: Number(feedbackCount[0]?.c ?? 0),
           funnel7d: funnel,
+          seriesDiagnostics,
+          seriesRevenue,
+          seriesUsers,
+          purchaseStatus,
+          topProducts,
         },
       });
     }
