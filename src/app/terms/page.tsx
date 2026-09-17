@@ -25,6 +25,16 @@ export default function TermsPage() {
           اگر دود غلیظ، بوی سوختگی، صدای برخورد فلز، از دست رفتن قدرت یا داغ‌کردن غیرعادی دیدید، رانندگی را متوقف کنید
           و به تعمیرگاه مراجعه کنید.
         </p>
+        <h2 className="mt-8 text-xl font-semibold text-amber-100">پرداخت</h2>
+        <p className="mt-3">
+          خرید اعتبار، اشتراک طلایی و پکیج معرفی تعمیرگاه از طریق درگاه پرداخت زیبال انجام می‌شود.
+          پس از پرداخت موفق، محصول همان لحظه روی حساب فعال می‌شود. در صورت کسر وجه بدون فعال‌سازی،
+          با کد پیگیری زیبال به{' '}
+          <a className="text-orange-300 underline" href={`mailto:${SITE.supportEmail}`}>
+            {SITE.supportEmail}
+          </a>{' '}
+          پیام بدهید.
+        </p>
         <p className="mt-8">
           پشتیبانی:{' '}
           <a className="text-orange-300 underline" href={`mailto:${SITE.supportEmail}`}>

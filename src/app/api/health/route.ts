@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { pingDb } from '@/db';
+import { getZibalPaymentMode } from '@/lib/zibal';
 
 export async function GET() {
   const started = Date.now();
@@ -16,6 +17,7 @@ export async function GET() {
     latencyMs = Date.now() - started;
   }
 
+  const paymentMode = getZibalPaymentMode();
   const payload = {
     status: dbOk ? 'ok' : 'degraded',
     service: 'smart-mec-backend',
@@ -25,6 +27,11 @@ export async function GET() {
         ok: dbOk,
         latencyMs,
         error: dbError,
+      },
+      payment: {
+        provider: 'zibal',
+        mode: paymentMode,
+        configured: paymentMode !== 'unset',
       },
     },
   };

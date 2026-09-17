@@ -11,7 +11,7 @@ import { garageTierRank, normalizeGarageTier } from '@/lib/constants';
 describe('payment helpers', () => {
   it('detects mock authorities', () => {
     expect(isMockAuthority('MOCK_ABC')).toBe(true);
-    expect(isMockAuthority('payping-code')).toBe(false);
+    expect(isMockAuthority('15966442233311')).toBe(false);
   });
 
   it('extends golden from remaining expiry, otherwise from now', () => {

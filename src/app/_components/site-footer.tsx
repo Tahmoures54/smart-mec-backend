@@ -45,38 +45,56 @@ export function SiteFooter() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-4 pb-6">
-        <a
-          referrerPolicy="origin"
-          target="_blank"
-          rel="noopener noreferrer"
-          href={ENAMAD_PROFILE_HREF}
-          aria-label="نماد اعتماد الکترونیکی"
-          className="inline-flex h-[130px] w-[130px] items-center justify-center rounded-2xl border-2 border-orange-400/40 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-transform hover:scale-105"
-        >
-          {!logoFailed ? (
-            // eslint-disable-next-line @next/next/no-img-element
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 pb-6">
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <a
+            referrerPolicy="origin"
+            target="_blank"
+            rel="noopener noreferrer"
+            href={ENAMAD_PROFILE_HREF}
+            aria-label="نماد اعتماد الکترونیکی"
+            className="inline-flex h-[130px] w-[130px] items-center justify-center rounded-2xl border-2 border-orange-400/40 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-transform hover:scale-105"
+          >
+            {!logoFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                referrerPolicy="origin"
+                src={ENAMAD_IMG_SRC}
+                alt="نماد اعتماد الکترونیکی"
+                width={110}
+                height={110}
+                className="h-[110px] w-[110px] cursor-pointer object-contain"
+                data-code={ENAMAD_SEAL_CODE}
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <span className="px-2 text-center text-xs font-bold leading-5 text-[#1a237e]">
+                نماد اعتماد
+                <br />
+                الکترونیکی
+                <br />
+                <span className="text-[10px] font-normal text-slate-600">مشاهده در enamad.ir</span>
+              </span>
+            )}
+          </a>
+          <a
+            target="_blank"
+            rel="noopener noreferrer"
+            href={SITE.zibalTrustHref}
+            aria-label="پرداخت امن زیبال"
+            className="inline-flex h-[130px] w-[130px] items-center justify-center rounded-2xl border-2 border-orange-400/40 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-transform hover:scale-105"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              referrerPolicy="origin"
-              src={ENAMAD_IMG_SRC}
-              alt="نماد اعتماد الکترونیکی"
+              src={SITE.zibalTrustImg}
+              alt="پرداخت امن زیبال"
               width={110}
               height={110}
-              className="h-[110px] w-[110px] cursor-pointer object-contain"
-              data-code={ENAMAD_SEAL_CODE}
-              onError={() => setLogoFailed(true)}
+              className="h-[110px] w-[110px] object-contain"
             />
-          ) : (
-            <span className="px-2 text-center text-xs font-bold leading-5 text-[#1a237e]">
-              نماد اعتماد
-              <br />
-              الکترونیکی
-              <br />
-              <span className="text-[10px] font-normal text-slate-600">مشاهده در enamad.ir</span>
-            </span>
-          )}
-        </a>
-        <p className="text-[11px] text-amber-100/45">نماد اعتماد الکترونیکی</p>
+          </a>
+        </div>
+        <p className="text-[11px] text-amber-100/45">نماد اعتماد الکترونیکی و درگاه پرداخت زیبال</p>
       </div>
 
       <p className="px-4 pb-8 text-center text-xs text-amber-100/40">

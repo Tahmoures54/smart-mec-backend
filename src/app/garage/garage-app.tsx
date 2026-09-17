@@ -67,6 +67,7 @@ export function GarageApp() {
   const [description, setDescription] = useState('');
   const [geoLoading, setGeoLoading] = useState(false);
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [paidBanner, setPaidBanner] = useState<'ok' | 'fail' | null>(null);
 
   const loadMine = useCallback(async (t: string) => {
     const { ok, status, body } = await api<{ data?: MyGarage[] }>('/api/garages/register', {
@@ -86,6 +87,13 @@ export function GarageApp() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMine(token);
   }, [token, loadMine]);
+
+  useEffect(() => {
+    const paid = new URLSearchParams(window.location.search).get('paid');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (paid === '1') setPaidBanner('ok');
+    if (paid === '0') setPaidBanner('fail');
+  }, []);
 
   async function sendOtp() {
     setError('');
@@ -252,6 +260,16 @@ export function GarageApp() {
         )}
       </div>
 
+      {paidBanner === 'ok' ? (
+        <p className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
+          پرداخت موفق بود — پکیج معرفی در صف تأیید ادمین قرار گرفت.
+        </p>
+      ) : null}
+      {paidBanner === 'fail' ? (
+        <p className="mb-4 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300">
+          پرداخت انجام نشد. اگر مبلغ کم شده با پشتیبانی تماس بگیر.
+        </p>
+      ) : null}
       {error ? <p className="mb-4 text-sm text-red-300">{error}</p> : null}
       {okMsg ? <p className="mb-4 text-sm text-emerald-300">{okMsg}</p> : null}
 

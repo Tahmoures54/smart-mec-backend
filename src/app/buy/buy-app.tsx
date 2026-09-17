@@ -62,6 +62,7 @@ const SALES_POINTS = [
 export function BuyApp() {
   const search = useSearchParams();
   const reason = search.get('reason') || '';
+  const paid = search.get('paid');
   const fromEmpty = reason === 'credits' || reason === 'empty' || reason === '402';
 
   // برای جلوگیری از hydration mismatch، مقدار اولیه 'a' است و در effect
@@ -210,6 +211,16 @@ export function BuyApp() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mx-auto max-w-2xl text-center">
+        {paid === '1' ? (
+          <p className="mb-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
+            پرداخت موفق بود — اعتبار یا اشتراک روی حسابت فعال شد.
+          </p>
+        ) : null}
+        {paid === '0' ? (
+          <p className="mb-3 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300">
+            پرداخت انجام نشد. اگر مبلغ از حساب کم شده، چند دقیقه صبر کن یا با پشتیبانی تماس بگیر.
+          </p>
+        ) : null}
         {fromEmpty ? (
           <p className="mb-2 text-sm font-semibold text-orange-300">
             اعتبارت تمام شده — با یک بسته کوچک دوباره شروع کن
@@ -271,6 +282,7 @@ export function BuyApp() {
               <h3 className="mt-1 text-lg font-bold text-amber-50">{p.name || p.title}</h3>
               <p className="text-sm text-amber-100/55">{packSubtitle(p)}</p>
               <p className="mt-3 text-2xl font-extrabold text-orange-300">{formatToman(p.price)}</p>
+              <p className="mt-1 text-[11px] text-amber-100/40">پرداخت امن از طریق زیبال</p>
               <button
                 type="button"
                 disabled={!!buyingId}
@@ -294,6 +306,7 @@ export function BuyApp() {
             <h3 className="text-lg font-bold text-amber-50">{p.name || p.title}</h3>
             <p className="text-sm text-amber-100/55">{packSubtitle(p)}</p>
             <p className="mt-3 text-2xl font-extrabold text-amber-300">{formatToman(p.price)}</p>
+            <p className="mt-1 text-[11px] text-amber-100/40">پرداخت امن از طریق زیبال</p>
             <button
               type="button"
               disabled={!!buyingId}
@@ -333,6 +346,10 @@ export function BuyApp() {
           ثبت تعمیرگاه و خرید پکیج معرفی
         </a>
       </section>
+
+      <p className="mt-10 text-center text-xs leading-6 text-amber-100/45">
+        پرداخت از طریق درگاه رسمی زیبال انجام می‌شود. مکانیک هوشمند شماره کارت شما را ذخیره نمی‌کند.
+      </p>
 
       {showLogin ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

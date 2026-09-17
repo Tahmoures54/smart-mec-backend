@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isProtectedApiPath, normalizeApiPath } from '@/lib/api-guard';
 
 describe('isProtectedApiPath', () => {
-  it('keeps PayPing callback public even under /api/purchase', () => {
+  it('keeps Zibal callback public even under /api/purchase', () => {
     expect(isProtectedApiPath('/api/purchase/verify')).toBe(false);
     expect(isProtectedApiPath('/api/v1/purchase/verify')).toBe(false);
     expect(isProtectedApiPath('/api/purchase/verify/')).toBe(false);

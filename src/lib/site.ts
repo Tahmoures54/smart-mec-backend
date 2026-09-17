@@ -8,6 +8,10 @@ export const SITE = {
   supportEmail: 'support@smart-mec.ir',
   packageId: 'ir.smartmec.app',
   githubApp: 'https://github.com/Tahmoures54/smart-mechanic-flutter',
+  domain: 'smart-mec.ir',
+  url: 'https://smart-mec.ir',
+  zibalTrustHref: 'https://gateway.zibal.ir/trustMe/smart-mec.ir',
+  zibalTrustImg: 'https://zibal.ir/trust/assets/2.png',
 } as const;
 
 export type DownloadLink = {

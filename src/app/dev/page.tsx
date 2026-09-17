@@ -14,7 +14,7 @@ const ENDPOINTS = [
   { path: '/api/account/credits', desc: 'پروفایل، اعتبار و سهمیه رایگان' },
   { path: '/api/diagnose', desc: 'عیب‌یابی متنی AI (سال ساخت + شرح)' },
   { path: '/api/diagnose/audio', desc: 'عیب‌یابی از صدای موتور' },
-  { path: '/api/purchase', desc: 'ایجاد تراکنش PayPing' },
+  { path: '/api/purchase', desc: 'ایجاد تراکنش زیبال' },
   { path: '/api/purchase/verify', desc: 'تأیید پرداخت (کال‌بک درگاه)' },
   { path: '/api/products', desc: 'لیست بسته‌های اعتبار و اشتراک طلایی' },
   { path: '/api/cars', desc: 'لیست خودروها با جستجو' },
