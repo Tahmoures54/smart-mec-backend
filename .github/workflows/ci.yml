@@ -12,17 +12,19 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_PATH: /tmp/smart-mec-ci.sqlite.db
+      JWT_SECRET: ci-test-secret
+      ADMIN_PHONE: 09120000000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
       - run: npm run build
-        env:
-          JWT_SECRET: ci-test-secret
-          DATABASE_URL: postgresql://user:pass@localhost/db
