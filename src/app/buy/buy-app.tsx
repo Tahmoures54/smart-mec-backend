@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { clearWebToken, readWebToken, saveWebToken } from '@/lib/web-auth';
+import { getBuyAbVariant, track } from '@/lib/analytics';
 
 type Profile = {
   phone: string;
@@ -62,6 +63,7 @@ export function BuyApp() {
   const search = useSearchParams();
   const reason = search.get('reason') || '';
   const fromEmpty = reason === 'credits' || reason === 'empty' || reason === '402';
+  const [buyAb, setBuyAb] = useState<'a' | 'b'>('a');
 
   const [token, setToken] = useState<string | null>(() => readWebToken());
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -87,6 +89,12 @@ export function BuyApp() {
     }
     if (ok && body.data) setProfile(body.data as Profile);
   }, []);
+
+  useEffect(() => {
+    const v = getBuyAbVariant();
+    setBuyAb(v);
+    track('buy_view', { reason, variant: v });
+  }, [reason]);
 
   useEffect(() => {
     void (async () => {
@@ -169,6 +177,7 @@ export function BuyApp() {
       return;
     }
     setBuyingId(productId);
+    track('buy_click', { productId, variant: buyAb, reason });
     setError('');
     try {
       const { ok, body } = await api<{ paymentUrl?: string }>('/api/purchase', {
@@ -202,10 +211,14 @@ export function BuyApp() {
           </p>
         ) : null}
         <h1 className="text-3xl font-extrabold text-amber-50 md:text-4xl">
-          ارزش یک تشخیص درست، بیشتر از قیمت بسته است
+          {buyAb === 'a'
+            ? 'جلوی هزینهٔ اضافهٔ تعمیرگاه را بگیر'
+            : 'هر سوال یک قدم نزدیک‌تر به تشخیص درست'}
         </h1>
         <p className="mt-3 text-amber-100/75">
-          جلوی هزینهٔ اضافی تعمیرگاه را بگیر؛ با آمادگی بیشتر برو و همان لحظه اعتبارت فعال شود.
+          {buyAb === 'a'
+            ? 'یک تشخیص غلط گاهی چند برابر قیمت کل بسته برایت آب می‌خورد. با آمادگی برو تعمیرگاه.'
+            : 'با اعتبار یا طلایی، سوال و follow-up قطع نمی‌شود — همان لحظه بعد از پرداخت فعال می‌شود.'}
         </p>
         {profile ? (
           <p className="mt-3 text-sm text-amber-100/55">
@@ -271,38 +284,27 @@ export function BuyApp() {
         اگر زیاد سوال داری یا چند خودرو داری، طلایی به‌صرفه‌تر از خرید تکی اعتبار است
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {goldPacks.map((p) => {
-          const hot = HIGHLIGHT_IDS.has(p.id);
-          return (
-            <div
-              key={p.id}
-              className={`rounded-2xl border p-5 ${
-                hot
-                  ? 'border-amber-400/40 bg-amber-500/10'
-                  : 'border-white/10 bg-[#1A120E]'
-              }`}
+        {goldPacks.map((p) => (
+          <div key={p.id} className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
+            <h3 className="text-lg font-bold text-amber-50">{p.name || p.title}</h3>
+            <p className="text-sm text-amber-100/55">{packSubtitle(p)}</p>
+            <p className="mt-3 text-2xl font-extrabold text-amber-300">{formatToman(p.price)}</p>
+            <button
+              type="button"
+              disabled={!!buyingId}
+              onClick={() => void buy(p.id)}
+              className="mt-4 w-full rounded-xl bg-amber-500/90 py-2.5 text-sm font-bold text-black hover:bg-amber-400 disabled:opacity-50"
             >
-              <h3 className="text-lg font-bold text-amber-50">{p.name || p.title}</h3>
-              <p className="text-sm text-amber-100/55">{packSubtitle(p)}</p>
-              <p className="mt-3 text-2xl font-extrabold text-amber-300">{formatToman(p.price)}</p>
-              <button
-                type="button"
-                disabled={!!buyingId}
-                onClick={() => void buy(p.id)}
-                className="mt-4 w-full rounded-xl bg-amber-500/90 py-2.5 text-sm font-bold text-black hover:bg-amber-400 disabled:opacity-50"
-              >
-                {buyingId === p.id ? 'در حال انتقال…' : 'فعال‌سازی طلایی'}
-              </button>
-            </div>
-          );
-        })}
+              {buyingId === p.id ? 'در حال انتقال…' : 'فعال‌سازی طلایی'}
+            </button>
+          </div>
+        ))}
       </div>
 
       <section className="mt-14 rounded-3xl border border-orange-400/25 bg-gradient-to-b from-orange-500/10 to-transparent p-6 md:p-8">
         <p className="text-sm font-semibold text-orange-300">مخصوص تعمیرگاه‌ها</p>
         <h2 className="mt-1 text-2xl font-extrabold text-amber-50">معرفی در چت عیب‌یابی</h2>
         <p className="mt-2 max-w-2xl text-sm leading-7 text-amber-100/75">
-          وقتی راننده نزدیک شما عیب‌یابی می‌کند، نام تعمیرگاهتان می‌تواند در انتهای نتیجه پیشنهاد شود.
           مسیر: ثبت تعمیرگاه → خرید پکیج → تأیید ادمین → نمایش در چت.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -316,9 +318,6 @@ export function BuyApp() {
             <div key={p.id} className="rounded-2xl border border-white/10 bg-black/30 p-4">
               <h3 className="font-bold text-amber-50">{p.name || p.id}</h3>
               <p className="mt-1 text-lg font-extrabold text-orange-300">{formatToman(p.price)}</p>
-              <p className="mt-2 text-xs leading-6 text-amber-100/50">
-                خرید فقط بعد از ثبت تعمیرگاه و با انتخاب همان تعمیرگاه انجام می‌شود.
-              </p>
             </div>
           ))}
         </div>
@@ -357,21 +356,11 @@ export function BuyApp() {
             {devOtp ? <p className="mt-2 text-xs text-amber-300">کد توسعه: {devOtp}</p> : null}
             <div className="mt-4 flex gap-2">
               {!otpSent ? (
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void sendOtp()}
-                  className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold"
-                >
+                <button type="button" disabled={loading} onClick={() => void sendOtp()} className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold">
                   ارسال کد
                 </button>
               ) : (
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void verifyOtp()}
-                  className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold"
-                >
+                <button type="button" disabled={loading} onClick={() => void verifyOtp()} className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold">
                   ورود و ادامه خرید
                 </button>
               )}
