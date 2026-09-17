@@ -31,6 +31,9 @@ export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
           <Link href="/buy" className="hover:text-white">
             شارژ اعتبار
           </Link>
+          <Link href="/garage" className="hover:text-white">
+            ثبت تعمیرگاه
+          </Link>
           <Link href="/#features" className="hover:text-white">
             امکانات
           </Link>
