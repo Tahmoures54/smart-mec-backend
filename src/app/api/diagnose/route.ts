@@ -4,8 +4,8 @@ import { db } from '@/db';
 import { diagnostics } from '@/db/schema';
 import { getUserFromRequest } from '@/lib/auth';
 import { RateLimiter } from '@/lib/rate-limit';
-import { handleError, BadRequestError, InsufficientCreditsError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
+import { handleError, BadRequestError, InsufficientCreditsError } from '@/lib/error-handler';
+import { logger } from '@/utils/logger';
 import {
   validateCarId,
   validateYear,
@@ -14,7 +14,7 @@ import {
   validateOptionalId,
   looksLikeCustomCarLabel,
 } from '@/lib/validation';
-import { isGoldenActive } from '@/lib/billing';
+import { isGoldenActive } from '@/lib/user-status';
 import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagnose-billing';
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
