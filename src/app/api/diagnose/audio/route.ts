@@ -9,6 +9,7 @@ import {
   validateCarId,
   validateYear,
   validateCustomCarName,
+  looksLikeCustomCarLabel,
 } from '@/lib/validation';
 import {
   handleError,
@@ -33,10 +34,16 @@ export async function POST(request: NextRequest) {
     RateLimiter.check(ip, 'diagnose_audio', 5, 10 * 60 * 1000);
 
     const form = await request.formData();
-    const carId = validateCarId(String(form.get('carId') || ''));
+    let rawCarId = String(form.get('carId') || '');
+    let rawCarName = form.get('carName') ? String(form.get('carName')) : null;
+    if (looksLikeCustomCarLabel(rawCarId)) {
+      rawCarName = rawCarName || rawCarId;
+      rawCarId = 'custom';
+    }
+    const carId = validateCarId(rawCarId);
     const year = validateYear(String(form.get('year') || ''));
     const customCarName = validateCustomCarName(
-      form.get('carName') ? String(form.get('carName')) : null
+      carId === 'custom' ? (rawCarName || null) : rawCarName
     );
     const clientFeatures = form.get('audioFeatures')
       ? String(form.get('audioFeatures')).trim()
