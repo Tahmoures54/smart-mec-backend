@@ -302,9 +302,8 @@ export function DiagnoseApp() {
           return;
         }
         if (status === 402) {
-          setNeedCredits(true);
-          await loadProducts();
-          throw new Error(body.error || 'اعتبار کافی نیست');
+          window.location.href = '/buy?reason=credits';
+          return;
         }
         if (!ok || !body.data?.result) throw new Error(body.error || 'عیب‌یابی ناموفق بود');
         setResult({
@@ -348,9 +347,8 @@ export function DiagnoseApp() {
           return;
         }
         if (status === 402) {
-          setNeedCredits(true);
-          await loadProducts();
-          throw new Error(body.error || 'اعتبار کافی نیست');
+          window.location.href = '/buy?reason=credits';
+          return;
         }
         if (!ok || !body.data?.result) throw new Error(body.error || 'عیب‌یابی ناموفق بود');
         setResult({
@@ -598,6 +596,13 @@ export function DiagnoseApp() {
           >
             {loading ? 'در حال عیب‌یابی…' : 'عیب‌یابی کن'}
           </button>
+
+          <p className="text-center text-xs text-amber-100/45">
+            اعتبار نداری؟{' '}
+            <a href="/buy" className="text-orange-300 hover:underline">
+              شارژ حساب
+            </a>
+          </p>
         </form>
 
         <div className="space-y-4">
@@ -650,27 +655,6 @@ export function DiagnoseApp() {
               نتیجه عیب‌یابی این‌جا می‌آید.
             </div>
           )}
-
-          {needCredits ? (
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5">
-              <h3 className="font-bold text-amber-200">اعتبار تمام شده</h3>
-              <p className="mt-2 text-sm text-amber-100/70">یک بسته بخر تا همان‌جا ادامه بدهی.</p>
-              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-                {products.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => void buy(p.id)}
-                      className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-right text-sm hover:border-orange-400/50"
-                    >
-                      <span className="block font-semibold">{p.name}</span>
-                      <span className="text-orange-300">{formatToman(p.price)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
 
           {history.length > 0 ? (
             <div>
