@@ -110,7 +110,6 @@ export function DiagnoseApp() {
   const selectedCustom = carId === 'custom';
 
   const filteredCars = useMemo(() => {
-    // API already filters by q; show a longer scrollable list
     return cars.slice(0, 40);
   }, [cars]);
 
@@ -126,6 +125,7 @@ export function DiagnoseApp() {
       setToken(null);
       setProfile(null);
       setHistory([]);
+      setError('نشست شما منقضی شده است. لطفاً دوباره وارد شوید.');
       return false;
     }
     if (ok && body.data) setProfile(body.data);
@@ -276,9 +276,15 @@ export function DiagnoseApp() {
     try {
       if (mode === 'audio' && audioBlob && !followUpText) {
         const form = new FormData();
-        form.set('carId', carId);
+        let aCarId = carId;
+        let aCarName = selectedCustom ? customName.trim() : '';
+        if ((!aCarId || aCarId === 'custom') && (aCarName || query.trim().length >= 2)) {
+          aCarId = 'custom';
+          aCarName = aCarName || query.trim();
+        }
+        form.set('carId', aCarId || 'custom');
         form.set('year', year);
-        if (selectedCustom) form.set('carName', customName);
+        if (aCarId === 'custom' && aCarName) form.set('carName', aCarName);
         if (description.trim()) form.set('description', description.trim());
         form.set('audio', audioBlob, 'engine-sound.webm');
         const { ok, status, body } = await api<{
@@ -290,8 +296,9 @@ export function DiagnoseApp() {
         }>('/api/diagnose/audio', { method: 'POST', token: t, form });
         if (status === 401) {
           pendingSubmit.current = true;
-          setShowLogin(true);
           logout();
+          setShowLogin(true);
+          setError(body.error || 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.');
           return;
         }
         if (status === 402) {
@@ -307,6 +314,15 @@ export function DiagnoseApp() {
           remainingFreeQuestions: body.remainingFreeQuestions,
         });
       } else {
+        let sendCarId = carId;
+        let sendCarName: string | undefined =
+          carId === 'custom' || selectedCustom
+            ? customName.trim() || query.trim() || undefined
+            : undefined;
+        if ((!sendCarId || sendCarId === 'custom') && (sendCarName || query.trim().length >= 2)) {
+          sendCarId = 'custom';
+          sendCarName = sendCarName || query.trim();
+        }
         const { ok, status, body } = await api<{
           data?: { result?: string };
           diagnosticId?: number;
@@ -317,17 +333,18 @@ export function DiagnoseApp() {
           method: 'POST',
           token: t,
           json: {
-            carId,
+            carId: sendCarId,
             year,
             description: problem,
-            carName: (carId === 'custom' || selectedCustom) ? (customName.trim() || query.trim() || undefined) : undefined,
+            carName: sendCarName,
             previousDiagnosticId: followUpText ? result?.diagnosticId : undefined,
           },
         });
         if (status === 401) {
           pendingSubmit.current = true;
-          setShowLogin(true);
           logout();
+          setShowLogin(true);
+          setError(body.error || 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.');
           return;
         }
         if (status === 402) {
@@ -630,7 +647,7 @@ export function DiagnoseApp() {
             </article>
           ) : (
             <div className="rounded-2xl border border-dashed border-white/15 p-8 text-amber-100/60">
-              نتیجه عیب‌یابی این‌جا می‌آید. این تحلیل جای مکانیک متخصص را نمی‌گیرد.
+              نتیجه عیب‌یابی این‌جا می‌آید.
             </div>
           )}
 
@@ -680,7 +697,7 @@ export function DiagnoseApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#1A120E] p-5">
             <h2 className="text-xl font-bold">ورود با شماره موبایل</h2>
-            <p className="mt-2 text-sm text-amber-100/70">همان حساب اپ؛ کد یک‌بارمصرف پیامک می‌شود.</p>
+            <p className="mt-2 text-sm text-amber-100/70">نشست تمام شده؟ دوباره وارد شو تا ادامه بدهی.</p>
             <label className="mt-4 block text-sm">
               موبایل
               <input
