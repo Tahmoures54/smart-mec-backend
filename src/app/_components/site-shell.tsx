@@ -1,14 +1,20 @@
 import type { ReactNode } from 'react';
 import { ENAMAD_LOGO_SRC, ENAMAD_PROFILE_HREF, ENAMAD_SEAL_CODE } from '@/lib/enamad';
+import { getDownloadLinks } from '@/lib/site';
+import { AppDownloadPrompt } from './app-download-prompt';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 
 export function SiteShell({ children }: { children: ReactNode }) {
+  const appDownload = getDownloadLinks().find((link) => link.href)?.href || null;
+
   return (
     <div className="flex min-h-screen flex-col text-white">
       <SiteHeader />
       <div className="flex-1">{children}</div>
       <SiteFooter />
+
+      <AppDownloadPrompt href={appDownload} />
 
       {/* Enamad floating seal — desktop only; footer shows on all sizes */}
       <div className="fixed bottom-4 left-4 z-50 hidden md:block">
