@@ -24,15 +24,16 @@ function envUrl(name: string): string {
 }
 
 export function getDownloadLinks(): DownloadLink[] {
-  const apk = envUrl('NEXT_PUBLIC_APK_URL') || '/downloads/smart-mec.apk';
+  // Never advertise a local APK URL unless an actual APK has been configured.
+  const apk = envUrl('NEXT_PUBLIC_APK_URL') || null;
   const bazaar = envUrl('NEXT_PUBLIC_CAFEBAZAAR_URL');
   const play = envUrl('NEXT_PUBLIC_PLAY_STORE_URL');
 
   return [
     {
       id: 'apk',
-      title: 'دانلود مستقیم',
-      subtitle: 'فایل APK اندروید — نصب سریع',
+      title: 'نسخه اندروید',
+      subtitle: apk ? 'فایل APK اندروید — نصب سریع' : 'به‌زودی برای دانلود مستقیم',
       href: apk,
     },
     {
@@ -50,6 +51,6 @@ export function getDownloadLinks(): DownloadLink[] {
   ];
 }
 
-export function primaryDownloadHref(): string {
-  return getDownloadLinks()[0]?.href || '/downloads/smart-mec.apk';
+export function primaryDownloadHref(): string | null {
+  return getDownloadLinks()[0]?.href || null;
 }
