@@ -24,6 +24,7 @@ import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagno
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
 import { SYSTEM_PROMPT_AUDIO } from '@/lib/prompts';
+import { structuredToMarkdown, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
 
 export const maxDuration = 60;
 
@@ -86,11 +87,15 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join('\n\n');
 
-    const { text: resultText } = await chatCompletion({
+    const { text: resultTextRaw } = await chatCompletion({
       systemPrompt: SYSTEM_PROMPT_AUDIO,
       userContent: `[مشخصات خودرو]\n${carDetails}\n\n[اطلاعات صوتی / شرح]\n${description}`,
       userId: user.id,
     });
+    const structured = tryParseStructuredDiagnose(resultTextRaw);
+    const resultText = structured
+      ? structuredToMarkdown(structured)
+      : resultTextRaw;
 
     let remainingFree: number | null = null;
     let remainingCredits: number | null = null;
@@ -112,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { result: resultText },
+      data: { result: resultText, structured: structured ?? null },
       diagnosticId,
       remainingCredits: !golden ? remainingCredits : null,
       remainingFreeQuestions: !golden ? remainingFree : null,
