@@ -14,9 +14,6 @@ export class ValidationError extends Error {
   }
 }
 
-/**
- * اعتبارسنجی شماره موبایل ایران
- */
 export function validatePhone(phone: string): string {
   if (!phone) {
     throw new ValidationError('شماره موبایل الزامی است', 'phone');
@@ -42,9 +39,6 @@ export function validatePhone(phone: string): string {
   return normalized;
 }
 
-/**
- * اعتبارسنجی کد OTP
- */
 export function validateOTP(code: string): string {
   if (!code) {
     throw new ValidationError('کد تأیید الزامی است', 'code');
@@ -59,9 +53,6 @@ export function validateOTP(code: string): string {
   return cleaned;
 }
 
-/**
- * اعتبارسنجی توضیحات عیب‌یابی
- */
 export function validateDescription(description: string): string {
   if (!description) {
     throw new ValidationError('توضیحات مشکل الزامی است', 'description');
@@ -86,9 +77,6 @@ export function validateDescription(description: string): string {
   return trimmed;
 }
 
-/**
- * اعتبارسنجی شناسه خودرو
- */
 export function validateCarId(carId: string): string {
   if (!carId) {
     throw new ValidationError('انتخاب خودرو الزامی است', 'carId');
@@ -96,15 +84,11 @@ export function validateCarId(carId: string): string {
 
   const trimmed = carId.trim();
 
-  // اجازه custom برای خودروهای خارج از لیست
   if (trimmed === 'custom') {
     return trimmed;
   }
 
-  // شناسه کاتالوگ فقط حروف/عدد/خط تیره
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-    // اگر کاربر نام فارسی فرستاده، به‌جای خطای مبهم، به caller بگوییم custom کند
-    // (route تشخیص آن را به custom نگاشت می‌کند)
     throw new ValidationError(
       'خودرو را از لیست انتخاب کن یا گزینه «خارج از لیست» را بزن',
       'carId'
@@ -114,7 +98,6 @@ export function validateCarId(carId: string): string {
   return trimmed;
 }
 
-/** اگر carId نام نمایشی/فارسی باشد، برای تبدیل به custom استفاده می‌شود */
 export function looksLikeCustomCarLabel(carId: unknown): boolean {
   if (typeof carId !== 'string') return false;
   const t = carId.trim();
@@ -122,13 +105,9 @@ export function looksLikeCustomCarLabel(carId: unknown): boolean {
   return !/^[a-zA-Z0-9_-]+$/.test(t);
 }
 
-/**
- * اعتبارسنجی سال ساخت (شمسی یا میلادی)
- * شمسی: 1340–1410 | میلادی: 1960–2030
- */
 export function validateYear(year: string | number | undefined | null): string {
   if (year === undefined || year === null || year === '') {
-    return ''; // سال اختیاری
+    return '';
   }
 
   const cleaned = String(year).trim().replace(/[^0-9]/g, '');
@@ -153,9 +132,6 @@ export function validateYear(year: string | number | undefined | null): string {
   return String(num);
 }
 
-/**
- * اعتبارسنجی نام خودرو سفارشی
- */
 export function validateCustomCarName(name: string | undefined | null): string | null {
   if (!name) return null;
   const trimmed = name.trim();
@@ -168,24 +144,28 @@ export function validateCustomCarName(name: string | undefined | null): string |
   return trimmed;
 }
 
-/**
- * اعتبارسنجی شناسه محصول
- */
+/** نام‌های قدیمی اپ فلاتر → شناسه فعلی بک‌اند */
+const PRODUCT_ALIASES: Record<string, ProductId> = {
+  golden_30: 'gold_monthly',
+  golden_90: 'gold_quarterly',
+  gold_30: 'gold_monthly',
+  gold_90: 'gold_quarterly',
+};
+
 export function validateProductId(productId: string): ProductId {
   if (!productId) {
     throw new ValidationError('انتخاب محصول الزامی است', 'productId');
   }
 
-  if (!(productId in PRODUCTS)) {
+  const normalized = PRODUCT_ALIASES[productId] || productId;
+
+  if (!(normalized in PRODUCTS)) {
     throw new ValidationError('محصول انتخاب‌شده معتبر نیست', 'productId');
   }
 
-  return productId as ProductId;
+  return normalized as ProductId;
 }
 
-/**
- * اعتبارسنجی Authority پرداخت
- */
 export function validateAuthority(authority: string): string {
   if (!authority) {
     throw new ValidationError('کد رهگیری پرداخت الزامی است', 'authority');
@@ -200,9 +180,6 @@ export function validateAuthority(authority: string): string {
   return trimmed;
 }
 
-/**
- * اعتبارسنجی توکن JWT
- */
 export function validateToken(token: string): string {
   if (!token) {
     throw new ValidationError('توکن احراز هویت الزامی است', 'token');
@@ -217,9 +194,6 @@ export function validateToken(token: string): string {
   return trimmed;
 }
 
-/**
- * Sanitize کردن ورودی‌های متنی برای جلوگیری از XSS
- */
 export function sanitizeText(text: string): string {
   return text
     .replace(/</g, '<')
@@ -229,9 +203,6 @@ export function sanitizeText(text: string): string {
     .replace(/\//g, '&#x2F;');
 }
 
-/**
- * بررسی اینکه یک مقدار عدد صحیح مثبت است
- */
 export function validateOptionalId(
   value: unknown,
   fieldName: string
