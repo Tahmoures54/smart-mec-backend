@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
       return withCors(
         request,
         NextResponse.json(
-          { success: false, error: 'توکن احراز هویت یافت نشد' },
+          { success: false, error: 'نشست شما تمام شده است. لطفاً دوباره وارد شوید.', code: 'UNAUTHORIZED' },
           { status: 401 }
         )
       );
@@ -98,7 +98,7 @@ export async function middleware(request: NextRequest) {
       return withCors(
         request,
         NextResponse.json(
-          { success: false, error: 'توکن نامعتبر یا منقضی شده است' },
+          { success: false, error: 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.', code: 'TOKEN_EXPIRED' },
           { status: 401 }
         )
       );
