@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/inject-enamad-meta.mjs",
-    "start": "next start --hostname 0.0.0.0",
+    "start": "node .next/standalone/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -14,7 +14,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
+    "better-sqlite3": "^11.10.0",
     "dotenv": "17.3.1",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "22.19.15",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
