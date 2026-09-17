@@ -13,6 +13,7 @@ import {
   validateYear,
   validateCustomCarName,
   validateOptionalId,
+  looksLikeCustomCarLabel,
 } from '@/lib/validation';
 import {
   handleError,
@@ -67,10 +68,19 @@ export async function POST(request: NextRequest) {
     RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
     const body = await request.json();
-    const carId = validateCarId(body.carId);
+    // اگر به‌جای id، نام فارسی/نمایشی آمده → custom
+    let rawCarId = body.carId;
+    let rawCarName = body.carName;
+    if (looksLikeCustomCarLabel(rawCarId)) {
+      rawCarName = rawCarName || rawCarId;
+      rawCarId = 'custom';
+    }
+    const carId = validateCarId(rawCarId);
     const year = validateYear(body.year);
     const description = validateDescription(body.description);
-    const customCarName = validateCustomCarName(body.carName);
+    const customCarName = validateCustomCarName(
+      carId === 'custom' ? (rawCarName || body.carName) : body.carName
+    );
     const previousDiagnosticId = validateOptionalId(
       body.previousDiagnosticId ?? body.followUpId,
       'previousDiagnosticId'
