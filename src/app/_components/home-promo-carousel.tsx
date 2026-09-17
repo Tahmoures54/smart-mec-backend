@@ -14,12 +14,44 @@ type Slide = {
 
 const BASE_SLIDES: Slide[] = [
   {
-    eyebrow: 'عیب‌یابی هوشمند',
-    title: 'قبل از تعمیرگاه، دقیق‌تر بدان',
-    body: 'مشکل خودرو را بنویس یا صدای موتور را بفرست و مسیر بررسی را روشن‌تر کن.',
+    eyebrow: 'خودروهای سبک و سواری',
+    title: 'برای خودروهای روزمره، دقیق‌تر تصمیم بگیر',
+    body: 'از خودروهای شهری و سواری تا مدل‌های پرتیراژ؛ مشکل را شرح بده و مسیر بررسی را روشن‌تر کن.',
     cta: 'شروع عیب‌یابی',
     href: '/diagnose',
-    icon: '🎯',
+    icon: '🚗',
+  },
+  {
+    eyebrow: 'شاسی‌بلند و آفرود',
+    title: 'برای مسیرهای سخت، آماده‌تر باش',
+    body: 'علائم موتور، انتقال قدرت و مشکلات رایج خودروهای شاسی‌بلند و آفرود را بهتر بررسی کن.',
+    cta: 'بررسی خودرو',
+    href: '/diagnose',
+    icon: '🏔️',
+  },
+  {
+    eyebrow: 'کامیون و اتوبوس',
+    title: 'وقتی وسیله سنگین است، تشخیص مهم‌تر می‌شود',
+    body: 'برای ناوگان، کامیون و اتوبوس، شرح دقیق علائم می‌تواند شروع بهتری برای بررسی فنی باشد.',
+    cta: 'شروع بررسی',
+    href: '/diagnose',
+    icon: '🚌',
+  },
+  {
+    eyebrow: 'جرثقیل و ماشین‌آلات سنگین',
+    title: 'ماشین‌آلات سنگین را هوشمندتر بررسی کن',
+    body: 'برای تجهیزات عمرانی و کارگاهی، علائم فنی را ثبت کن و قبل از توقف طولانی مسیر بررسی را مشخص‌تر کن.',
+    cta: 'راهنمایی فنی',
+    href: '/diagnose',
+    icon: '🏗️',
+  },
+  {
+    eyebrow: 'ژنراتور و تجهیزات تولید برق',
+    title: 'تجهیزات تولید برق هم نیاز به تشخیص دارند',
+    body: 'علائم موتور، لرزش، صدا یا افت عملکرد ژنراتور را ثبت کن و بررسی اولیه را منظم‌تر شروع کن.',
+    cta: 'شروع بررسی',
+    href: '/diagnose',
+    icon: '⚡',
   },
   {
     eyebrow: 'تحلیل صدای موتور',
@@ -32,7 +64,7 @@ const BASE_SLIDES: Slide[] = [
   {
     eyebrow: 'آمادگی برای تعمیرگاه',
     title: 'با اطلاعات بیشتر وارد تعمیرگاه شو',
-    body: 'قبل از تعویض قطعه، سوال‌های درست را بشناس و تصمیم آگاهانه‌تری بگیر.',
+    body: 'قبل از تعویض قطعه، سؤال‌های درست را بشناس و تصمیم آگاهانه‌تری بگیر.',
     cta: 'راهنمایی بگیر',
     href: '/diagnose',
     icon: '🛡️',
@@ -71,7 +103,7 @@ export function HomePromoCarousel({ appHref }: { appHref: string | null }) {
   return (
     <section
       className="mx-auto max-w-6xl px-4 py-5 sm:py-7"
-      aria-label="معرفی قابلیت‌های مکانیک هوشمند"
+      aria-label="معرفی قابلیت‌ها و دسته‌های تحت پوشش مکانیک هوشمند"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -113,7 +145,7 @@ export function HomePromoCarousel({ appHref }: { appHref: string | null }) {
                 type="button"
                 role="tab"
                 aria-selected={index === active}
-                aria-label={`اسلاید ${index + 1}`}
+                aria-label={`اسلاید ${index + 1}: ${item.eyebrow}`}
                 onClick={() => setActive(index)}
                 className={`h-1.5 rounded-full transition-all ${index === active ? 'w-7 bg-orange-400' : 'w-1.5 bg-white/20 hover:bg-white/40'}`}
               />
