@@ -1,48 +1,39 @@
-// ═══════════════════════════════════════════════════════════
-// AI Diagnose Route - Smart-MEC
-// ═══════════════════════════════════════════════════════════
-
 import { NextRequest, NextResponse } from 'next/server';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { diagnostics } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
+import { RateLimiter } from '@/lib/rate-limit';
+import { handleError, BadRequestError, InsufficientCreditsError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import {
   validateCarId,
-  validateDescription,
   validateYear,
+  validateDescription,
   validateCustomCarName,
   validateOptionalId,
   looksLikeCustomCarLabel,
 } from '@/lib/validation';
-import {
-  handleError,
-  InsufficientCreditsError,
-  BadRequestError,
-} from '@/lib/error-handler';
-import { RateLimiter } from '@/lib/rate-limiter';
-import { logger } from '@/utils/logger';
-import { User } from '@/types';
-import { isGoldenActive } from '@/lib/user-status';
+import { isGoldenActive } from '@/lib/billing';
 import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagnose-billing';
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
 import { SYSTEM_PROMPT_FREE, SYSTEM_PROMPT_PREMIUM } from '@/lib/prompts';
+import { structuredToMarkdown, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
 import {
   formatGaragesForChat,
   getChatApprovedGaragesNearby,
 } from '@/lib/chat-garages';
+import type { User } from '@/types';
 
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
-    if (!user) throw new Error('کاربر یافت نشد');
-
-    const url = new URL(request.url);
-    const limit = Math.min(Number(url.searchParams.get('limit') || '20'), 50);
-    const offset = Number(url.searchParams.get('offset') || '0');
+    const user = (await getUserFromRequest(request)) as User;
+    const { searchParams } = request.nextUrl;
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10) || 20, 50);
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
     const history = await db.query.diagnostics.findMany({
       where: eq(diagnostics.userId, user.id),
@@ -68,7 +59,6 @@ export async function POST(request: NextRequest) {
     RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
     const body = await request.json();
-    // اگر به‌جای id، نام فارسی/نمایشی آمده → custom
     let rawCarId = body.carId;
     let rawCarName = body.carName;
     if (looksLikeCustomCarLabel(rawCarId)) {
@@ -120,11 +110,14 @@ export async function POST(request: NextRequest) {
       userId: user.id,
     });
 
-    // فقط تعمیرگاه‌هایی که پرداخت کرده و ادمین تأیید کرده در چت می‌آیند
+    const structured = tryParseStructuredDiagnose(resultTextRaw);
+    let resultText = structured
+      ? structuredToMarkdown(structured)
+      : resultTextRaw;
+
     const cityHint = typeof body.city === 'string' ? body.city : undefined;
     const userLat = Number(body.lat);
     const userLng = Number(body.lng);
-    let resultText = resultTextRaw;
     try {
       const promo = await getChatApprovedGaragesNearby({
         lat: Number.isFinite(userLat) ? userLat : null,
@@ -132,7 +125,7 @@ export async function POST(request: NextRequest) {
         city: cityHint || null,
         limit: 3,
       });
-      resultText = resultTextRaw + formatGaragesForChat(promo);
+      resultText = resultText + formatGaragesForChat(promo);
     } catch (e) {
       logger.warn('chat garage promo append failed', e);
     }
@@ -172,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { result: resultText },
+      data: { result: resultText, structured: structured ?? null },
       diagnosticId,
       remainingCredits: !golden ? remainingCredits : null,
       remainingFreeQuestions: !golden ? remainingFree : null,
