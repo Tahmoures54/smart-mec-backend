@@ -60,7 +60,7 @@ export function validateDescription(description: string): string {
 
   const trimmed = description.trim();
 
-  if (trimmed.length < 5) {
+  if (trimmed.length < 10) {
     throw new ValidationError(
       'توضیحات را کمی بیشتر بنویس (حداقل چند کلمه)',
       'description'
