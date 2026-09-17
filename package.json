@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/inject-enamad-meta.mjs",
-    "start": "next start -p ${PORT:-3000}",
+    "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
