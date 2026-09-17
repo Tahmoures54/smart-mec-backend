@@ -10,14 +10,14 @@ const isBuilding =
   process.env.npm_lifecycle_event === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
-type Database = BetterSQLite3Database<typeof schema>;
+type DrizzleDb = BetterSQLite3Database<typeof schema>;
 
 const DB_PATH = process.env.DATABASE_PATH || '/app/db/sqlite.db';
 
 let sqlite: Database.Database | null = null;
-let dbInstance: Database | null = null;
+let dbInstance: DrizzleDb | null = null;
 
-function getSqlite(): Database.Database {
+export function getSqlite(): Database.Database {
   if (!sqlite) {
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) {
@@ -34,14 +34,14 @@ function getSqlite(): Database.Database {
   return sqlite;
 }
 
-function getDb(): Database {
+function getDb(): DrizzleDb {
   if (!dbInstance) {
     dbInstance = drizzle(getSqlite(), { schema });
   }
   return dbInstance;
 }
 
-export const db = new Proxy({} as Database, {
+export const db = new Proxy({} as DrizzleDb, {
   get(_, prop) {
     const realDb = getDb();
     const value = (realDb as any)[prop];
@@ -56,6 +56,7 @@ async function ensureTables() {
   try {
     const client = getSqlite();
 
+    // جدول‌ها با INTEGER برای created_at/updated_at (هماهنگ با schema.ts)
     client.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,9 +69,9 @@ async function ensureTables() {
         referred_by INTEGER REFERENCES users(id),
         earnings INTEGER DEFAULT 0 NOT NULL,
         marketing_opt_in INTEGER DEFAULT 0 NOT NULL,
-        recovery_sms_at TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        recovery_sms_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS golden_usage (
@@ -78,7 +79,7 @@ async function ensureTables() {
         user_id INTEGER NOT NULL REFERENCES users(id),
         year_month TEXT NOT NULL,
         count INTEGER DEFAULT 0 NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS monthly_free_usage (
@@ -86,7 +87,7 @@ async function ensureTables() {
         user_id INTEGER NOT NULL REFERENCES users(id),
         year_month TEXT NOT NULL,
         free_count INTEGER DEFAULT 0 NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS otps (
@@ -95,7 +96,7 @@ async function ensureTables() {
         code TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
         is_used INTEGER DEFAULT 0 NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS diagnostics (
@@ -105,7 +106,7 @@ async function ensureTables() {
         description TEXT NOT NULL,
         result TEXT NOT NULL,
         year INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS purchases (
@@ -117,8 +118,8 @@ async function ensureTables() {
         authority TEXT UNIQUE,
         ref_id TEXT,
         garage_id INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS withdrawals (
@@ -129,8 +130,8 @@ async function ensureTables() {
         full_name TEXT,
         status TEXT DEFAULT 'pending' NOT NULL,
         admin_note TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS garages (
@@ -156,8 +157,8 @@ async function ensureTables() {
         owner_user_id INTEGER REFERENCES users(id),
         chat_status TEXT DEFAULT 'none' NOT NULL,
         show_in_chat INTEGER DEFAULT 0 NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS feedbacks (
@@ -166,7 +167,7 @@ async function ensureTables() {
         diagnostic_id INTEGER REFERENCES diagnostics(id),
         rating INTEGER NOT NULL,
         comment TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE TABLE IF NOT EXISTS analytics_events (
@@ -176,7 +177,7 @@ async function ensureTables() {
         user_id INTEGER,
         path TEXT,
         props TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
       CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users (referred_by);
@@ -212,7 +213,7 @@ async function ensureTables() {
 
     addColumn('users', 'monthly_limit', 'INTEGER DEFAULT 200');
     addColumn('users', 'marketing_opt_in', 'INTEGER DEFAULT 0 NOT NULL');
-    addColumn('users', 'recovery_sms_at', 'TEXT');
+    addColumn('users', 'recovery_sms_at', 'INTEGER');
     addColumn('diagnostics', 'year', 'INTEGER');
     addColumn('purchases', 'garage_id', 'INTEGER');
     addColumn('garages', 'subscription_tier', "TEXT DEFAULT 'free' NOT NULL");
