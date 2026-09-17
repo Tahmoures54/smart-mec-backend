@@ -6,10 +6,10 @@ describe('download links', () => {
     vi.unstubAllEnvs();
   });
 
-  it('defaults to the hosted APK and marks stores as coming soon', () => {
+  it('does not advertise a missing local APK', () => {
     const links = getDownloadLinks();
-    expect(primaryDownloadHref()).toBe('/downloads/smart-mec.apk');
-    expect(links[0]).toMatchObject({ id: 'apk', href: '/downloads/smart-mec.apk' });
+    expect(primaryDownloadHref()).toBeNull();
+    expect(links[0]).toMatchObject({ id: 'apk', href: null });
     expect(links[1]?.href).toBeNull();
     expect(links[2]?.href).toBeNull();
   });
@@ -21,6 +21,7 @@ describe('download links', () => {
 
     const links = getDownloadLinks();
     expect(primaryDownloadHref()).toBe('https://cdn.example/app.apk');
+    expect(links[0]?.href).toBe('https://cdn.example/app.apk');
     expect(links[1]?.href).toContain('cafebazaar.ir');
     expect(links[2]?.href).toContain('play.google.com');
   });
