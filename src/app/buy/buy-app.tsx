@@ -63,6 +63,9 @@ export function BuyApp() {
   const search = useSearchParams();
   const reason = search.get('reason') || '';
   const fromEmpty = reason === 'credits' || reason === 'empty' || reason === '402';
+
+  // برای جلوگیری از hydration mismatch، مقدار اولیه 'a' است و در effect
+  // بعد از mount با مقدار واقعی localStorage جایگزین می‌شود.
   const [buyAb, setBuyAb] = useState<'a' | 'b'>('a');
 
   const [token, setToken] = useState<string | null>(() => readWebToken());
@@ -92,6 +95,7 @@ export function BuyApp() {
 
   useEffect(() => {
     const v = getBuyAbVariant();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBuyAb(v);
     track('buy_view', { reason, variant: v });
   }, [reason]);
@@ -106,6 +110,7 @@ export function BuyApp() {
 
   useEffect(() => {
     if (!token) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadProfile(token);
   }, [token, loadProfile]);
 
@@ -186,7 +191,7 @@ export function BuyApp() {
         json: { productId, from: 'web' },
       });
       if (!ok || !body.paymentUrl) throw new Error(body.error || 'ساخت تراکنش ناموفق');
-      window.location.href = body.paymentUrl;
+      window.location.assign(body.paymentUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در پرداخت');
       setBuyingId(null);
@@ -356,15 +361,29 @@ export function BuyApp() {
             {devOtp ? <p className="mt-2 text-xs text-amber-300">کد توسعه: {devOtp}</p> : null}
             <div className="mt-4 flex gap-2">
               {!otpSent ? (
-                <button type="button" disabled={loading} onClick={() => void sendOtp()} className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void sendOtp()}
+                  className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold"
+                >
                   ارسال کد
                 </button>
               ) : (
-                <button type="button" disabled={loading} onClick={() => void verifyOtp()} className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void verifyOtp()}
+                  className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold"
+                >
                   ورود و ادامه خرید
                 </button>
               )}
-              <button type="button" onClick={() => setShowLogin(false)} className="rounded-xl bg-white/10 px-4">
+              <button
+                type="button"
+                onClick={() => setShowLogin(false)}
+                className="rounded-xl bg-white/10 px-4"
+              >
                 بعداً
               </button>
             </div>
