@@ -154,35 +154,54 @@ function BarChart({ points, color }: { points: { day: string; value: number }[];
   );
 }
 
-function DonutChart({ items }: { items: { label: string; value: number; color: string }[] }) {
+/**
+ * محاسبهٔ برش‌های دونات در یک helper خارج از کامپوننت تا قاعدهٔ
+ * react-hooks/immutability (منع mutation در بدنهٔ render) رعایت شود.
+ */
+function computeDonutSlices(
+  items: { label: string; value: number; color: string }[],
+  r: number
+) {
   const total = Math.max(1, items.reduce((a, b) => a + b.value, 0));
-  let acc = 0;
-  const r = 48;
   const c = 2 * Math.PI * r;
+  const slices: Array<{
+    label: string;
+    color: string;
+    dash: number;
+    gap: number;
+    rot: number;
+  }> = [];
+  let acc = 0;
+  for (const it of items) {
+    const dash = (it.value / total) * c;
+    const gap = c - dash;
+    const rot = (acc / total) * 360 - 90;
+    slices.push({ label: it.label, color: it.color, dash, gap, rot });
+    acc += it.value;
+  }
+  return { total, slices };
+}
+
+function DonutChart({ items }: { items: { label: string; value: number; color: string }[] }) {
+  const r = 48;
+  const { total, slices } = computeDonutSlices(items, r);
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
       <svg width={120} height={120} viewBox="0 0 120 120">
         <circle cx="60" cy="60" r={r} fill="none" stroke="#222" strokeWidth="14" />
-        {items.map((it) => {
-          const frac = it.value / total;
-          const dash = frac * c;
-          const gap = c - dash;
-          const rot = (acc / total) * 360 - 90;
-          acc += it.value;
-          return (
-            <circle
-              key={it.label}
-              cx="60"
-              cy="60"
-              r={r}
-              fill="none"
-              stroke={it.color}
-              strokeWidth="14"
-              strokeDasharray={`${dash} ${gap}`}
-              transform={`rotate(${rot} 60 60)`}
-            />
-          );
-        })}
+        {slices.map((s) => (
+          <circle
+            key={s.label}
+            cx="60"
+            cy="60"
+            r={r}
+            fill="none"
+            stroke={s.color}
+            strokeWidth="14"
+            strokeDasharray={`${s.dash} ${s.gap}`}
+            transform={`rotate(${s.rot} 60 60)`}
+          />
+        ))}
         <text x="60" y="64" textAnchor="middle" fill="#eee" fontSize="14" fontWeight="700">
           {total.toLocaleString('fa-IR')}
         </text>
