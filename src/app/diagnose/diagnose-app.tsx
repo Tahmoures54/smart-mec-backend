@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { markdownToHtml } from '@/lib/markdown';
+import { DiagnoseResultView } from './diagnose-result-view';
 import { clearWebToken, getTokenKey, readWebToken, saveWebToken } from '@/lib/web-auth';
 
 const TOKEN_KEY = getTokenKey();
@@ -423,8 +423,6 @@ export function DiagnoseApp() {
     setDescription(item.description);
   }
 
-  const resultHtml = result ? markdownToHtml(result.text) : '';
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -608,11 +606,8 @@ export function DiagnoseApp() {
         <div className="space-y-4">
           {result ? (
             <article className="rounded-2xl border border-orange-400/30 bg-[#1A120E] p-5">
-              <h2 className="mb-4 text-xl font-bold text-amber-100">نتیجه</h2>
-              <div
-                className="diagnose-result text-sm leading-8 text-amber-50/90"
-                dangerouslySetInnerHTML={{ __html: resultHtml }}
-              />
+              <h2 className="mb-4 text-xl font-bold text-amber-100">نتیجه عیب‌یابی</h2>
+              <DiagnoseResultView text={result.text} />
               {result.diagnosticId ? (
                 <form
                   className="mt-6 border-t border-white/10 pt-4"
