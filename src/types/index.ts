@@ -26,7 +26,7 @@ export interface JWTPayload {
   exp?: number;
 }
 
-// ─── Car (aligned with src/data/cars.json) ───
+// ─── Car ───
 export type CarCategory =
   | 'sedan'
   | 'suv'
@@ -66,7 +66,7 @@ export interface Car {
   createdAt?: string | Date;
 }
 
-// ─── Products (Credit Packs + Garage chat promo) ───
+// ─── Products ───
 export type ProductId =
   | 'credit_5'
   | 'credit_10'
@@ -91,12 +91,13 @@ export interface Product {
   days: number;
 }
 
+/** قیمت‌ها به تومان — هم‌تراز با اپ فلاتر */
 export const PRODUCTS: Record<ProductId, Product> = {
   credit_5: {
     id: 'credit_5',
     name: 'پک ۵ اعتبار',
     title: 'پک ۵ اعتبار',
-    price: 15000,
+    price: 65000,
     credits: 5,
     goldenDays: 0,
     monthlyLimit: 0,
@@ -106,7 +107,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'credit_10',
     name: 'پک ۱۰ اعتبار',
     title: 'پک ۱۰ اعتبار',
-    price: 28000,
+    price: 120000,
     credits: 10,
     goldenDays: 0,
     monthlyLimit: 0,
@@ -116,7 +117,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'credit_20',
     name: 'پک ۲۰ اعتبار',
     title: 'پک ۲۰ اعتبار',
-    price: 52000,
+    price: 200000,
     credits: 20,
     goldenDays: 0,
     monthlyLimit: 0,
@@ -126,7 +127,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'credit_50',
     name: 'پک ۵۰ اعتبار',
     title: 'پک ۵۰ اعتبار',
-    price: 120000,
+    price: 350000,
     credits: 50,
     goldenDays: 0,
     monthlyLimit: 0,
@@ -136,7 +137,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'credit_100',
     name: 'پک ۱۰۰ اعتبار',
     title: 'پک ۱۰۰ اعتبار',
-    price: 220000,
+    price: 600000,
     credits: 100,
     goldenDays: 0,
     monthlyLimit: 0,
@@ -146,7 +147,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'gold_monthly',
     name: 'اشتراک طلایی ماهانه',
     title: 'اشتراک طلایی ماهانه',
-    price: 99000,
+    price: 199000,
     credits: 0,
     goldenDays: 30,
     monthlyLimit: 100,
@@ -156,7 +157,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'gold_quarterly',
     name: 'اشتراک طلایی سه‌ماهه',
     title: 'اشتراک طلایی سه‌ماهه',
-    price: 249000,
+    price: 499000,
     credits: 0,
     goldenDays: 90,
     monthlyLimit: 100,
@@ -166,7 +167,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     id: 'gold_yearly',
     name: 'اشتراک طلایی سالانه',
     title: 'اشتراک طلایی سالانه',
-    price: 990000,
+    price: 1490000,
     credits: 0,
     goldenDays: 365,
     monthlyLimit: 100,
@@ -204,7 +205,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
   },
 };
 
-// ─── Diagnose (aligned with real API) ───
+// ─── Diagnose ───
 export interface DiagnoseRequest {
   carId?: string;
   year?: string | number;
