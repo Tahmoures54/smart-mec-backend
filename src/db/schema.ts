@@ -125,6 +125,8 @@ export const withdrawals = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id).notNull(),
     amount: integer('amount').notNull(),
+    cardNumber: text('card_number'),
+    fullName: text('full_name'),
     status: text('status').default('pending').notNull(),
     adminNote: text('admin_note'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
