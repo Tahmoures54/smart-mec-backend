@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { AdminDashboardCharts } from './admin-dashboard-charts';
 
 const API = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -188,19 +189,11 @@ export default function AdminPage() {
       phone: '',
       lat: '',
       lng: '',
-      rating: '',
-      reviewsCount: '',
-      specialties: '',
-      photoUrl: '',
-      website: '',
-      description: '',
       city: 'تهران',
-      isOpen: true,
       isFeatured: false,
       isVerified: false,
       isActive: true,
       subscriptionTier: 'free',
-      subscriptionExpiresAt: '',
     };
   }
 
@@ -336,16 +329,7 @@ export default function AdminPage() {
           {error && <div style={s.alertError}>{error}</div>}
 
           {tab === 'dashboard' && dash && (
-            <div style={s.statGrid}>
-              <StatCard icon="👥" title="کاربران" value={fmt(dash.users)} accent="#42a5f5" />
-              <StatCard icon="💰" title="درآمد" value={`${fmt(dash.revenue)} ت`} accent="#66bb6a" />
-              <StatCard icon="🧠" title="عیب‌یابی" value={fmt(dash.diagnostics)} accent="#ab47bc" />
-              <StatCard icon="⏳" title="برداشت معلق" value={fmt(dash.pendingWithdrawals)} accent="#ff9800" />
-              <StatCard icon="🔧" title="تعمیرگاه‌ها" value={fmt(dash.garages || 0)} accent="#ffa726" />
-              <StatCard icon="⭐" title="ویژه / فعال" value={`${fmt(dash.garagesFeatured || 0)} / ${fmt(dash.garagesActive || 0)}`} accent="#ffca28" />
-              <StatCard icon="🎁" title="درآمد رفرال" value={`${fmt(dash.totalReferralEarnings || 0)} ت`} accent="#26c6da" />
-              <StatCard icon="⭐" title="بازخورد" value={fmt(dash.feedback || 0)} accent="#ef5350" />
-            </div>
+            <AdminDashboardCharts dash={dash} fmt={fmt} />
           )}
 
           {tab === 'garages' && (
@@ -357,8 +341,8 @@ export default function AdminPage() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 {([
-                  ['pending_review', 'صف تأیید (پرداخت‌شده)'],
-                  ['approved', 'تأیید‌شده در چت'],
+                  ['pending_review', 'صف تأیید'],
+                  ['approved', 'تأیید‌شده'],
                   ['rejected', 'رد شده'],
                   ['none', 'بدون پکیج'],
                   ['all', 'همه'],
@@ -374,17 +358,14 @@ export default function AdminPage() {
                     }}
                   >
                     {label}
-                    {key === 'pending_review'
-                      ? ` (${garages.filter((g) => g.chatStatus === 'pending_review').length})`
-                      : ''}
                   </button>
                 ))}
               </div>
               {garageForm && (
-                <div style={{ ...s.tableCard, marginBottom: 16, border: '1px solid rgba(255,152,0,0.35)' }}>
+                <div style={{ ...s.tableCard, marginBottom: 16, padding: 16, border: '1px solid rgba(255,152,0,0.35)' }}>
                   <div style={{ fontWeight: 800, marginBottom: 12 }}>{garageForm.id ? `ویرایش #${garageForm.id}` : 'افزودن تعمیرگاه'}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {(['name','phone','city','address','lat','lng','rating','reviewsCount','specialties','photoUrl','website','subscriptionTier','subscriptionExpiresAt'] as string[]).map((key) => (
+                    {(['name', 'phone', 'city', 'address', 'lat', 'lng', 'subscriptionTier'] as string[]).map((key) => (
                       <label key={key} style={{ fontSize: 12, color: '#aaa' }}>
                         {key}
                         <input style={{ ...s.input, marginTop: 4, marginBottom: 0 }} value={garageForm[key] ?? ''} onChange={(e) => setGarageForm({ ...garageForm, [key]: e.target.value })} />
@@ -401,40 +382,26 @@ export default function AdminPage() {
                 <table style={s.table}>
                   <thead>
                     <tr>
-                      <th style={s.th}>#</th><th style={s.th}>نام</th><th style={s.th}>شهر</th><th style={s.th}>تلفن</th><th style={s.th}>سطح</th><th style={s.th}>وضعیت</th><th style={s.th}>چت</th><th style={s.th}>عملیات</th>
+                      <th style={s.th}>#</th><th style={s.th}>نام</th><th style={s.th}>شهر</th><th style={s.th}>چت</th><th style={s.th}>عملیات</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredGarages.length === 0 && <tr><td colSpan={8} style={{ ...s.td, textAlign: 'center', color: '#777' }}>خالی در این فیلتر</td></tr>}
+                    {filteredGarages.length === 0 && <tr><td colSpan={5} style={{ ...s.td, textAlign: 'center', color: '#777' }}>خالی</td></tr>}
                     {filteredGarages.map((g) => (
                       <tr key={g.id} style={{ opacity: g.isActive ? 1 : 0.45 }}>
                         <td style={s.td}>{g.id}</td>
-                        <td style={s.td}><div style={{ fontWeight: 700 }}>{g.name}</div></td>
+                        <td style={s.td}>{g.name}</td>
                         <td style={s.td}>{g.city || '—'}</td>
-                        <td style={s.td}>{g.phone || '—'}</td>
-                        <td style={s.td}>{g.subscriptionTier || 'free'}</td>
-                        <td style={s.td}>
-                          {g.isFeatured && <span style={badgeGold}>ویژه</span>}{' '}
-                          {g.isVerified && <span style={badgeOk}>تأیید</span>}
-                        </td>
-                        <td style={s.td}>
-                          <span style={g.chatStatus === 'pending_review' ? badgeGold : g.chatStatus === 'approved' ? badgeOk : badgeMuted}>
-                            {g.chatStatus || 'none'}
-                          </span>
-                        </td>
+                        <td style={s.td}>{g.chatStatus || 'none'}</td>
                         <td style={s.td}>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {g.chatStatus === 'pending_review' && (
                               <>
-                                <button style={{ ...s.btnPrimarySm, background: '#66bb6a' }} onClick={() => approveGarageChat(g.id, 'approve')}>تأیید چت</button>
+                                <button style={{ ...s.btnPrimarySm, background: '#66bb6a' }} onClick={() => approveGarageChat(g.id, 'approve')}>تأیید</button>
                                 <button style={{ ...s.btnGhost, color: '#e57373' }} onClick={() => approveGarageChat(g.id, 'reject')}>رد</button>
                               </>
                             )}
-                            {g.chatStatus === 'approved' && (
-                              <button style={{ ...s.btnGhost, color: '#e57373' }} onClick={() => approveGarageChat(g.id, 'reject')}>لغو نمایش</button>
-                            )}
-                            <button style={s.btnGhost} onClick={() => setGarageForm({ ...emptyGarageForm(), ...g, lat: String(g.lat ?? ''), lng: String(g.lng ?? ''), subscriptionTier: g.subscriptionTier || 'free' })}>ویرایش</button>
-                            <button style={s.btnGhost} onClick={() => toggleGarage(g.id, 'isFeatured')}>⭐</button>
+                            <button style={s.btnGhost} onClick={() => setGarageForm({ ...emptyGarageForm(), ...g })}>ویرایش</button>
                             <button style={s.btnGhost} onClick={() => toggleGarage(g.id, 'isActive')}>⏻</button>
                             <button style={{ ...s.btnGhost, color: '#e57373' }} onClick={() => deleteGarage(g.id)}>حذف</button>
                           </div>
@@ -530,16 +497,6 @@ export default function AdminPage() {
   );
 }
 
-function StatCard({ icon, title, value, accent }: { icon: string; title: string; value: string; accent: string }) {
-  return (
-    <div style={{ ...s.statCard, borderTop: `3px solid ${accent}` }}>
-      <div style={{ fontSize: 22 }}>{icon}</div>
-      <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{title}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>{value}</div>
-    </div>
-  );
-}
-
 const badgeGold: CSSProperties = { background: 'rgba(255,193,7,0.2)', color: '#ffc107', padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700 };
 const badgeOk: CSSProperties = { background: 'rgba(102,187,106,0.2)', color: '#66bb6a', padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700 };
 const badgeMuted: CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#aaa', padding: '2px 8px', borderRadius: 999, fontSize: 11 };
@@ -556,9 +513,6 @@ const s: Record<string, CSSProperties> = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   pageTitle: { margin: 0, fontSize: 22 },
   pageSub: { margin: '4px 0 0', color: '#777', fontSize: 13 },
-  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 },
-  statCard: { background: '#1a1a1a', borderRadius: 14, padding: 14 },
-  toolbar: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   tableCard: { background: '#1a1a1a', borderRadius: 14, overflow: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'right', padding: '10px 12px', fontSize: 12, color: '#888', borderBottom: '1px solid #2a2a2a' },
@@ -575,4 +529,5 @@ const s: Record<string, CSSProperties> = {
   label: { display: 'block', textAlign: 'right', fontSize: 13, color: '#aaa', marginBottom: 6 },
   alertError: { background: 'rgba(229,115,115,0.15)', color: '#e57373', padding: 10, borderRadius: 10, marginBottom: 12, fontSize: 13 },
   spinner: { width: 22, height: 22, border: '2px solid #333', borderTopColor: '#ff9800', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  toolbar: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
 };
