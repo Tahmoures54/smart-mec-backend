@@ -2,6 +2,7 @@
 // SMS Service (Kavenegar) - Smart-MEC
 // ═══════════════════════════════════════════════════════════
 
+import { randomInt } from 'node:crypto';
 import { logger } from '@/utils/logger';
 
 export class SMSService {
@@ -9,7 +10,7 @@ export class SMSService {
   private static template = process.env.KAVENEGAR_TEMPLATE || 'verify';
 
   static isDevOtpVisible(): boolean {
-    return process.env.SHOW_OTP_IN_DEV === 'true';
+    return process.env.SHOW_OTP_IN_DEV === 'true' && process.env.NODE_ENV !== 'production';
   }
 
   static async sendOTP(phone: string, code: string): Promise<boolean> {
@@ -50,8 +51,8 @@ export class SMSService {
     }
   }
 
-  /** کد ۶ رقمی — هماهنگ با اپ فلاتر */
+  /** Secure 6-digit OTP generation. */
   static generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return randomInt(100000, 1000000).toString();
   }
 }
