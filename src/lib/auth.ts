@@ -63,7 +63,6 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
     throw new UnauthorizedError('حساب کاربری یافت نشد. لطفاً دوباره وارد شوید.');
   }
 
-  // تبدیل اشیاء Date به استرینگ برای تطابق با تایپ User
   return {
     ...user,
     createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : null,
@@ -73,11 +72,12 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
 }
 
 export function getAdminPhone(): string {
-  return (process.env.ADMIN_PHONE || '09160684552').replace(/\s/g, '');
+  return (process.env.ADMIN_PHONE || '').replace(/\s/g, '');
 }
 
 export function isAdminPhone(phone: string): boolean {
-  return phone === getAdminPhone();
+  const adminPhone = getAdminPhone();
+  return Boolean(adminPhone) && phone === adminPhone;
 }
 
 export async function requireAdmin(req: NextRequest): Promise<User> {
@@ -105,5 +105,5 @@ export async function requireAdmin(req: NextRequest): Promise<User> {
 export function isAdminRequest(req: NextRequest): boolean {
   const token = getTokenFromRequest(req);
   const systemToken = process.env.ADMIN_SYSTEM_TOKEN;
-  return token !== null && systemToken !== undefined && token === systemToken;
+  return token !== null && Boolean(systemToken) && token === systemToken;
 }
