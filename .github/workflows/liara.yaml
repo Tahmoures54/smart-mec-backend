@@ -17,9 +17,20 @@ jobs:
         with:
           node-version: "22"
 
-      # ★ تولید package-lock.json معتبر قبل از deploy
       - name: Generate package-lock.json
         run: npm install --package-lock-only
+
+      # ★ مرحله جدید: build پروژه
+      - name: Build Next.js
+        run: |
+          npm ci
+          npm run build
+
+      # ★ مرحله جدید: کپی فایل‌های استاتیک به پوشه standalone
+      - name: Copy static assets to standalone
+        run: |
+          cp -r public .next/standalone/
+          cp -r .next/static .next/standalone/.next/
 
       - name: Deploy to Liara
         env:
