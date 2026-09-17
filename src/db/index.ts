@@ -1,6 +1,8 @@
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
-import { neon, Pool } from '@neondatabase/serverless';
+import fs from 'node:fs';
+import path from 'node:path';
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema';
 import { logger } from '@/utils/logger';
 
@@ -8,39 +10,33 @@ const isBuilding =
   process.env.npm_lifecycle_event === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
-type Database = NeonDatabase<typeof schema>;
+type Database = BetterSQLite3Database<typeof schema>;
 
-let sqlClient: ReturnType<typeof neon> | null = null;
-let pool: Pool | null = null;
+const DB_PATH = process.env.DATABASE_PATH || '/app/db/sqlite.db';
+
+let sqlite: Database.Database | null = null;
 let dbInstance: Database | null = null;
 
-function getSql() {
-  if (!process.env.DATABASE_URL) {
-    if (isBuilding) {
-      throw new Error('DATABASE_URL is not set. Skipping DB init at build time.');
+function getSqlite(): Database.Database {
+  if (!sqlite) {
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-    throw new Error('❌ DATABASE_URL is not set in environment variables');
-  }
-  if (!sqlClient) {
-    sqlClient = neon(process.env.DATABASE_URL);
-  }
-  return sqlClient;
-}
+    sqlite = new Database(DB_PATH);
 
-function getPool(): Pool {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('❌ DATABASE_URL is not set in environment variables');
+    // بهینه‌سازی و پایداری
+    sqlite.pragma('journal_mode = WAL');
+    sqlite.pragma('synchronous = NORMAL');
+    sqlite.pragma('busy_timeout = 5000');
+    sqlite.pragma('foreign_keys = ON');
   }
-  if (!pool) {
-    // neon-http cannot run interactive transactions; Pool/WebSocket can.
-    pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-  }
-  return pool;
+  return sqlite;
 }
 
 function getDb(): Database {
   if (!dbInstance) {
-    dbInstance = drizzle(getPool(), { schema });
+    dbInstance = drizzle(getSqlite(), { schema });
   }
   return dbInstance;
 }
@@ -58,191 +54,202 @@ export const db = new Proxy({} as Database, {
 
 async function ensureTables() {
   try {
-    const sql = getSql();
+    const client = getSqlite();
 
-    await sql`
+    client.exec(`
       CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone TEXT UNIQUE NOT NULL,
         credits INTEGER DEFAULT 0 NOT NULL,
-        is_golden BOOLEAN DEFAULT false NOT NULL,
+        is_golden INTEGER DEFAULT 0 NOT NULL,
         golden_expires_at TEXT,
         monthly_limit INTEGER DEFAULT 200,
         referral_code TEXT UNIQUE,
         referred_by INTEGER REFERENCES users(id),
         earnings INTEGER DEFAULT 0 NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        marketing_opt_in INTEGER DEFAULT 0 NOT NULL,
+        recovery_sms_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS golden_usage (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         year_month TEXT NOT NULL,
         count INTEGER DEFAULT 0 NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS monthly_free_usage (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         year_month TEXT NOT NULL,
         free_count INTEGER DEFAULT 0 NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS otps (
-        id SERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone TEXT NOT NULL,
         code TEXT NOT NULL,
-        expires_at BIGINT NOT NULL,
-        is_used BOOLEAN DEFAULT false NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        expires_at INTEGER NOT NULL,
+        is_used INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS diagnostics (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         car_id TEXT NOT NULL,
         description TEXT NOT NULL,
         result TEXT NOT NULL,
-        audio_url TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        year INTEGER,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS purchases (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         product_id TEXT NOT NULL,
         amount INTEGER NOT NULL,
         status TEXT DEFAULT 'pending' NOT NULL,
         authority TEXT UNIQUE,
         ref_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        garage_id INTEGER,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS withdrawals (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         amount INTEGER NOT NULL,
-        card_number TEXT NOT NULL,
-        full_name TEXT NOT NULL,
+        card_number TEXT,
+        full_name TEXT,
         status TEXT DEFAULT 'pending' NOT NULL,
         admin_note TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS garages (
-        id SERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         address TEXT,
         phone TEXT,
-        lat DOUBLE PRECISION NOT NULL,
-        lng DOUBLE PRECISION NOT NULL,
-        rating DOUBLE PRECISION,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        rating REAL,
         reviews_count INTEGER DEFAULT 0,
         specialties TEXT,
         photo_url TEXT,
         website TEXT,
         description TEXT,
-        is_open BOOLEAN DEFAULT true,
-        is_featured BOOLEAN DEFAULT false NOT NULL,
-        is_verified BOOLEAN DEFAULT false NOT NULL,
-        is_active BOOLEAN DEFAULT true NOT NULL,
+        is_open INTEGER DEFAULT 1,
+        is_featured INTEGER DEFAULT 0 NOT NULL,
+        is_verified INTEGER DEFAULT 0 NOT NULL,
+        is_active INTEGER DEFAULT 1 NOT NULL,
         subscription_tier TEXT DEFAULT 'free' NOT NULL,
         subscription_expires_at TEXT,
         city TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        owner_user_id INTEGER REFERENCES users(id),
+        chat_status TEXT DEFAULT 'none' NOT NULL,
+        show_in_chat INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`
       CREATE TABLE IF NOT EXISTS feedbacks (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         diagnostic_id INTEGER REFERENCES diagnostics(id),
         rating INTEGER NOT NULL,
         comment TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
-    `;
 
-    await sql`CREATE INDEX IF NOT EXISTS idx_garages_lat_lng ON garages (lat, lng);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_garages_active ON garages (is_active);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_garages_featured ON garages (is_featured);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_garages_city ON garages (city);`;
-    try {
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_golden_usage_user_month ON golden_usage (user_id, year_month);`;
-      await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_monthly_free_usage_user_month ON monthly_free_usage (user_id, year_month);`;
-    } catch (indexErr) {
-      logger.warn('Could not create unique usage indexes (possible duplicates)', indexErr);
-    }
-    await sql`CREATE INDEX IF NOT EXISTS idx_diagnostics_user_id ON diagnostics (user_id);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_diagnostics_created_at ON diagnostics (created_at);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases (user_id);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases (status);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals (user_id);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals (status);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps (phone);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users (referred_by);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_feedbacks_user_id ON feedbacks (user_id);`;
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event TEXT NOT NULL,
+        session_id TEXT,
+        user_id INTEGER,
+        path TEXT,
+        props TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
 
+      CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users (referred_by);
+      CREATE INDEX IF NOT EXISTS idx_golden_usage_user ON golden_usage (user_id, year_month);
+      CREATE INDEX IF NOT EXISTS idx_monthly_free_usage_user ON monthly_free_usage (user_id, year_month);
+      CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps (phone);
+      CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps (expires_at);
+      CREATE INDEX IF NOT EXISTS idx_diagnostics_user_id ON diagnostics (user_id);
+      CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases (user_id);
+      CREATE INDEX IF NOT EXISTS idx_purchases_authority ON purchases (authority);
+      CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases (status);
+      CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals (user_id);
+      CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals (status);
+      CREATE INDEX IF NOT EXISTS idx_garages_lat_lng ON garages (lat, lng);
+      CREATE INDEX IF NOT EXISTS idx_garages_active ON garages (is_active);
+      CREATE INDEX IF NOT EXISTS idx_garages_featured ON garages (is_featured);
+      CREATE INDEX IF NOT EXISTS idx_garages_city ON garages (city);
+      CREATE INDEX IF NOT EXISTS idx_garages_owner ON garages (owner_user_id);
+      CREATE INDEX IF NOT EXISTS idx_garages_show_chat ON garages (show_in_chat);
+      CREATE INDEX IF NOT EXISTS idx_feedbacks_user_id ON feedbacks (user_id);
+      CREATE INDEX IF NOT EXISTS idx_analytics_event ON analytics_events (event);
+      CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events (created_at);
+    `);
+
+    // افزودن ستون‌های جدید در صورت نیاز (SQLite از IF NOT EXISTS برای ADD COLUMN پشتیبانی نمی‌کند)
+    const addColumn = (table: string, column: string, def: string) => {
+      try {
+        client.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def};`);
+      } catch {
+        // ستون از قبل وجود دارد
+      }
+    };
+
+    addColumn('users', 'monthly_limit', 'INTEGER DEFAULT 200');
+    addColumn('users', 'marketing_opt_in', 'INTEGER DEFAULT 0 NOT NULL');
+    addColumn('users', 'recovery_sms_at', 'TEXT');
+    addColumn('diagnostics', 'year', 'INTEGER');
+    addColumn('purchases', 'garage_id', 'INTEGER');
+    addColumn('garages', 'subscription_tier', "TEXT DEFAULT 'free' NOT NULL");
+    addColumn('garages', 'subscription_expires_at', 'TEXT');
+    addColumn('garages', 'city', 'TEXT');
+    addColumn('garages', 'owner_user_id', 'INTEGER REFERENCES users(id)');
+    addColumn('garages', 'chat_status', "TEXT DEFAULT 'none' NOT NULL");
+    addColumn('garages', 'show_in_chat', 'INTEGER DEFAULT 0 NOT NULL');
+    addColumn('garages', 'is_verified', 'INTEGER DEFAULT 0 NOT NULL');
+    addColumn('garages', 'is_featured', 'INTEGER DEFAULT 0 NOT NULL');
+
+    // Seed تعمیرگاه‌های نمونه در تهران (فقط اگر خالی باشد)
     try {
-      const countResult = await sql`SELECT COUNT(*)::int AS c FROM garages;`;
-      const count = Number((countResult as any)?.[0]?.c ?? 0);
-      if (count === 0) {
-        await sql`
+      const row = client.prepare('SELECT COUNT(*) AS c FROM garages').get() as { c: number };
+      if (!row || row.c === 0) {
+        const insert = client.prepare(`
           INSERT INTO garages (name, address, phone, lat, lng, rating, reviews_count, specialties, is_open, is_featured, is_verified, is_active, subscription_tier, city, description)
-          VALUES
-            ('تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.3380, 4.6, 128, 'موتور,تنظیم موتور', true, true, true, true, 'gold', 'تهران', 'تخصص در موتورهای بنزینی و توربو'),
-            ('خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.4100, 4.3, 86, 'عمومی,سرویس دوره‌ای', true, false, true, true, 'free', 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'),
-            ('گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.7010, 51.3910, 4.5, 210, 'گیربکس,دیفرانسیل', true, true, true, true, 'silver', 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'),
-            ('برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.7570, 51.4105, 4.4, 95, 'برق,ایسیو', true, false, true, true, 'free', 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'),
-            ('تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.5930, 51.4350, 4.1, 54, 'جلوبندی,فرمان', true, false, false, true, 'free', 'تهران', 'تنظیم فرمان و جلوبندی')
-        `;
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const seed = [
+          ['تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.338, 4.6, 128, 'موتور,تنظیم موتور', 1, 1, 1, 1, 'gold', 'تهران', 'تخصص در موتورهای بنزینی و توربو'],
+          ['خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.41, 4.3, 86, 'عمومی,سرویس دوره‌ای', 1, 0, 1, 1, 'free', 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'],
+          ['گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.701, 51.391, 4.5, 210, 'گیربکس,دیفرانسیل', 1, 1, 1, 1, 'silver', 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'],
+          ['برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.757, 51.4105, 4.4, 95, 'برق,ایسیو', 1, 0, 1, 1, 'free', 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'],
+          ['تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.593, 51.435, 4.1, 54, 'جلوبندی,فرمان', 1, 0, 0, 1, 'free', 'تهران', 'تنظیم فرمان و جلوبندی'],
+        ];
+        const insertMany = client.transaction((rows: any[][]) => {
+          for (const r of rows) insert.run(...r);
+        });
+        insertMany(seed);
         logger.info('✅ Seeded sample garages (Tehran).');
       }
     } catch (seedErr) {
       logger.warn('Could not seed garages', seedErr);
     }
 
-    try {
-      await sql`ALTER TABLE otps ALTER COLUMN expires_at TYPE BIGINT;`;
-    } catch (alterError) {
-      logger.warn('Could not alter otps.expires_at type (maybe already BIGINT)', alterError);
-    }
-
-    try {
-      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_limit INTEGER DEFAULT 200;`;
-    } catch {
-      // column already exists
-    }
-
-    try {
-      await sql`ALTER TABLE garages ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free' NOT NULL;`;
-      await sql`ALTER TABLE garages ADD COLUMN IF NOT EXISTS subscription_expires_at TEXT;`;
-    } catch (e) {
-      logger.warn('Could not add subscription columns to garages', e);
-    }
-
-    logger.info('✅ Database tables verified and ready.');
+    logger.info('✅ SQLite database tables verified and ready.', { path: DB_PATH });
   } catch (error) {
     logger.error('❌ Failed to ensure database tables:', error);
     throw error;
@@ -255,9 +262,6 @@ export function ensureDbReady(): Promise<void> {
   if (isBuilding) {
     return Promise.resolve();
   }
-  if (!process.env.DATABASE_URL) {
-    return Promise.reject(new Error('❌ DATABASE_URL is not set in environment variables'));
-  }
   if (!tablesReady) {
     tablesReady = ensureTables();
   }
@@ -267,12 +271,12 @@ export function ensureDbReady(): Promise<void> {
 export async function pingDb(): Promise<number> {
   const started = Date.now();
   await ensureDbReady();
-  await getSql()`select 1 as ok`;
+  const row = getSqlite().prepare('SELECT 1 AS ok').get();
   return Date.now() - started;
 }
 
 if (!isBuilding) {
   ensureDbReady()
-    .then(() => logger.info('✅ Neon PostgreSQL connected successfully.'))
-    .catch((err) => logger.error('❌ Database connection failed:', err.message));
+    .then(() => logger.info('✅ SQLite connected successfully.', { path: DB_PATH }))
+    .catch((err) => logger.error('❌ Database init failed:', err.message));
 }
