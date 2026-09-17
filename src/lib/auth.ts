@@ -33,7 +33,7 @@ export async function verifyToken(token: string): Promise<JWTPayload> {
     const { payload } = await jwtVerify(token, getJwtSecretKey());
     return payload as unknown as JWTPayload;
   } catch {
-    throw new UnauthorizedError('توکن نامعتبر یا منقضی شده است');
+    throw new UnauthorizedError('نشست شما منقضی شده است. لطفاً دوباره وارد شوید.');
   }
 }
 
@@ -50,7 +50,7 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
 
   const token = getTokenFromRequest(req);
   if (!token) {
-    throw new UnauthorizedError('توکن احراز هویت یافت نشد');
+    throw new UnauthorizedError('نشست شما تمام شده است. لطفاً دوباره وارد شوید.');
   }
 
   const payload = await verifyToken(token);
@@ -60,7 +60,7 @@ export async function getUserFromRequest(req: NextRequest): Promise<User> {
   });
 
   if (!user) {
-    throw new UnauthorizedError('کاربر یافت نشد');
+    throw new UnauthorizedError('حساب کاربری یافت نشد. لطفاً دوباره وارد شوید.');
   }
 
   // تبدیل اشیاء Date به استرینگ برای تطابق با تایپ User
