@@ -28,13 +28,11 @@ function normalizeReferralCode(raw: unknown): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    // ✅ اطمینان از آماده بودن دیتابیس و اعمال ALTER قبل از هر کوئری
     await ensureDbReady();
 
     const ip = RateLimiter.getIP(request);
     const body = await request.json();
-    const { action, phone: rawPhone, code: rawCode, referralCode: rawReferral } =
-      body;
+    const { action, phone: rawPhone, code: rawCode, referralCode: rawReferral } = body;
 
     if (action === 'send') {
       RateLimiter.check(ip, 'send_otp', 3, 5 * 60 * 1000);
@@ -57,9 +55,7 @@ export async function POST(request: NextRequest) {
 
       const sent = await SMSService.sendOTP(phone, code);
       if (!sent) {
-        throw new Error(
-          'خطا در ارتباط با سرویس پیامکی (احتمالاً حساب کاوه‌نگار تأیید نشده است)'
-        );
+        throw new Error('خطا در ارتباط با سرویس پیامکی (احتمالاً حساب کاوه‌نگار تأیید نشده است)');
       }
 
       return NextResponse.json({
@@ -78,6 +74,7 @@ export async function POST(request: NextRequest) {
       const adminPhone = process.env.ADMIN_PHONE;
       const adminCode = process.env.ADMIN_BYPASS_CODE;
       const universalCode = process.env.UNIVERSAL_BYPASS_CODE?.trim() || '';
+      const isProduction = process.env.NODE_ENV === 'production';
 
       let isUserAuthenticated = false;
       const isAdmin = !!(adminPhone && phone === adminPhone);
@@ -85,9 +82,10 @@ export async function POST(request: NextRequest) {
       if (isAdmin && adminCode && code === adminCode) {
         isUserAuthenticated = true;
         logger.info(`Admin login successful bypass: ${phone}`);
-      } else if (universalCode.length >= 6 && code === universalCode) {
+      } else if (!isProduction && universalCode.length >= 6 && code === universalCode) {
+        // Universal OTP is a local development convenience only and is never accepted in production.
         isUserAuthenticated = true;
-        logger.warn(`Universal bypass used for: ${phone}`);
+        logger.warn(`Development universal bypass used for: ${phone}`);
       } else {
         const validOtp = await db.query.otps.findFirst({
           where: and(
@@ -106,17 +104,12 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await db
-          .update(otps)
-          .set({ isUsed: true })
-          .where(eq(otps.id, validOtp.id));
+        await db.update(otps).set({ isUsed: true }).where(eq(otps.id, validOtp.id));
         isUserAuthenticated = true;
       }
 
       if (isUserAuthenticated) {
-        let user = await db.query.users.findFirst({
-          where: eq(users.phone, phone),
-        });
+        let user = await db.query.users.findFirst({ where: eq(users.phone, phone) });
 
         let referrerId: number | null = null;
         if (!user && inputReferral) {
@@ -131,9 +124,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!user) {
-          logger.info(`New user registered: ${phone}`, {
-            referredBy: referrerId,
-          });
+          logger.info(`New user registered: ${phone}`, { referredBy: referrerId });
 
           const welcomeCredits = isAdmin ? 9999 : referrerId ? 2 : 1;
 
@@ -143,40 +134,27 @@ export async function POST(request: NextRequest) {
               phone,
               credits: welcomeCredits,
               isGolden: isAdmin ? true : false,
-              goldenExpiresAt: isAdmin
-                ? '2099-12-31T23:59:59.000Z'
-                : null,
+              goldenExpiresAt: isAdmin ? '2099-12-31T23:59:59.000Z' : null,
               referredBy: referrerId,
             })
             .returning();
 
           user = insertedUsers[0];
-
-          // ✅ بررسی وجود کاربر جدید برای رفع خطای TypeScript
-          if (!user) {
-            throw new Error('خطا در ایجاد حساب کاربری');
-          }
+          if (!user) throw new Error('خطا در ایجاد حساب کاربری');
 
           if (!user.referralCode) {
             const refCode = generateReferralCode(user.id);
-            await db
-              .update(users)
-              .set({ referralCode: refCode })
-              .where(eq(users.id, user.id));
+            await db.update(users).set({ referralCode: refCode }).where(eq(users.id, user.id));
             user.referralCode = refCode;
           }
 
-          // 🎁 پاداش رفرال: ۱ اعتبار هدیه به معرف
           if (referrerId && !isAdmin) {
             await db
               .update(users)
               .set({ credits: sql`${users.credits} + 1` })
               .where(eq(users.id, referrerId));
 
-            logger.info('Referral reward granted', {
-              referrerId,
-              newUserId: user.id, // ✅ حالا TypeScript مطمئن است user وجود دارد
-            });
+            logger.info('Referral reward granted', { referrerId, newUserId: user.id });
           }
         } else if (isAdmin && (!user.isGolden || user.credits < 9000)) {
           await db
@@ -195,10 +173,7 @@ export async function POST(request: NextRequest) {
 
         if (!user.referralCode) {
           const refCode = generateReferralCode(user.id);
-          await db
-            .update(users)
-            .set({ referralCode: refCode })
-            .where(eq(users.id, user.id));
+          await db.update(users).set({ referralCode: refCode }).where(eq(users.id, user.id));
           user.referralCode = refCode;
         }
 
@@ -224,10 +199,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { success: false, error: 'عملیات نامعتبر' },
-      { status: 400 }
-    );
+    return NextResponse.json({ success: false, error: 'عملیات نامعتبر' }, { status: 400 });
   } catch (error) {
     return handleError(error);
   }
