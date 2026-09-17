@@ -20,12 +20,8 @@ let dbInstance: DrizzleDb | null = null;
 export function getSqlite(): Database.Database {
   if (!sqlite) {
     const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     sqlite = new Database(DB_PATH);
-
-    // بهینه‌سازی و پایداری
     sqlite.pragma('journal_mode = WAL');
     sqlite.pragma('synchronous = NORMAL');
     sqlite.pragma('busy_timeout = 5000');
@@ -35,9 +31,7 @@ export function getSqlite(): Database.Database {
 }
 
 function getDb(): DrizzleDb {
-  if (!dbInstance) {
-    dbInstance = drizzle(getSqlite(), { schema });
-  }
+  if (!dbInstance) dbInstance = drizzle(getSqlite(), { schema });
   return dbInstance;
 }
 
@@ -45,10 +39,7 @@ export const db = new Proxy({} as DrizzleDb, {
   get(_, prop) {
     const realDb = getDb();
     const value = (realDb as any)[prop];
-    if (typeof value === 'function') {
-      return value.bind(realDb);
-    }
-    return value;
+    return typeof value === 'function' ? value.bind(realDb) : value;
   },
 });
 
@@ -56,7 +47,6 @@ async function ensureTables() {
   try {
     const client = getSqlite();
 
-    // جدول‌ها با INTEGER برای created_at/updated_at (هماهنگ با schema.ts)
     client.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +63,6 @@ async function ensureTables() {
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS golden_usage (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -81,7 +70,6 @@ async function ensureTables() {
         count INTEGER DEFAULT 0 NOT NULL,
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS monthly_free_usage (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -89,7 +77,6 @@ async function ensureTables() {
         free_count INTEGER DEFAULT 0 NOT NULL,
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS otps (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone TEXT NOT NULL,
@@ -98,7 +85,6 @@ async function ensureTables() {
         is_used INTEGER DEFAULT 0 NOT NULL,
         created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS diagnostics (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -108,7 +94,6 @@ async function ensureTables() {
         year INTEGER,
         created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS purchases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -121,7 +106,6 @@ async function ensureTables() {
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS withdrawals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -133,7 +117,6 @@ async function ensureTables() {
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS garages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -160,7 +143,6 @@ async function ensureTables() {
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS feedbacks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -169,7 +151,6 @@ async function ensureTables() {
         comment TEXT,
         created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE TABLE IF NOT EXISTS analytics_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event TEXT NOT NULL,
@@ -179,7 +160,6 @@ async function ensureTables() {
         props TEXT,
         created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
-
       CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users (referred_by);
       CREATE INDEX IF NOT EXISTS idx_golden_usage_user ON golden_usage (user_id, year_month);
       CREATE INDEX IF NOT EXISTS idx_monthly_free_usage_user ON monthly_free_usage (user_id, year_month);
@@ -202,12 +182,14 @@ async function ensureTables() {
       CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events (created_at);
     `);
 
-    // افزودن ستون‌های جدید در صورت نیاز (SQLite از IF NOT EXISTS برای ADD COLUMN پشتیبانی نمی‌کند)
     const addColumn = (table: string, column: string, def: string) => {
       try {
         client.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def};`);
-      } catch {
-        // ستون از قبل وجود دارد
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.toLowerCase().includes('duplicate column name')) {
+          throw error;
+        }
       }
     };
 
@@ -225,34 +207,36 @@ async function ensureTables() {
     addColumn('garages', 'is_verified', 'INTEGER DEFAULT 0 NOT NULL');
     addColumn('garages', 'is_featured', 'INTEGER DEFAULT 0 NOT NULL');
 
-    // Seed تعمیرگاه‌های نمونه در تهران (فقط اگر خالی باشد)
-    try {
-      const row = client.prepare('SELECT COUNT(*) AS c FROM garages').get() as { c: number };
-      if (!row || row.c === 0) {
-        const insert = client.prepare(`
-          INSERT INTO garages (name, address, phone, lat, lng, rating, reviews_count, specialties, is_open, is_featured, is_verified, is_active, subscription_tier, city, description)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        const seed = [
-          ['تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.338, 4.6, 128, 'موتور,تنظیم موتور', 1, 1, 1, 1, 'gold', 'تهران', 'تخصص در موتورهای بنزینی و توربو'],
-          ['خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.41, 4.3, 86, 'عمومی,سرویس دوره‌ای', 1, 0, 1, 1, 'free', 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'],
-          ['گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.701, 51.391, 4.5, 210, 'گیربکس,دیفرانسیل', 1, 1, 1, 1, 'silver', 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'],
-          ['برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.757, 51.4105, 4.4, 95, 'برق,ایسیو', 1, 0, 1, 1, 'free', 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'],
-          ['تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.593, 51.435, 4.1, 54, 'جلوبندی,فرمان', 1, 0, 0, 1, 'free', 'تهران', 'تنظیم فرمان و جلوبندی'],
-        ];
-        const insertMany = client.transaction((rows: any[][]) => {
-          for (const r of rows) insert.run(...r);
-        });
-        insertMany(seed);
-        logger.info('✅ Seeded sample garages (Tehran).');
+    // Demo garages must be opt-in. A fresh production database should not contain fake businesses.
+    if (process.env.SEED_DEMO_DATA === 'true') {
+      try {
+        const row = client.prepare('SELECT COUNT(*) AS c FROM garages').get() as { c: number };
+        if (!row || row.c === 0) {
+          const insert = client.prepare(`
+            INSERT INTO garages (name, address, phone, lat, lng, rating, reviews_count, specialties, is_open, is_featured, is_verified, is_active, subscription_tier, city, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          const seed = [
+            ['تعمیرگاه تخصصی موتور پارس', 'تهران، خیابان آزادی', '02188001234', 35.6997, 51.338, 4.6, 128, 'موتور,تنظیم موتور', 1, 1, 1, 1, 'gold', 'تهران', 'تخصص در موتورهای بنزینی و توربو'],
+            ['خدمات خودرو آریا', 'تهران، جردن', '02122005678', 35.7575, 51.41, 4.3, 86, 'عمومی,سرویس دوره‌ای', 1, 0, 1, 1, 'free', 'تهران', 'سرویس کامل خودروهای داخلی و خارجی'],
+            ['گیربکس و دیفرانسیل تهران', 'تهران، انقلاب', '02166443322', 35.701, 51.391, 4.5, 210, 'گیربکس,دیفرانسیل', 1, 1, 1, 1, 'silver', 'تهران', 'تعمیر تخصصی گیربکس اتومات و دستی'],
+            ['برق خودرو مدرن', 'تهران، ونک', '02188887766', 35.757, 51.4105, 4.4, 95, 'برق,ایسیو', 1, 0, 1, 1, 'free', 'تهران', 'عیب‌یابی برق و کامپیوتر خودرو'],
+            ['تعمیرگاه جلوبندی و فرمان', 'تهران، شهرری', '02155990011', 35.593, 51.435, 4.1, 54, 'جلوبندی,فرمان', 1, 0, 0, 1, 'free', 'تهران', 'تنظیم فرمان و جلوبندی'],
+          ];
+          const insertMany = client.transaction((rows: any[][]) => {
+            for (const r of rows) insert.run(...r);
+          });
+          insertMany(seed);
+          logger.info('Seeded sample garages (SEED_DEMO_DATA=true).');
+        }
+      } catch (seedErr) {
+        logger.warn('Could not seed demo garages', seedErr);
       }
-    } catch (seedErr) {
-      logger.warn('Could not seed garages', seedErr);
     }
 
-    logger.info('✅ SQLite database tables verified and ready.', { path: DB_PATH });
+    logger.info('SQLite database tables verified and ready.', { path: DB_PATH });
   } catch (error) {
-    logger.error('❌ Failed to ensure database tables:', error);
+    logger.error('Failed to ensure database tables:', error);
     throw error;
   }
 }
@@ -260,24 +244,20 @@ async function ensureTables() {
 let tablesReady: Promise<void> | null = null;
 
 export function ensureDbReady(): Promise<void> {
-  if (isBuilding) {
-    return Promise.resolve();
-  }
-  if (!tablesReady) {
-    tablesReady = ensureTables();
-  }
+  if (isBuilding) return Promise.resolve();
+  if (!tablesReady) tablesReady = ensureTables();
   return tablesReady;
 }
 
 export async function pingDb(): Promise<number> {
   const started = Date.now();
   await ensureDbReady();
-  const row = getSqlite().prepare('SELECT 1 AS ok').get();
+  getSqlite().prepare('SELECT 1 AS ok').get();
   return Date.now() - started;
 }
 
 if (!isBuilding) {
   ensureDbReady()
-    .then(() => logger.info('✅ SQLite connected successfully.', { path: DB_PATH }))
-    .catch((err) => logger.error('❌ Database init failed:', err.message));
+    .then(() => logger.info('SQLite connected successfully.', { path: DB_PATH }))
+    .catch((err) => logger.error('Database init failed:', err instanceof Error ? err.message : err));
 }
