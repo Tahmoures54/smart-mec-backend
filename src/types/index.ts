@@ -285,6 +285,9 @@ export interface StructuredCause {
 
 export interface StructuredDiagnose {
   urgency: 'green' | 'yellow' | 'red' | string;
+  confidence?: 'high' | 'medium' | 'low' | string;
+  safeToDrive?: boolean | null;
+  evidence?: string[];
   statusSummary: string;
   causes: StructuredCause[];
   mechanicQuestions: string[];
