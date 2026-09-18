@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     const currentMonth = now.toISOString().slice(0, 7);
 
     if (!golden) {
-      const freeAvailable = hasFreeQuota(user.id, currentMonth, db.query);
+      const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
       if (!freeAvailable && user.credits <= 0) {
         throw new InsufficientCreditsError(
           'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
@@ -97,10 +97,6 @@ export async function POST(request: NextRequest) {
       ? structuredToMarkdown(structured)
       : resultTextRaw;
 
-    let remainingFree: number | null = null;
-    let remainingCredits: number | null = null;
-    let diagnosticId: number | undefined;
-
     const txResult = db.transaction((tx) => {
       const billing = consumeDiagnoseQuota(tx, user, now);
       const id = saveDiagnostic(tx, {
@@ -111,18 +107,15 @@ export async function POST(request: NextRequest) {
       });
       return { billing, id };
     });
-    remainingFree = txResult.billing.remainingFree;
-    remainingCredits = txResult.billing.remainingCredits;
-    diagnosticId = txResult.id;
 
-    logger.info('Audio diagnose successful', { userId: user.id, diagnosticId });
+    logger.info('Audio diagnose successful', { userId: user.id, diagnosticId: txResult.id });
 
     return NextResponse.json({
       success: true,
       data: { result: resultText, structured: structured ?? null },
-      diagnosticId,
-      remainingCredits: !golden ? remainingCredits : null,
-      remainingFreeQuestions: !golden ? remainingFree : null,
+      diagnosticId: txResult.id,
+      remainingCredits: !golden ? txResult.billing.remainingCredits : null,
+      remainingFreeQuestions: !golden ? txResult.billing.remainingFree : null,
     });
   } catch (error) {
     return handleError(error);

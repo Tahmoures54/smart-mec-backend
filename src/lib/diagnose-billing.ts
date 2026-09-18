@@ -9,7 +9,7 @@ import { isGoldenActive } from '@/lib/user-status';
 import { User } from '@/types';
 import { db } from '@/db';
 
-type Tx = Pick<typeof db, 'update' | 'insert' | 'query'>;
+type Tx = Pick<typeof db, 'update' | 'insert' | 'select'>;
 
 export type DiagnoseBillingResult = {
   remainingFree: number | null;
@@ -21,14 +21,18 @@ export type DiagnoseBillingResult = {
 export function hasFreeQuota(
   userId: number,
   yearMonth: string,
-  lookup: Tx['query']
+  client: Tx = db
 ): boolean {
-  const existing = lookup.monthlyFreeUsage.findFirst({
-    where: and(
-      eq(monthlyFreeUsage.userId, userId),
-      eq(monthlyFreeUsage.yearMonth, yearMonth)
-    ),
-  });
+  const existing = client
+    .select()
+    .from(monthlyFreeUsage)
+    .where(
+      and(
+        eq(monthlyFreeUsage.userId, userId),
+        eq(monthlyFreeUsage.yearMonth, yearMonth)
+      )
+    )
+    .get();
   return !existing || existing.freeCount < monthlyFreeLimit();
 }
 
@@ -54,12 +58,13 @@ function consumeGolden(tx: Tx, user: User, yearMonth: string, now: Date) {
 
   if (incremented.length > 0) return;
 
-  const existing = tx.query.goldenUsage.findFirst({
-    where: and(
-      eq(goldenUsage.userId, user.id),
-      eq(goldenUsage.yearMonth, yearMonth)
-    ),
-  });
+  const existing = tx
+    .select()
+    .from(goldenUsage)
+    .where(
+      and(eq(goldenUsage.userId, user.id), eq(goldenUsage.yearMonth, yearMonth))
+    )
+    .get();
 
   if (existing) {
     throw new BadRequestError(limitMessage);
@@ -103,7 +108,7 @@ function consumeFreeOrCredit(
   now: Date
 ): DiagnoseBillingResult {
   const freeLimit = monthlyFreeLimit();
-  const freeAvailable = hasFreeQuota(user.id, yearMonth, tx.query);
+  const freeAvailable = hasFreeQuota(user.id, yearMonth, tx);
 
   if (freeAvailable) {
     const updated = tx
@@ -130,12 +135,16 @@ function consumeFreeOrCredit(
       };
     }
 
-    const existingFree = tx.query.monthlyFreeUsage.findFirst({
-      where: and(
-        eq(monthlyFreeUsage.userId, user.id),
-        eq(monthlyFreeUsage.yearMonth, yearMonth)
-      ),
-    });
+    const existingFree = tx
+      .select()
+      .from(monthlyFreeUsage)
+      .where(
+        and(
+          eq(monthlyFreeUsage.userId, user.id),
+          eq(monthlyFreeUsage.yearMonth, yearMonth)
+        )
+      )
+      .get();
 
     if (!existingFree) {
       try {

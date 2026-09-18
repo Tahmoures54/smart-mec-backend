@@ -14,10 +14,12 @@ import { minWithdrawal } from '@/lib/constants';
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
-    const list = db.query.withdrawals.findMany({
-      where: eq(withdrawals.userId, user.id),
-      orderBy: [desc(withdrawals.createdAt)],
-    });
+    const list = db
+      .select()
+      .from(withdrawals)
+      .where(eq(withdrawals.userId, user.id))
+      .orderBy(desc(withdrawals.createdAt))
+      .all();
     return NextResponse.json({ success: true, data: list });
   } catch (error) {
     return handleError(error);
@@ -55,14 +57,14 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('نام صاحب حساب الزامی است');
     }
 
-    // better-sqlite3: transaction باید همگام باشد
     const row = db.transaction((tx) => {
-      const pending = tx.query.withdrawals.findFirst({
-        where: and(
-          eq(withdrawals.userId, user.id),
-          eq(withdrawals.status, 'pending')
-        ),
-      });
+      const pending = tx
+        .select()
+        .from(withdrawals)
+        .where(
+          and(eq(withdrawals.userId, user.id), eq(withdrawals.status, 'pending'))
+        )
+        .get();
       if (pending) {
         throw new BadRequestError(
           'یک درخواست برداشت در انتظار بررسی دارید. تا تعیین تکلیف صبر کنید.'

@@ -35,12 +35,14 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10) || 20, 50);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
-    const history = db.query.diagnostics.findMany({
-      where: eq(diagnostics.userId, user.id),
-      orderBy: [desc(diagnostics.createdAt)],
-      limit,
-      offset,
-    });
+    const history = db
+      .select()
+      .from(diagnostics)
+      .where(eq(diagnostics.userId, user.id))
+      .orderBy(desc(diagnostics.createdAt))
+      .limit(limit)
+      .offset(offset)
+      .all();
 
     return NextResponse.json({
       success: true,
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
     const currentMonth = now.toISOString().slice(0, 7);
 
     if (!golden) {
-      const freeAvailable = hasFreeQuota(user.id, currentMonth, db.query);
+      const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
       if (!freeAvailable && user.credits <= 0) {
         throw new InsufficientCreditsError(
           'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
@@ -105,9 +107,11 @@ export async function POST(request: NextRequest) {
 
     let followUpBlock = '';
     if (previousDiagnosticId) {
-      const prev = db.query.diagnostics.findFirst({
-        where: eq(diagnostics.id, previousDiagnosticId),
-      });
+      const prev = db
+        .select()
+        .from(diagnostics)
+        .where(eq(diagnostics.id, previousDiagnosticId))
+        .get();
       if (!prev || prev.userId !== user.id) {
         throw new BadRequestError('عیب‌یابی قبلی یافت نشد');
       }
@@ -148,7 +152,6 @@ export async function POST(request: NextRequest) {
     let usedFree = false;
 
     try {
-      // better-sqlite3: callback باید همگام باشد (نه async)
       const txResult = db.transaction((tx) => {
         const billing = consumeDiagnoseQuota(tx, user, now);
         const id = saveDiagnostic(tx, {
@@ -166,7 +169,10 @@ export async function POST(request: NextRequest) {
     } catch (txError) {
       logger.error('Transaction failed during diagnose save', {
         userId: user.id,
-        error: txError instanceof Error ? { message: txError.message, stack: txError.stack } : txError,
+        error:
+          txError instanceof Error
+            ? { message: txError.message, stack: txError.stack }
+            : txError,
       });
       throw txError;
     }
