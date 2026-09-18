@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       let isUserAuthenticated = false;
       const isAdmin = !!(adminPhone && phone === adminPhone);
 
-      if (isAdmin && adminCode && code === adminCode) {
+      if (!isProduction && isAdmin && adminCode && code === adminCode) {
         isUserAuthenticated = true;
         logger.info(`Admin login successful bypass: ${phone}`);
       } else if (!isProduction && universalCode.length >= 6 && code === universalCode) {
