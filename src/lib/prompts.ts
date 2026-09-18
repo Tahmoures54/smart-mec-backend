@@ -115,9 +115,9 @@ export function validateDiagnosisInvariants(
     if (res.causes.length > 0) problems.push('causes باید در حالت questions خالی باشد');
     if (res.mechanicQuestions.length > 0)
       problems.push('mechanicQuestions باید در حالت questions خالی باشد');
-    if (res.followUpQuestions.length === 0)
-      problems.push('followUpQuestions در حالت questions نباید خالی باشد');
-    if (res.questionOptions.length !== res.followUpQuestions.length)
+    if (res.followUpQuestions.length !== 1)
+      problems.push('در هر پاسخ questions دقیقاً یک سؤال مجاز است');
+    if (res.questionOptions.length !== 1 || res.questionOptions.length !== res.followUpQuestions.length)
       problems.push('questionOptions باید برای همه followUpQuestions گزینه داشته باشد');
     if (res.questionOptions.some((q) => q.options.length < 2))
       problems.push('هر questionOptions باید حداقل دو گزینه داشته باشد');
