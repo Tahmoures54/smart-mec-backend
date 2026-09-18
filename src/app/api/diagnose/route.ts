@@ -3,7 +3,7 @@ import { eq, desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { diagnostics } from '@/db/schema';
 import { getUserFromRequest } from '@/lib/auth';
-import { RateLimiter } from '@/lib/rate-limit';
+import { RateLimiter } from '@/lib/rate-limiter';
 import { handleError, BadRequestError, InsufficientCreditsError } from '@/lib/error-handler';
 import { logger } from '@/utils/logger';
 import {
