@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { pingDb } from '@/db';
 import { getZibalPaymentMode } from '@/lib/zibal';
+import { productionEnvironmentHealthy, validateProductionEnvironment } from '@/lib/production-env';
 
 export async function GET() {
   const started = Date.now();
@@ -17,8 +18,9 @@ export async function GET() {
   }
 
   const paymentMode = getZibalPaymentMode();
+  const productionHealthy = productionEnvironmentHealthy();
   const payload = {
-    status: dbOk ? 'ok' : 'degraded',
+    status: dbOk && productionHealthy ? 'ok' : 'degraded',
     service: 'smart-mec-backend',
     timestamp: new Date().toISOString(),
     checks: {
@@ -32,8 +34,14 @@ export async function GET() {
         mode: paymentMode,
         configured: paymentMode === 'live' || paymentMode === 'sandbox',
       },
+      production: {
+        healthy: productionHealthy,
+        ...(process.env.NODE_ENV === 'production'
+          ? { checks: validateProductionEnvironment().map(({ key, ok, required, message }) => ({ key, ok, required, message })) }
+          : {}),
+      },
     },
   };
 
-  return NextResponse.json(payload, { status: dbOk ? 200 : 503 });
+  return NextResponse.json(payload, { status: dbOk && productionHealthy ? 200 : 503 });
 }
