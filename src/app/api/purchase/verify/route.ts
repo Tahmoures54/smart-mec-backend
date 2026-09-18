@@ -151,9 +151,25 @@ export async function GET(request: NextRequest) {
       return page('یافت نشد', 'تراکنش پیدا نشد.', false, fromWeb);
     }
 
-    if (!productId || !(productId in PRODUCTS)) {
-      productId = purchase.productId as ProductId;
+    const purchaseProductId = purchase.productId as ProductId;
+    if (!(purchaseProductId in PRODUCTS)) {
+      logger.error('Purchase references unknown product', {
+        purchaseId: purchase.id,
+        productId: purchase.productId,
+      });
+      return page('خطا', 'محصول تراکنش نامعتبر است.', false, fromWeb);
     }
+
+    // Never trust productId from the callback URL. The product is immutable on
+    // the server-side purchase row created before redirecting to the gateway.
+    if (productId && productId !== purchaseProductId) {
+      logger.warn('Payment callback product mismatch', {
+        purchaseId: purchase.id,
+        callbackProductId: productId,
+        purchaseProductId,
+      });
+    }
+    productId = purchaseProductId;
     const product = PRODUCTS[productId];
     if (!product) {
       return page('خطا', 'محصول نامعتبر است.', false, fromWeb);
