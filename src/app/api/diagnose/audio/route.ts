@@ -26,7 +26,7 @@ import { chatCompletion } from '@/lib/ai';
 import { SYSTEM_PROMPT_AUDIO } from '@/lib/prompts';
 import { structuredToMarkdown, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 export async function POST(request: NextRequest) {
   try {
