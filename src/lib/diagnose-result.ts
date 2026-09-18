@@ -150,9 +150,9 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
         }))
       : [];
     const responseMode = String(obj.responseMode || (Array.isArray(obj.followUpQuestions) && obj.followUpQuestions.length ? 'questions' : 'diagnosis'));
-    const followUpRound = Number.isFinite(Number(obj.followUpRound)) ? Number(obj.followUpRound) : 0;
+    const followUpRound = Number.isFinite(Number(obj.followUpRound)) ? Math.max(0, Math.min(5, Number(obj.followUpRound))) : 0;
     const missingInfo = Array.isArray(obj.missingInfo)
-      ? obj.missingInfo.map(String).filter(Boolean).slice(0, 4)
+      ? obj.missingInfo.map(String).filter(Boolean).slice(0, 1)
       : [];
     const followUpQuestions = Array.isArray(obj.followUpQuestions)
       ? obj.followUpQuestions.map(String).filter(Boolean).slice(0, 4)
@@ -161,7 +161,7 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
       ? obj.questionOptions.map((q) => ({
           question: String(q?.question || ''),
           options: Array.isArray(q?.options) ? q.options.map(String).filter(Boolean).slice(0, 6) : [],
-        })).filter((q) => q.question && q.options.length >= 2).slice(0, 6)
+        })).filter((q) => q.question && q.options.length >= 2).slice(0, 1)
       : [];
     const urgency = ['green', 'yellow', 'red'].includes(String(obj.urgency))
       ? String(obj.urgency)
