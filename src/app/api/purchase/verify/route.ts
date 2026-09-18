@@ -130,6 +130,13 @@ export async function GET(request: NextRequest) {
     const fromParam = url.searchParams.get('from');
     const fromWeb = fromParam === 'web' || fromParam !== 'app';
     const zibalSuccess = url.searchParams.get('success');
+    logger.info('Payment callback received', {
+      trackId,
+      productId,
+      from: fromParam || 'app',
+      success: zibalSuccess,
+      status: url.searchParams.get('status'),
+    });
 
     if (zibalSuccess === '0') {
       return page('ناموفق', 'پرداخت لغو شد یا انجام نشد.', false, fromWeb);
@@ -201,23 +208,33 @@ export async function GET(request: NextRequest) {
           return page('ناموفق', 'پرداخت تأیید نشد.', false, fromWeb);
         }
 
-        // Zibal reports the verified amount in Rials. Our database stores Toman.
-        // Never grant a product when the gateway-confirmed amount differs.
-        if (
-          data.amountRial == null ||
-          !amountsMatchTomanAndRial(Number(purchase.amount), Number(data.amountRial))
-        ) {
-          logger.error('Zibal amount mismatch', {
+        // Zibal normally returns the verified amount for result 100.
+        // For result 201 (already verified), some responses omit amount/orderId.
+        // The callback trackId is already bound to this pending purchase, so do not
+        // reject a legitimate retry merely because Zibal omitted those fields.
+        if (data.result === 100) {
+          if (
+            data.amountRial == null ||
+            !amountsMatchTomanAndRial(Number(purchase.amount), Number(data.amountRial))
+          ) {
+            logger.error('Zibal amount mismatch', {
+              purchaseId: purchase.id,
+              expectedToman: purchase.amount,
+              gatewayAmountRial: data.amountRial,
+              trackId,
+            });
+            db.update(purchases)
+              .set({ status: 'failed', updatedAt: new Date() })
+              .where(eq(purchases.id, purchase.id))
+              .run();
+            return page('ناموفق', 'مبلغ پرداخت با سفارش مطابقت ندارد.', false, fromWeb);
+          }
+        } else {
+          logger.info('Zibal payment already verified; accepting idempotent callback', {
             purchaseId: purchase.id,
-            expectedToman: purchase.amount,
-            gatewayAmountRial: data.amountRial,
             trackId,
+            result: data.result,
           });
-          db.update(purchases)
-            .set({ status: 'failed', updatedAt: new Date() })
-            .where(eq(purchases.id, purchase.id))
-            .run();
-          return page('ناموفق', 'مبلغ پرداخت با سفارش مطابقت ندارد.', false, fromWeb);
         }
 
         // Bind the gateway transaction to our own order whenever Zibal returns it.
