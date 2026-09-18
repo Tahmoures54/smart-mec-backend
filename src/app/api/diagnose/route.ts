@@ -26,7 +26,7 @@ import {
 } from '@/lib/chat-garages';
 import type { User } from '@/types';
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 export async function GET(request: NextRequest) {
   try {
