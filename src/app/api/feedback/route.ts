@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getUserFromRequest } from '@/lib/auth';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
-import { validatePositiveInteger } from '@/lib/validation';
+import { validateOptionalId } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,9 +25,14 @@ export async function POST(request: NextRequest) {
 
     let diagnosticId: number | null = null;
     if (body.diagnosticId) {
-      diagnosticId = validatePositiveInteger(body.diagnosticId, 'diagnosticId');
+      const id = validateOptionalId(body.diagnosticId, 'diagnosticId');
+      if (id === undefined) {
+        throw new BadRequestError('شناسه عیب‌یابی نامعتبر است');
+      }
+      diagnosticId = id;
+
       const diag = await db.query.diagnostics.findFirst({
-        where: eq(diagnostics.id, diagnosticId),
+        where: eq(diagnostics.id, id),
       });
       if (!diag || diag.userId !== user.id) {
         throw new BadRequestError('عیب‌یابی مرتبط یافت نشد');
