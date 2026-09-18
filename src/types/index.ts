@@ -284,6 +284,10 @@ export interface StructuredCause {
 }
 
 export interface StructuredDiagnose {
+  responseMode?: 'questions' | 'diagnosis' | string;
+  followUpRound?: 0 | 1 | 2 | number;
+  missingInfo?: string[];
+  followUpQuestions?: string[];
   urgency: 'green' | 'yellow' | 'red' | string;
   confidence?: 'high' | 'medium' | 'low' | string;
   safeToDrive?: boolean | null;
