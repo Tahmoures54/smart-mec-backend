@@ -114,6 +114,8 @@ export async function POST(request: NextRequest) {
     const carDetails = buildCarDetails(carId, year, customCarName);
 
     let followUpBlock = '';
+    let previousFollowUpRound = 0;
+    let previousWasQuestions = false;
     if (previousDiagnosticId) {
       const prev = db
         .select()
@@ -123,14 +125,17 @@ export async function POST(request: NextRequest) {
       if (!prev || prev.userId !== user.id) {
         throw new BadRequestError('عیب‌یابی قبلی یافت نشد');
       }
-      followUpBlock = `\n\n[عیب‌یابی قبلی]\nشرح: ${prev.description}\nنتیجه:\n${prev.result.slice(0, 3000)}\n`;
+      const previousStructured = tryParseStructuredDiagnose(prev.result);
+      previousFollowUpRound = Number(previousStructured?.followUpRound || 0);
+      previousWasQuestions = previousStructured?.responseMode === 'questions';
+      followUpBlock = `\n\n[عیب‌یابی قبلی]\nمرحله پرسش قبلی: ${previousFollowUpRound}\nشرح: ${prev.description}\nنتیجه:\n${prev.result.slice(0, 3000)}\n`;
     }
 
     logger.info('Diagnose requested', { userId: user.id, carId, year, ip, descLen: description.length, golden });
 
     const { text: resultTextRaw } = await chatCompletion({
       systemPrompt: golden ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE,
-      userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی کاربر]\n${description}`,
+      userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی/پاسخ جدید کاربر]\n${description}\n\n[قواعد مرحله‌ای]\nاین یک درخواست اولیه است اگر previousDiagnosticId وجود ندارد. اگر previousDiagnosticId وجود دارد، این متن پاسخ کاربر به مرحله قبل است. ${previousWasQuestions ? `مرحله قبلی سؤال‌محور بوده و شماره مرحله آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس.` : ''}`,
       userId: user.id,
     });
 
@@ -143,6 +148,9 @@ export async function POST(request: NextRequest) {
     const userLat = Number(payload.lat);
     const userLng = Number(payload.lng);
     try {
+      if (structured?.responseMode === 'questions') {
+        // Do not distract a user who is answering clarification questions with garage promotion.
+      } else {
       const promo = await getChatApprovedGaragesNearby({
         lat: Number.isFinite(userLat) ? userLat : null,
         lng: Number.isFinite(userLng) ? userLng : null,
@@ -150,6 +158,7 @@ export async function POST(request: NextRequest) {
         limit: 3,
       });
       resultText = resultText + formatGaragesForChat(promo);
+      }
     } catch (e) {
       logger.warn('chat garage promo append failed', e);
     }
