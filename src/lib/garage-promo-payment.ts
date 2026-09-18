@@ -6,8 +6,8 @@ import {
   tierFromGarageProduct,
 } from '@/lib/chat-garages';
 
-/** بعد از پرداخت موفق — pending_review تا ادمین تأیید کند */
-export async function applyGaragePromoAfterPayment(
+/** بعد از پرداخت موفق — pending_review تا ادمین تأیید کند (همگام برای better-sqlite3) */
+export function applyGaragePromoAfterPayment(
   tx: any,
   purchase: { userId: number; productId: string; garageId?: number | null }
 ) {
@@ -20,8 +20,7 @@ export async function applyGaragePromoAfterPayment(
   const expires = new Date();
   expires.setDate(expires.getDate() + days);
 
-  await tx
-    .update(garages)
+  tx.update(garages)
     .set({
       subscriptionTier: tier,
       subscriptionExpiresAt: expires.toISOString(),
@@ -30,5 +29,6 @@ export async function applyGaragePromoAfterPayment(
       showInChat: false,
       updatedAt: new Date(),
     })
-    .where(eq(garages.id, garageId));
+    .where(eq(garages.id, garageId))
+    .run();
 }

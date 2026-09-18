@@ -39,55 +39,49 @@ function page(title: string, message: string, ok: boolean, fromWeb = false) {
   return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
-/**
- * Fetch a single user row inside a transaction.
- * NOTE: We intentionally avoid `tx.query.users.findFirst` because not all
- * Drizzle transaction contexts expose the `query` API, and using it can
- * throw "Cannot read properties of undefined (reading 'users')".
- */
-async function getUserById(tx: any, userId: number) {
-  const rows = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+function getUserById(tx: any, userId: number) {
+  const rows = tx.select().from(users).where(eq(users.id, userId)).limit(1).all();
   return rows[0];
 }
 
-async function grantProduct(tx: any, userId: number, product: (typeof PRODUCTS)[ProductId]) {
-  const user = await getUserById(tx, userId);
+function grantProduct(tx: any, userId: number, product: (typeof PRODUCTS)[ProductId]) {
+  const user = getUserById(tx, userId);
   if (!user) return;
   if (product.goldenDays) {
-    await tx
-      .update(users)
+    tx.update(users)
       .set({
         isGolden: true,
         goldenExpiresAt: computeGoldenExpiry(user.goldenExpiresAt, product.goldenDays),
         monthlyLimit: product.monthlyLimit ?? user.monthlyLimit,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userId));
+      .where(eq(users.id, userId))
+      .run();
   } else if (product.credits) {
-    await tx
-      .update(users)
+    tx.update(users)
       .set({
         credits: sql`${users.credits} + ${product.credits}`,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userId));
+      .where(eq(users.id, userId))
+      .run();
   }
 }
 
-async function creditReferrerCommission(tx: any, userId: number, amount: number) {
-  const user = await getUserById(tx, userId);
+function creditReferrerCommission(tx: any, userId: number, amount: number) {
+  const user = getUserById(tx, userId);
   if (!user?.referredBy) return;
   const pct =
     typeof referralPercentage === 'function' ? referralPercentage() : Number(referralPercentage);
   const commission = computeReferralCommission(amount, pct);
   if (commission <= 0) return;
-  await tx
-    .update(users)
+  tx.update(users)
     .set({
       earnings: sql`${users.earnings} + ${commission}`,
       updatedAt: new Date(),
     })
-    .where(eq(users.id, user.referredBy));
+    .where(eq(users.id, user.referredBy))
+    .run();
 }
 
 export async function GET(request: NextRequest) {
@@ -106,11 +100,12 @@ export async function GET(request: NextRequest) {
       return page('خطا', 'اطلاعات پرداخت ناقص است.', false, fromWeb);
     }
 
-    const found = await db
+    const found = db
       .select()
       .from(purchases)
       .where(eq(purchases.authority, trackId))
-      .limit(1);
+      .limit(1)
+      .all();
     const purchase = found[0];
     if (!purchase) {
       return page('یافت نشد', 'تراکنش پیدا نشد.', false, fromWeb);
@@ -129,9 +124,7 @@ export async function GET(request: NextRequest) {
     }
 
     let finalRefNumber = '';
-    // پشتیبانی از هر دو نام: ZIBAL_MERCHANT_ID و ZIBAL_MERCHANT (.env.example)
     const merchant = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT;
-    // فقط MOCK واقعی یا محیط بدون merchant در غیرپروداکشن → شبیه‌سازی
     if (isMockAuthority(trackId) || (!merchant && process.env.NODE_ENV !== 'production')) {
       finalRefNumber = `MOCK-${Date.now()}`;
     } else {
@@ -149,10 +142,10 @@ export async function GET(request: NextRequest) {
         });
         const data = await res.json();
         if (data.result !== 100 && data.result !== 201) {
-          await db
-            .update(purchases)
+          db.update(purchases)
             .set({ status: 'failed', updatedAt: new Date() })
-            .where(eq(purchases.id, purchase.id));
+            .where(eq(purchases.id, purchase.id))
+            .run();
           logger.warn('Zibal verify rejected', {
             trackId,
             result: data.result,
@@ -173,23 +166,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const claimed = await db.transaction(async (tx) => {
-      const rows = await tx
+    // better-sqlite3: callback باید همگام باشد
+    const claimed = db.transaction((tx) => {
+      const rows = tx
         .update(purchases)
         .set({ status: 'completed', refId: finalRefNumber, updatedAt: new Date() })
         .where(and(eq(purchases.id, purchase.id), eq(purchases.status, 'pending')))
-        .returning({ id: purchases.id });
+        .returning({ id: purchases.id })
+        .all();
       if (rows.length === 0) return [];
-      await grantProduct(tx, purchase.userId, product);
-      await creditReferrerCommission(tx, purchase.userId, purchase.amount);
-      // Promo/garage side-effect must not break the whole payment if it fails.
+      grantProduct(tx, purchase.userId, product);
+      creditReferrerCommission(tx, purchase.userId, purchase.amount);
       try {
-        await applyGaragePromoAfterPayment(tx, purchase);
+        applyGaragePromoAfterPayment(tx, purchase);
       } catch (promoErr) {
         logger.error('Garage promo after payment failed (non-blocking)', {
           purchaseId: purchase.id,
           message: promoErr instanceof Error ? promoErr.message : String(promoErr),
-          stack: promoErr instanceof Error ? promoErr.stack : undefined,
         });
       }
       return rows;
@@ -200,12 +193,14 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      await db.insert(analyticsEvents).values({
-        event: 'pay_success',
-        userId: purchase.userId,
-        path: '/api/purchase/verify',
-        props: { productId, amount: purchase.amount, trackId },
-      });
+      db.insert(analyticsEvents)
+        .values({
+          event: 'pay_success',
+          userId: purchase.userId,
+          path: '/api/purchase/verify',
+          props: { productId, amount: purchase.amount, trackId },
+        })
+        .run();
     } catch {
       /* non-blocking */
     }
