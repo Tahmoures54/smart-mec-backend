@@ -27,6 +27,9 @@ type Product = {
   pricePerCredit?: number | null;
   pricePerMonth?: number | null;
   savePercent?: number | null;
+  hasDiscount?: boolean;
+  originalPrice?: number;
+  discountAmount?: number;
 };
 
 async function api<T>(
@@ -213,12 +216,20 @@ export function BuyApp() {
 
   function renderPrice(p: Product, accent: 'orange' | 'amber') {
     const priceClass = accent === 'orange' ? 'text-orange-300' : 'text-amber-300';
+    const discounted = Boolean(p.hasDiscount && p.originalPrice && p.originalPrice > p.price);
+    const original = p.originalPrice || p.compareAtPrice;
     return (
-      <div className="mt-3">
-        {p.compareAtPrice && p.compareAtPrice > p.price ? (
-          <p className="text-xs text-amber-100/40 line-through">{formatToman(p.compareAtPrice)}</p>
+      <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+        {discounted && original ? (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-amber-100/50">قیمت اصلی</span>
+            <span className="text-amber-100/45 line-through">{formatToman(original)}</span>
+          </div>
         ) : null}
-        <p className={`text-2xl font-extrabold ${priceClass}`}>{formatToman(p.price)}</p>
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-xs font-semibold text-amber-100/65">مبلغ قابل پرداخت</span>
+          <p className={`text-2xl font-extrabold ${priceClass}`}>{formatToman(p.price)}</p>
+        </div>
         {p.pricePerCredit ? (
           <p className="mt-0.5 text-[11px] text-amber-100/50">
             هر عیب‌یابی حدود {p.pricePerCredit.toLocaleString('fa-IR')} تومان
@@ -229,9 +240,9 @@ export function BuyApp() {
             حدود {p.pricePerMonth.toLocaleString('fa-IR')} تومان در ماه
           </p>
         ) : null}
-        {p.savePercent ? (
+        {discounted && p.discountAmount ? (
           <p className="mt-1 text-[11px] font-semibold text-emerald-400/90">
-            {p.savePercent.toLocaleString('fa-IR')}٪ به‌صرفه‌تر
+            {formatToman(p.discountAmount)} تخفیف · {p.savePercent?.toLocaleString('fa-IR')}٪ کمتر
           </p>
         ) : null}
       </div>
