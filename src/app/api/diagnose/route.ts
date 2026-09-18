@@ -170,7 +170,12 @@ export async function POST(request: NextRequest) {
 
     try {
       const txResult = db.transaction((tx) => {
-        const billing = consumeDiagnoseQuota(tx, user, now);
+        // Clarification rounds are part of the same diagnosis session.
+        // Do not consume a paid/free diagnosis merely for asking questions.
+        const billing =
+          structured?.responseMode === 'questions'
+            ? { remainingFree: null, remainingCredits: user.credits, usedFree: false }
+            : consumeDiagnoseQuota(tx, user, now);
         const id = saveDiagnostic(tx, {
           userId: user.id,
           carId: storedCarId(carId, year, customCarName),
