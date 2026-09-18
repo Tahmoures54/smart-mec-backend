@@ -1,15 +1,45 @@
 import { NextResponse } from 'next/server';
-import { PRODUCTS } from '@/types';
+import { PRODUCTS, type Product } from '@/types';
 
-export async function GET() {
-  const data = Object.values(PRODUCTS).map((product) => ({
+function enrich(product: Product) {
+  const perCredit =
+    product.credits > 0 ? Math.round(product.price / product.credits) : null;
+  const perMonth =
+    product.goldenDays > 0
+      ? Math.round(product.price / (product.goldenDays / 30))
+      : null;
+  const savePercent =
+    product.compareAtPrice && product.compareAtPrice > product.price
+      ? Math.round(
+          ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
+        )
+      : null;
+
+  return {
     ...product,
     currency: 'IRT',
-  }));
+    pricePerCredit: perCredit,
+    pricePerMonth: perMonth,
+    savePercent,
+  };
+}
+
+export async function GET() {
+  const data = Object.values(PRODUCTS)
+    .map(enrich)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   return NextResponse.json({
     success: true,
     data,
-    meta: { count: data.length },
+    meta: {
+      count: data.length,
+      psychology: {
+        entry: 'credit_5',
+        popular: 'credit_20',
+        bestValue: 'credit_50',
+        smartSuggest: 'gold_monthly',
+      },
+    },
   });
 }
