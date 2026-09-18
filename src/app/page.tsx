@@ -28,7 +28,51 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const PAINS = [
+/* -------------------------------------------------------------------------
+ * Types
+ * ---------------------------------------------------------------------- */
+
+interface PainPoint {
+  icon: string;
+  title: string;
+  body: string;
+}
+
+interface Benefit {
+  icon: string;
+  title: string;
+  body: string;
+}
+
+interface PricingPack {
+  id: string;
+  name: string;
+  /** عدد خام به تومان — فرمت‌دهی در زمان رندر و در JSON-LD انجام می‌شود */
+  price: number;
+  badge?: string;
+  points: string[];
+  cta: string;
+  highlight?: boolean;
+}
+
+interface ProofStat {
+  value: string;
+  label: string;
+}
+
+interface HowItWorksStep {
+  n: string;
+  title: string;
+  body: string;
+}
+
+type StoreIconId = 'apk' | 'bazaar' | 'play';
+
+/* -------------------------------------------------------------------------
+ * Content — تک منبع حقیقت برای متن‌ها و اعداد
+ * ---------------------------------------------------------------------- */
+
+const PAIN_POINTS: PainPoint[] = [
   {
     icon: '💸',
     title: 'تشخیص اشتباه = پول دور ریختن',
@@ -46,7 +90,7 @@ const PAINS = [
   },
 ];
 
-const BENEFITS = [
+const BENEFITS: Benefit[] = [
   {
     icon: '🎯',
     title: 'بفهم مشکل از کجاست',
@@ -79,22 +123,18 @@ const BENEFITS = [
   },
 ];
 
-const PACKS = [
+const PRICING_PACKS: PricingPack[] = [
   {
     id: 'credit_10',
     name: 'شروع هوشمند',
-    price: '۲۸٬۰۰۰',
-    unit: 'تومان',
-    badge: null as string | null,
+    price: 28_000,
     points: ['۱۰ اعتبار عیب‌یابی', 'مناسب تست و شروع', 'فعال‌سازی آنی'],
     cta: 'شروع با این بسته',
-    highlight: false,
   },
   {
     id: 'credit_50',
     name: 'پرفروش',
-    price: '۱۲۰٬۰۰۰',
-    unit: 'تومان',
+    price: 120_000,
     badge: 'پیشنهاد اکثر کاربران',
     points: ['۵۰ اعتبار', 'به‌صرفه‌تر از خرید تکی', 'مناسب خانواده / چند خودرو'],
     cta: 'انتخاب پرفروش',
@@ -103,55 +143,49 @@ const PACKS = [
   {
     id: 'gold_monthly',
     name: 'طلایی ماهانه',
-    price: '۹۹٬۰۰۰',
-    unit: 'تومان',
+    price: 99_000,
     badge: 'بدون نگرانی اعتبار',
     points: ['۳۰ روز اشتراک طلایی', 'سقف ماهانه بالا', 'ادامهٔ گفتگو بدون قطع'],
     cta: 'طلایی شو',
-    highlight: false,
   },
 ];
 
-const PROOFS = [
+const PROOF_STATS: ProofStat[] = [
   { value: 'بانک فنی گسترده', label: 'پوشش خودروهای پرتیراژ ایران' },
   { value: 'متن + صدا', label: 'دو راه برای توصیف مشکل' },
   { value: 'چند ثانیه', label: 'از شرح مشکل تا راهنمایی اولیه' },
   { value: 'قبل از تعمیرگاه', label: 'تصمیم آگاهانه‌تر و هزینهٔ کمتر' },
 ];
 
-function StoreIcon({ id }: { id: 'apk' | 'bazaar' | 'play' }) {
-  if (id === 'bazaar') {
-    return (
-      <svg viewBox="0 0 24 24" className="h-8 w-8" aria-hidden>
-        <path fill="#4CAF50" d="M4 4h7v7H4z" />
-        <path fill="#FFC107" d="M13 4h7v7h-7z" />
-        <path fill="#2196F3" d="M4 13h7v7H4z" />
-        <path fill="#FF5722" d="M13 13h7v7h-7z" />
-      </svg>
-    );
-  }
-  if (id === 'play') {
-    return (
-      <svg viewBox="0 0 24 24" className="h-8 w-8" aria-hidden>
-        <path fill="#EA4335" d="M3 3.5v17l11-8.5z" />
-        <path fill="#FBBC04" d="M14 12 3 20.5 19.5 15z" />
-        <path fill="#34A853" d="M14 12 19.5 9 3 3.5z" />
-        <path fill="#4285F4" d="M19.5 9 14 12l5.5 3L22 12z" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8 text-emerald-400" fill="currentColor" aria-hidden>
-      <path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2Zm0 18H7V5h10v14Z" />
-    </svg>
-  );
+const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
+  { n: '۱', title: 'وارد شو', body: 'با شماره موبایل؛ سریع و بدون دردسر.' },
+  {
+    n: '۲',
+    title: 'مشکل را بگو',
+    body: 'خودرو را انتخاب کن، شرح بنویس یا صدای موتور را بفرست.',
+  },
+  {
+    n: '۳',
+    title: 'با اعتماد اقدام کن',
+    body: 'راهنمایی شفاف بگیر و اگر لازم شد، آماده‌تر به تعمیرگاه برو.',
+  },
+];
+
+/* -------------------------------------------------------------------------
+ * Small helpers
+ * ---------------------------------------------------------------------- */
+
+function cn(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(' ');
 }
 
-export default function Home() {
-  const carCount = Array.isArray(carsData) ? carsData.length : 0;
-  const downloads = getDownloadLinks();
+function formatToman(amount: number): string {
+  return amount.toLocaleString('fa-IR');
+}
 
-  const jsonLd = {
+/** ساخت JSON-LD با قیمت‌های واقعیِ همان بسته‌هایی که در صفحه نمایش داده می‌شوند */
+function buildLandingJsonLd(packs: PricingPack[]) {
+  return {
     '@context': 'https://schema.org',
     '@graph': [
       {
@@ -168,11 +202,66 @@ export default function Home() {
         operatingSystem: 'Android',
         applicationCategory: 'UtilitiesApplication',
         description: SITE.description,
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'IRR' },
         inLanguage: 'fa-IR',
+        offers: packs.map((pack) => ({
+          '@type': 'Offer',
+          name: pack.name,
+          price: pack.price,
+          priceCurrency: 'IRT',
+          availability: 'https://schema.org/InStock',
+          url: '/diagnose',
+        })),
       },
     ],
-  };
+  } as const;
+}
+
+/* -------------------------------------------------------------------------
+ * Store icon — exhaustive switch یعنی اگر آیکون جدیدی اضافه شود و پیاده
+ * نشود، بیلد با خطای TypeScript متوقف می‌شود (نه یک باگ خاموش در UI)
+ * ---------------------------------------------------------------------- */
+
+function StoreIcon({ id }: { id: StoreIconId }) {
+  switch (id) {
+    case 'bazaar':
+      return (
+        <svg viewBox="0 0 24 24" className="h-8 w-8" aria-hidden>
+          <path fill="#4CAF50" d="M4 4h7v7H4z" />
+          <path fill="#FFC107" d="M13 4h7v7h-7z" />
+          <path fill="#2196F3" d="M4 13h7v7H4z" />
+          <path fill="#FF5722" d="M13 13h7v7h-7z" />
+        </svg>
+      );
+    case 'play':
+      return (
+        <svg viewBox="0 0 24 24" className="h-8 w-8" aria-hidden>
+          <path fill="#EA4335" d="M3 3.5v17l11-8.5z" />
+          <path fill="#FBBC04" d="M14 12 3 20.5 19.5 15z" />
+          <path fill="#34A853" d="M14 12 19.5 9 3 3.5z" />
+          <path fill="#4285F4" d="M19.5 9 14 12l5.5 3L22 12z" />
+        </svg>
+      );
+    case 'apk':
+      return (
+        <svg viewBox="0 0 24 24" className="h-8 w-8 text-emerald-400" fill="currentColor" aria-hidden>
+          <path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2Zm0 18H7V5h10v14Z" />
+        </svg>
+      );
+    default: {
+      const exhaustiveCheck: never = id;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------
+ * Page
+ * ---------------------------------------------------------------------- */
+
+export default function Home() {
+  const carCount = Array.isArray(carsData) ? carsData.length : 0;
+  const downloads = getDownloadLinks();
+  const jsonLd = buildLandingJsonLd(PRICING_PACKS);
 
   return (
     <SiteShell>
@@ -184,6 +273,7 @@ export default function Home() {
       />
 
       <main>
+        {/* ------------------------------ Hero ------------------------------ */}
         <section className="relative overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,122,26,0.12),_transparent_55%)]" />
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 md:grid-cols-2 md:py-24">
@@ -226,7 +316,7 @@ export default function Home() {
               </p>
 
               <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {PROOFS.map((p) => (
+                {PROOF_STATS.map((p) => (
                   <div
                     key={p.label}
                     className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-center"
@@ -290,6 +380,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* --------------------------- Pain points --------------------------- */}
         <section className="border-y border-white/10 bg-black/25">
           <div className="mx-auto max-w-6xl px-4 py-14">
             <h2 className="text-center text-2xl font-bold md:text-3xl">
@@ -300,7 +391,7 @@ export default function Home() {
               انجام شده یا نه.
             </p>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {PAINS.map((item) => (
+              {PAIN_POINTS.map((item) => (
                 <article
                   key={item.title}
                   className="rounded-2xl border border-white/10 bg-[#1A120E] p-5"
@@ -324,6 +415,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ----------------------------- Benefits ----------------------------- */}
         <section id="features" className="mx-auto max-w-6xl px-4 py-16">
           <h2 className="text-3xl font-bold">چرا راننده‌های باهوش از اینجا شروع می‌کنند؟</h2>
           <p className="mt-3 max-w-2xl text-amber-100/70">
@@ -346,34 +438,19 @@ export default function Home() {
           </div>
         </section>
 
+        {/* --------------------------- How it works --------------------------- */}
         <section className="border-y border-white/10 bg-gradient-to-b from-orange-500/5 to-transparent">
           <div className="mx-auto max-w-6xl px-4 py-16">
             <h2 className="text-center text-3xl font-bold">از الان تا نتیجه، زیر ۲ دقیقه</h2>
             <ol className="mt-10 grid gap-6 md:grid-cols-3">
-              {[
-                {
-                  n: '۱',
-                  t: 'وارد شو',
-                  b: 'با شماره موبایل؛ سریع و بدون دردسر.',
-                },
-                {
-                  n: '۲',
-                  t: 'مشکل را بگو',
-                  b: 'خودرو را انتخاب کن، شرح بنویس یا صدای موتور را بفرست.',
-                },
-                {
-                  n: '۳',
-                  t: 'با اعتماد اقدام کن',
-                  b: 'راهنمایی شفاف بگیر و اگر لازم شد، آماده‌تر به تعمیرگاه برو.',
-                },
-              ].map((s) => (
+              {HOW_IT_WORKS_STEPS.map((s) => (
                 <li
                   key={s.n}
                   className="relative rounded-2xl border border-orange-400/25 bg-[#1A120E] p-6"
                 >
                   <span className="text-3xl font-black text-orange-400">{s.n}</span>
-                  <h3 className="mt-3 text-xl font-bold">{s.t}</h3>
-                  <p className="mt-2 text-sm leading-7 text-amber-100/70">{s.b}</p>
+                  <h3 className="mt-3 text-xl font-bold">{s.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-amber-100/70">{s.body}</p>
                 </li>
               ))}
             </ol>
@@ -388,9 +465,12 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ------------------------------ Pricing ------------------------------ */}
         <section id="pricing" className="mx-auto max-w-6xl px-4 py-16">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold text-orange-300">سرمایه‌گذاری کوچک، جلوگیری از هزینهٔ بزرگ</p>
+            <p className="text-sm font-semibold text-orange-300">
+              سرمایه‌گذاری کوچک، جلوگیری از هزینهٔ بزرگ
+            </p>
             <h2 className="mt-2 text-3xl font-bold">یک تشخیص اشتباه گران‌تر از کل بسته است</h2>
             <p className="mt-3 text-amber-100/70">
               هزینهٔ یک قطعهٔ اشتباه یا اجرت بیهوده را با قیمت بسته‌ها مقایسه کن. کاربران معمولاً از
@@ -399,15 +479,15 @@ export default function Home() {
           </div>
 
           <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {PACKS.map((pack) => (
+            {PRICING_PACKS.map((pack) => (
               <article
                 key={pack.id}
-                className={
-                  'relative flex flex-col rounded-2xl border p-6 ' +
-                  (pack.highlight
+                className={cn(
+                  'relative flex flex-col rounded-2xl border p-6',
+                  pack.highlight
                     ? 'border-orange-400/60 bg-orange-500/10 shadow-[0_0_40px_rgba(255,122,26,0.15)]'
-                    : 'border-white/10 bg-white/[0.03]')
-                }
+                    : 'border-white/10 bg-white/[0.03]',
+                )}
               >
                 {pack.badge ? (
                   <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
@@ -416,8 +496,8 @@ export default function Home() {
                 ) : null}
                 <h3 className="text-xl font-bold text-amber-50">{pack.name}</h3>
                 <p className="mt-4">
-                  <span className="text-3xl font-black text-white">{pack.price}</span>
-                  <span className="mr-1 text-sm text-amber-100/60">{pack.unit}</span>
+                  <span className="text-3xl font-black text-white">{formatToman(pack.price)}</span>
+                  <span className="mr-1 text-sm text-amber-100/60">تومان</span>
                 </p>
                 <ul className="mt-5 flex-1 space-y-2 text-sm text-amber-100/75">
                   {pack.points.map((pt) => (
@@ -429,12 +509,12 @@ export default function Home() {
                 </ul>
                 <Link
                   href="/diagnose"
-                  className={
-                    'mt-6 block rounded-xl py-3 text-center text-sm font-bold transition ' +
-                    (pack.highlight
+                  className={cn(
+                    'mt-6 block rounded-xl py-3 text-center text-sm font-bold transition',
+                    pack.highlight
                       ? 'bg-orange-500 text-white hover:bg-orange-400'
-                      : 'bg-white/10 text-amber-100 hover:bg-white/15')
-                  }
+                      : 'bg-white/10 text-amber-100 hover:bg-white/15',
+                  )}
                 >
                   {pack.cta}
                 </Link>
@@ -448,6 +528,7 @@ export default function Home() {
           </p>
         </section>
 
+        {/* ----------------------------- Downloads ----------------------------- */}
         <section id="download" className="border-t border-white/10 bg-black/20">
           <div className="mx-auto max-w-6xl px-4 py-16">
             <h2 className="text-3xl font-bold">اپ را هم داشته باش</h2>
@@ -455,13 +536,13 @@ export default function Home() {
               عیب‌یابی وب همین حالا باز است. اگر دوست داری همیشه روی گوشی باشد، APK را نصب کن.
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {downloads.map((item) => {
-                const ready = Boolean(item.href);
-                const className =
-                  'flex h-full flex-col rounded-2xl border p-5 transition-colors ' +
-                  (ready
+              {getDownloadLinksReady(downloads).map(({ item, ready, href }) => {
+                const className = cn(
+                  'flex h-full flex-col rounded-2xl border p-5 transition-colors',
+                  ready
                     ? 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15'
-                    : 'border-white/10 bg-white/[0.02] opacity-80');
+                    : 'border-white/10 bg-white/[0.02] opacity-80',
+                );
                 const inner = (
                   <>
                     <StoreIcon id={item.id} />
@@ -475,11 +556,9 @@ export default function Home() {
                 return ready ? (
                   <a
                     key={item.id}
-                    href={item.href!}
+                    href={href}
                     className={className}
-                    {...(item.href!.startsWith('http')
-                      ? { target: '_blank', rel: 'noopener noreferrer' }
-                      : {})}
+                    {...(href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                   >
                     {inner}
                   </a>
@@ -493,6 +572,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ----------------------------- Final CTA ----------------------------- */}
         <section className="mx-auto max-w-6xl px-4 py-16">
           <div className="relative overflow-hidden rounded-3xl border border-orange-400/30 bg-gradient-to-l from-orange-600/30 via-[#1A120E] to-[#1A120E] p-8 md:p-12">
             <div className="relative max-w-xl">
@@ -526,5 +606,23 @@ export default function Home() {
         </section>
       </main>
     </SiteShell>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * getDownloadLinksReady
+ * به‌جای item.href! (non-null assertion خطرناک)، این تابع href را از قبل
+ * resolve و type-narrow می‌کند تا در JSX نیازی به هیچ فرض ناامنی نباشد.
+ * ---------------------------------------------------------------------- */
+
+type DownloadItem = ReturnType<typeof getDownloadLinks>[number];
+
+function getDownloadLinksReady(
+  items: DownloadItem[],
+): Array<{ item: DownloadItem; ready: true; href: string } | { item: DownloadItem; ready: false; href: null }> {
+  return items.map((item) =>
+    item.href
+      ? { item, ready: true as const, href: item.href }
+      : { item, ready: false as const, href: null },
   );
 }
