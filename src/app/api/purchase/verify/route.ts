@@ -12,7 +12,12 @@ import {
   computeReferralCommission,
   isMockAuthority,
 } from '@/lib/payment';
-import { amountsMatchTomanAndRial, purchaseOrderId, verifyZibalPayment } from '@/lib/zibal';
+import {
+  amountsMatchTomanAndRial,
+  isUserCanceledCallback,
+  purchaseOrderId,
+  verifyZibalPayment,
+} from '@/lib/zibal';
 import { referralPercentage } from '@/lib/constants';
 
 
@@ -138,7 +143,14 @@ export async function GET(request: NextRequest) {
       status: url.searchParams.get('status'),
     });
 
-    if (zibalSuccess === '0') {
+    const callbackStatus = url.searchParams.get('status');
+    if (isUserCanceledCallback(zibalSuccess, callbackStatus)) {
+      logger.info('Payment callback canceled by user/gateway', {
+        trackId,
+        productId,
+        success: zibalSuccess,
+        status: callbackStatus,
+      });
       return page('ناموفق', 'پرداخت لغو شد یا انجام نشد.', false, fromWeb);
     }
 
