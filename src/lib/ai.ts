@@ -1,4 +1,5 @@
 import { logger } from '@/utils/logger';
+import { AppError } from '@/lib/error-handler';
 
 export async function chatCompletion(options: {
   systemPrompt: string;
@@ -7,13 +8,19 @@ export async function chatCompletion(options: {
   timeoutMs?: number;
   maxTokens?: number;
 }): Promise<{ text: string; finishReason?: string }> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  const apiEndpoint =
-    process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1';
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+  const apiEndpoint = (
+    process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1'
+  ).replace(/\/$/, '');
   const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
   if (!apiKey) {
-    throw new Error('تنظیمات هوش مصنوعی در سرور ناقص است.');
+    logger.error('DEEPSEEK_API_KEY is missing in environment');
+    throw new AppError(
+      'تنظیمات هوش مصنوعی روی سرور ناقص است. کلید DEEPSEEK_API_KEY را در لیارا تنظیم کنید.',
+      503,
+      'AI_NOT_CONFIGURED'
+    );
   }
 
   const timeoutMs =
@@ -45,8 +52,24 @@ export async function chatCompletion(options: {
     });
 
     if (!response.ok) {
-      throw new Error(
-        'هوش مصنوعی در حال حاضر پاسخگو نیست. لطفاً چند دقیقه دیگر تلاش کنید.'
+      let detail = '';
+      try {
+        const errBody = await response.text();
+        detail = errBody.slice(0, 300);
+      } catch {
+        /* ignore */
+      }
+      logger.error('AI provider HTTP error', {
+        status: response.status,
+        detail,
+        userId: options.userId,
+        endpoint: apiEndpoint,
+        model,
+      });
+      throw new AppError(
+        'هوش مصنوعی در حال حاضر پاسخگو نیست. لطفاً چند دقیقه دیگر تلاش کنید.',
+        502,
+        'AI_PROVIDER_ERROR'
       );
     }
 
@@ -56,7 +79,12 @@ export async function chatCompletion(options: {
     let text = choice?.message?.content as string | undefined;
 
     if (!text) {
-      throw new Error('پاسخ نامعتبر از سرویس هوش مصنوعی');
+      logger.error('AI empty content', { userId: options.userId, dataKeys: Object.keys(data || {}) });
+      throw new AppError(
+        'پاسخ نامعتبر از سرویس هوش مصنوعی دریافت شد.',
+        502,
+        'AI_EMPTY_RESPONSE'
+      );
     }
 
     if (finishReason === 'length') {
@@ -71,14 +99,21 @@ export async function chatCompletion(options: {
 
     return { text, finishReason };
   } catch (err: unknown) {
+    if (err instanceof AppError) throw err;
     const e = err as { name?: string; message?: string };
     logger.error('AI API error', { error: e.message, userId: options.userId });
     if (e.name === 'AbortError') {
-      throw new Error(
-        'زمان پاسخگویی هوش مصنوعی طولانی شد. لطفاً دوباره تلاش کنید.'
+      throw new AppError(
+        'زمان پاسخگویی هوش مصنوعی طولانی شد. لطفاً دوباره تلاش کنید.',
+        504,
+        'AI_TIMEOUT'
       );
     }
-    throw new Error(e.message || 'خطا در برقراری ارتباط با سرویس هوش مصنوعی');
+    throw new AppError(
+      e.message || 'خطا در برقراری ارتباط با سرویس هوش مصنوعی',
+      502,
+      'AI_NETWORK_ERROR'
+    );
   } finally {
     clearTimeout(timeoutId);
   }

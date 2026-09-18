@@ -58,21 +58,33 @@ export async function POST(request: NextRequest) {
     const ip = RateLimiter.getIP(request);
     RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
 
-    const body = await request.json();
-    let rawCarId = body.carId;
-    let rawCarName = body.carName;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestError('بدنه درخواست نامعتبر است');
+    }
+    logger.info('Diagnose POST received', {
+      userId: user.id,
+      ip,
+      hasCarId: Boolean((body as { carId?: unknown }).carId),
+      hasDescription: Boolean((body as { description?: unknown }).description),
+    });
+    const payload = body as Record<string, unknown>;
+    let rawCarId = payload.carId;
+    let rawCarName = payload.carName;
     if (looksLikeCustomCarLabel(rawCarId)) {
       rawCarName = rawCarName || rawCarId;
       rawCarId = 'custom';
     }
-    const carId = validateCarId(rawCarId);
-    const year = validateYear(body.year);
-    const description = validateDescription(body.description);
+    const carId = validateCarId(String(rawCarId ?? ''));
+    const year = validateYear(payload.year as string | number | undefined | null);
+    const description = validateDescription(String(payload.description ?? ''));
     const customCarName = validateCustomCarName(
-      carId === 'custom' ? (rawCarName || body.carName) : body.carName
+      carId === 'custom'
+        ? String(rawCarName ?? payload.carName ?? '')
+        : (payload.carName as string | undefined)
     );
     const previousDiagnosticId = validateOptionalId(
-      body.previousDiagnosticId ?? body.followUpId,
+      payload.previousDiagnosticId ?? payload.followUpId,
       'previousDiagnosticId'
     );
 
@@ -102,7 +114,7 @@ export async function POST(request: NextRequest) {
       followUpBlock = `\n\n[عیب‌یابی قبلی]\nشرح: ${prev.description}\nنتیجه:\n${prev.result.slice(0, 3000)}\n`;
     }
 
-    logger.info('Diagnose requested', { userId: user.id, carId, year, ip });
+    logger.info('Diagnose requested', { userId: user.id, carId, year, ip, descLen: description.length, golden });
 
     const { text: resultTextRaw } = await chatCompletion({
       systemPrompt: golden ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE,
@@ -115,9 +127,9 @@ export async function POST(request: NextRequest) {
       ? structuredToMarkdown(structured)
       : resultTextRaw;
 
-    const cityHint = typeof body.city === 'string' ? body.city : undefined;
-    const userLat = Number(body.lat);
-    const userLng = Number(body.lng);
+    const cityHint = typeof payload.city === 'string' ? payload.city : undefined;
+    const userLat = Number(payload.lat);
+    const userLng = Number(payload.lng);
     try {
       const promo = await getChatApprovedGaragesNearby({
         lat: Number.isFinite(userLat) ? userLat : null,

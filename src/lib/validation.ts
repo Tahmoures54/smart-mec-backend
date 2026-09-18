@@ -60,7 +60,7 @@ export function validateDescription(description: string): string {
 
   const trimmed = description.trim();
 
-  if (trimmed.length < 10) {
+  if (trimmed.length < 5) {
     throw new ValidationError(
       'توضیحات را کمی بیشتر بنویس (حداقل چند کلمه)',
       'description'
@@ -89,15 +89,17 @@ export function validateCarId(carId: string): string {
   }
 
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-    throw new ValidationError(
-      'خودرو را از لیست انتخاب کن یا گزینه «خارج از لیست» را بزن',
-      'carId'
-    );
+    throw new ValidationError('شناسه خودرو نامعتبر است', 'carId');
+  }
+
+  if (trimmed.length > 64) {
+    throw new ValidationError('شناسه خودرو بیش از حد طولانی است', 'carId');
   }
 
   return trimmed;
 }
 
+/** اگر carId شبیه نام فارسی خودرو باشد (نه id لاتین) → custom */
 export function looksLikeCustomCarLabel(carId: unknown): boolean {
   if (typeof carId !== 'string') return false;
   const t = carId.trim();
@@ -180,49 +182,20 @@ export function validateAuthority(authority: string): string {
   return trimmed;
 }
 
-export function validateToken(token: string): string {
-  if (!token) {
-    throw new ValidationError('توکن احراز هویت الزامی است', 'token');
+export function validateOptionalId(
+  value: unknown,
+  field: string
+): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new ValidationError(`${field} نامعتبر است`, field);
   }
-
-  const trimmed = token.trim();
-
-  if (!/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(trimmed)) {
-    throw new ValidationError('فرمت توکن نامعتبر است', 'token');
-  }
-
-  return trimmed;
+  return n;
 }
 
 export function sanitizeText(text: string): string {
   return text
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '"')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
-}
-
-export function validateOptionalId(
-  value: unknown,
-  fieldName: string
-): number | null {
-  if (value === undefined || value === null || value === '') return null;
-  return validatePositiveInteger(value, fieldName);
-}
-
-export function validatePositiveInteger(
-  value: any,
-  fieldName: string
-): number {
-  const num = Number(value);
-
-  if (!Number.isInteger(num) || num <= 0) {
-    throw new ValidationError(
-      `${fieldName} باید یک عدد صحیح مثبت باشد`,
-      fieldName
-    );
-  }
-
-  return num;
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
