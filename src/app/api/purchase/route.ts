@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const callbackUrl = `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`;
+    const callbackUrl = `${appUrl}/api/purchase/verify?productId=${encodeURIComponent(productId)}${webQuery || '&from=app'}`;
 
     try {
       const zibal = await requestZibalPayment({
