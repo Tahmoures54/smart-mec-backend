@@ -157,6 +157,12 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
     const followUpQuestions = Array.isArray(obj.followUpQuestions)
       ? obj.followUpQuestions.map(String).filter(Boolean).slice(0, 4)
       : [];
+    const questionOptions = Array.isArray(obj.questionOptions)
+      ? obj.questionOptions.map((q) => ({
+          question: String(q?.question || ''),
+          options: Array.isArray(q?.options) ? q.options.map(String).filter(Boolean).slice(0, 6) : [],
+        })).filter((q) => q.question && q.options.length >= 2).slice(0, 6)
+      : [];
     const urgency = ['green', 'yellow', 'red'].includes(String(obj.urgency))
       ? String(obj.urgency)
       : 'yellow';
@@ -174,6 +180,7 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
       followUpRound,
       missingInfo,
       followUpQuestions,
+      questionOptions,
       urgency,
       confidence,
       safeToDrive,
@@ -200,7 +207,11 @@ export function structuredToMarkdown(s: StructuredDiagnose): string {
     lines.push('## چند سؤال کوتاه برای دقیق‌تر شدن بررسی');
     if (s.statusSummary) lines.push(s.statusSummary);
     if (s.followUpQuestions?.length) {
-      s.followUpQuestions.slice(0, 4).forEach((q, i) => lines.push(`${i + 1}. ${q}`));
+      s.followUpQuestions.slice(0, 6).forEach((q, i) => lines.push(`${i + 1}. ${q}`));
+    }
+    if (s.questionOptions?.length) {
+      lines.push('برای هر سؤال یکی از گزینه‌های پیشنهادی را انتخاب کن:');
+      for (const q of s.questionOptions.slice(0, 6)) lines.push(`- ${q.question}: ${q.options.join(' | ')}`);
     }
     lines.push('');
     lines.push(s.nextStep || 'به همین سؤال‌ها پاسخ بده تا بررسی را دقیق‌تر ادامه بدهم.');
