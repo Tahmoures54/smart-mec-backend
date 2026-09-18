@@ -1,16 +1,21 @@
 import { logger } from '@/utils/logger';
 
 export const TOMAN_TO_RIAL = 10;
+export const ZIBAL_SANDBOX_MERCHANT = 'zibal';
+export const ZIBAL_SUCCESS_RESULT = 100;
+export const ZIBAL_ALREADY_VERIFIED_RESULT = 201;
 
 const DEFAULT_REQUEST_URL = 'https://gateway.zibal.ir/v1/request';
 const DEFAULT_VERIFY_URL = 'https://gateway.zibal.ir/v1/verify';
 const DEFAULT_START_URL = 'https://gateway.zibal.ir/start';
 const DEFAULT_TIMEOUT_MS = 15000;
 
+export type ZibalPaymentMode = 'live' | 'sandbox' | 'mock' | 'unset';
+
 export class ZibalError extends Error {
   constructor(
     message: string,
-    public code?: number | string
+    public readonly result?: number
   ) {
     super(message);
     this.name = 'ZibalError';
@@ -40,12 +45,12 @@ export function allowMockPayments(): boolean {
   return !isProduction();
 }
 
-export function getZibalPaymentMode(): 'live' | 'sandbox' | 'mock' | 'unconfigured' {
+export function getZibalPaymentMode(): ZibalPaymentMode {
   const merchant = getZibalMerchant();
   if (!merchant) {
-    return isProduction() ? 'unconfigured' : 'mock';
+    return isProduction() ? 'unset' : 'mock';
   }
-  if (merchant.toLowerCase() === 'zibal') return 'sandbox';
+  if (merchant.toLowerCase() === ZIBAL_SANDBOX_MERCHANT) return 'sandbox';
   return 'live';
 }
 
@@ -78,16 +83,35 @@ export function purchaseOrderId(purchaseId: number): string {
   return `sm-${purchaseId}`;
 }
 
+export function parsePurchaseIdFromOrderId(orderId: string | null | undefined): number | null {
+  if (!orderId) return null;
+  const match = /^sm-(\d+)$/.exec(orderId.trim());
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 export function startPaymentUrl(trackId: string | number): string {
   return `${startUrlBase()}/${trackId}`;
 }
 
-export function isMockAuthority(authority: string | null | undefined): boolean {
-  return !!authority && authority.startsWith('MOCK-');
+export function isUserCanceledCallback(success: string | null, status: string | null): boolean {
+  if (success === '0') return true;
+  return status === '3';
 }
 
-export function makeMockAuthority(): string {
-  return `MOCK-${Date.now()}`;
+export function isSuccessfulVerifyResult(result: number): boolean {
+  return result === ZIBAL_SUCCESS_RESULT || result === ZIBAL_ALREADY_VERIFIED_RESULT;
+}
+
+export function verifyResultMessage(result: number): string {
+  const map: Record<number, string> = {
+    100: 'موفق',
+    201: 'قبلاً تأیید شده',
+    202: 'سفارش یافت نشد یا پرداخت نشده',
+    203: 'trackId نامعتبر',
+  };
+  return map[result] || `کد ${result}`;
 }
 
 interface ZibalRequestApiResponse {
@@ -99,12 +123,10 @@ interface ZibalRequestApiResponse {
 interface ZibalVerifyApiResponse {
   result?: number;
   refNumber?: string;
-  paidAt?: string;
   amount?: number;
   status?: number;
   message?: string;
   orderId?: string;
-  cardNumber?: string;
 }
 
 export interface ZibalRequestResult {
@@ -217,27 +239,4 @@ export async function verifyZibalPayment(trackId: string): Promise<ZibalVerifyRe
     message: data.message,
     orderId: data.orderId,
   };
-}
-
-/** result 100 = success first time, 201 = already verified */
-export function isSuccessfulVerifyResult(result: number): boolean {
-  return result === 100 || result === 201;
-}
-
-export function verifyResultMessage(result: number): string {
-  const map: Record<number, string> = {
-    100: 'موفق',
-    201: 'قبلاً تأیید شده',
-    202: 'سفارش یافت نشد',
-    203: 'merchant نامعتبر',
-  };
-  return map[result] || `کد ${result}`;
-}
-
-export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
