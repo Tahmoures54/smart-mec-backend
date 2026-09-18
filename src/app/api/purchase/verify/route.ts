@@ -129,13 +129,14 @@ export async function GET(request: NextRequest) {
     }
 
     let finalRefNumber = '';
-    const merchant = process.env.ZIBAL_MERCHANT_ID;
+    // پشتیبانی از هر دو نام: ZIBAL_MERCHANT_ID و ZIBAL_MERCHANT (.env.example)
+    const merchant = process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT;
     // فقط MOCK واقعی یا محیط بدون merchant در غیرپروداکشن → شبیه‌سازی
     if (isMockAuthority(trackId) || (!merchant && process.env.NODE_ENV !== 'production')) {
       finalRefNumber = `MOCK-${Date.now()}`;
     } else {
       if (!merchant) {
-        return page('خطا', 'پیکربندی درگاه ناقص است (ZIBAL_MERCHANT_ID).', false, fromWeb);
+        return page('خطا', 'پیکربندی درگاه ناقص است (ZIBAL_MERCHANT).', false, fromWeb);
       }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);

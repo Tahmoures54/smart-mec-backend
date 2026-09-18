@@ -13,6 +13,11 @@ const ZIBAL_REQUEST_URL = 'https://gateway.zibal.ir/v1/request';
 const ZIBAL_TIMEOUT_MS = 15000;
 const TOMAN_TO_RIAL = 10;
 
+/** پشتیبانی از هر دو نام متغیر محیطی برای سازگاری با پنل لیارا / .env قدیمی */
+function getZibalMerchant(): string | undefined {
+  return process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || undefined;
+}
+
 interface ZibalRequestResponse {
   result: number;
   trackId?: number;
@@ -62,11 +67,11 @@ export async function POST(request: NextRequest) {
         .where(eq(garages.id, garageId));
     }
 
-    const zibalMerchant = process.env.ZIBAL_MERCHANT_ID;
+    const zibalMerchant = getZibalMerchant();
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
     if (!zibalMerchant) {
-      logger.info('Creating MOCK payment (ZIBAL_MERCHANT_ID not set)...');
+      logger.info('Creating MOCK payment (ZIBAL_MERCHANT / ZIBAL_MERCHANT_ID not set)...');
 
       const authority =
         'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
