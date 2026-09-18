@@ -8,18 +8,23 @@ function enrich(product: Product) {
     product.goldenDays > 0
       ? Math.round(product.price / (product.goldenDays / 30))
       : null;
-  const savePercent =
-    product.compareAtPrice && product.compareAtPrice > product.price
-      ? Math.round(
-          ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
-        )
-      : null;
+  const hasDiscount =
+    Boolean(product.compareAtPrice && product.compareAtPrice > product.price);
+  const discountAmount = hasDiscount
+    ? (product.compareAtPrice as number) - product.price
+    : 0;
+  const savePercent = hasDiscount
+    ? Math.round((discountAmount / (product.compareAtPrice as number)) * 100)
+    : null;
 
   return {
     ...product,
     currency: 'IRT',
     pricePerCredit: perCredit,
     pricePerMonth: perMonth,
+    hasDiscount,
+    originalPrice: hasDiscount ? product.compareAtPrice : product.price,
+    discountAmount,
     savePercent,
   };
 }
