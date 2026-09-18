@@ -54,7 +54,10 @@ describe('validateCarId / description / products', () => {
   });
 
   it('enforces description length', () => {
-    expect(() => validateDescription('کوتاه')).toThrow(ValidationError);
+    // حداقل ۵ کاراکتر — «کوتاه» دقیقاً ۵ تاست و مجاز است
+    expect(() => validateDescription('abcd')).toThrow(ValidationError);
+    expect(() => validateDescription('کوت')).toThrow(ValidationError);
+    expect(validateDescription('کوتاه')).toBe('کوتاه');
     expect(validateDescription('صدای تق‌تق از جلوبندی می‌آید')).toContain('جلوبندی');
   });
 
@@ -64,7 +67,9 @@ describe('validateCarId / description / products', () => {
   });
 
   it('parses optional ids', () => {
-    expect(validateOptionalId(undefined, 'id')).toBeNull();
+    expect(validateOptionalId(undefined, 'id')).toBeUndefined();
+    expect(validateOptionalId(null, 'id')).toBeUndefined();
+    expect(validateOptionalId('', 'id')).toBeUndefined();
     expect(validateOptionalId('42', 'id')).toBe(42);
     expect(() => validateOptionalId('0', 'id')).toThrow(ValidationError);
   });
