@@ -39,8 +39,19 @@ function page(title: string, message: string, ok: boolean, fromWeb = false) {
   return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
+/**
+ * Fetch a single user row inside a transaction.
+ * NOTE: We intentionally avoid `tx.query.users.findFirst` because not all
+ * Drizzle transaction contexts expose the `query` API, and using it can
+ * throw "Cannot read properties of undefined (reading 'users')".
+ */
+async function getUserById(tx: any, userId: number) {
+  const rows = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0];
+}
+
 async function grantProduct(tx: any, userId: number, product: (typeof PRODUCTS)[ProductId]) {
-  const user = await tx.query.users.findFirst({ where: eq(users.id, userId) });
+  const user = await getUserById(tx, userId);
   if (!user) return;
   if (product.goldenDays) {
     await tx
@@ -64,7 +75,7 @@ async function grantProduct(tx: any, userId: number, product: (typeof PRODUCTS)[
 }
 
 async function creditReferrerCommission(tx: any, userId: number, amount: number) {
-  const user = await tx.query.users.findFirst({ where: eq(users.id, userId) });
+  const user = await getUserById(tx, userId);
   if (!user?.referredBy) return;
   const pct =
     typeof referralPercentage === 'function' ? referralPercentage() : Number(referralPercentage);
@@ -141,11 +152,20 @@ export async function GET(request: NextRequest) {
             .update(purchases)
             .set({ status: 'failed', updatedAt: new Date() })
             .where(eq(purchases.id, purchase.id));
+          logger.warn('Zibal verify rejected', {
+            trackId,
+            result: data.result,
+            message: data.message,
+          });
           return page('ناموفق', 'پرداخت تأیید نشد.', false, fromWeb);
         }
         finalRefNumber = String(data.refNumber || '');
       } catch (e) {
-        logger.error('Zibal verify error', e);
+        logger.error('Zibal verify error', {
+          trackId,
+          message: e instanceof Error ? e.message : String(e),
+          stack: e instanceof Error ? e.stack : undefined,
+        });
         return page('خطا', 'ارتباط با درگاه برقرار نشد.', false, fromWeb);
       } finally {
         clearTimeout(timer);
@@ -161,7 +181,16 @@ export async function GET(request: NextRequest) {
       if (rows.length === 0) return [];
       await grantProduct(tx, purchase.userId, product);
       await creditReferrerCommission(tx, purchase.userId, purchase.amount);
-      await applyGaragePromoAfterPayment(tx, purchase);
+      // Promo/garage side-effect must not break the whole payment if it fails.
+      try {
+        await applyGaragePromoAfterPayment(tx, purchase);
+      } catch (promoErr) {
+        logger.error('Garage promo after payment failed (non-blocking)', {
+          purchaseId: purchase.id,
+          message: promoErr instanceof Error ? promoErr.message : String(promoErr),
+          stack: promoErr instanceof Error ? promoErr.stack : undefined,
+        });
+      }
       return rows;
     });
 
@@ -188,7 +217,10 @@ export async function GET(request: NextRequest) {
       fromWeb
     );
   } catch (error) {
-    logger.error('Verify Route Error:', error);
+    logger.error('Verify Route Error:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return page('خطای سیستمی', 'مشکلی رخ داد.', false, true);
   }
 }
