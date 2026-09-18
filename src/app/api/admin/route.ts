@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             c: sql<number>`count(*)`,
           })
           .from(analyticsEvents)
-          .where(sql`${analyticsEvents.createdAt} > NOW() - INTERVAL '7 days'`)
+          .where(sql`${analyticsEvents.createdAt} >= unixepoch('now', '-7 days')`)
           .groupBy(analyticsEvents.event);
         for (const r of rows) funnel[r.event] = Number(r.c);
       } catch {
@@ -65,13 +65,13 @@ export async function GET(request: NextRequest) {
       try {
         const drows = await db
           .select({
-            day: sql<string>`to_char(date_trunc('day', ${diagnostics.createdAt}), 'YYYY-MM-DD')`,
-            count: sql<number>`count(*)::int`,
+            day: sql<string>`date(${diagnostics.createdAt}, 'unixepoch')`,
+            count: sql<number>`count(*)`,
           })
           .from(diagnostics)
-          .where(sql`${diagnostics.createdAt} >= NOW() - INTERVAL '14 days'`)
-          .groupBy(sql`date_trunc('day', ${diagnostics.createdAt})`)
-          .orderBy(sql`date_trunc('day', ${diagnostics.createdAt})`);
+          .where(sql`${diagnostics.createdAt} >= unixepoch('now', '-14 days')`)
+          .groupBy(sql`date(${diagnostics.createdAt}, 'unixepoch')`)
+          .orderBy(sql`date(${diagnostics.createdAt}, 'unixepoch')`);
         seriesDiagnostics = drows.map((r) => ({ day: String(r.day), count: Number(r.count) }));
       } catch {
         seriesDiagnostics = [];
@@ -81,14 +81,14 @@ export async function GET(request: NextRequest) {
       try {
         const prows = await db
           .select({
-            day: sql<string>`to_char(date_trunc('day', ${purchases.createdAt}), 'YYYY-MM-DD')`,
+            day: sql<string>`date(${purchases.createdAt}, 'unixepoch')`,
             amount: sql<number>`coalesce(sum(case when ${purchases.status} = 'completed' then ${purchases.amount} else 0 end),0)::int`,
-            count: sql<number>`count(*) FILTER (WHERE ${purchases.status} = 'completed')::int`,
+            count: sql<number>`sum(case when ${purchases.status} = 'completed' then 1 else 0 end)`,
           })
           .from(purchases)
-          .where(sql`${purchases.createdAt} >= NOW() - INTERVAL '14 days'`)
-          .groupBy(sql`date_trunc('day', ${purchases.createdAt})`)
-          .orderBy(sql`date_trunc('day', ${purchases.createdAt})`);
+          .where(sql`${purchases.createdAt} >= unixepoch('now', '-14 days')`)
+          .groupBy(sql`date(${purchases.createdAt}, 'unixepoch')`)
+          .orderBy(sql`date(${purchases.createdAt}, 'unixepoch')`);
         seriesRevenue = prows.map((r) => ({
           day: String(r.day),
           amount: Number(r.amount || 0),
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         const srows = await db
           .select({
             status: purchases.status,
-            count: sql<number>`count(*)::int`,
+            count: sql<number>`count(*)`,
           })
           .from(purchases)
           .groupBy(purchases.status);
@@ -117,8 +117,8 @@ export async function GET(request: NextRequest) {
         const trows = await db
           .select({
             productId: purchases.productId,
-            count: sql<number>`count(*)::int`,
-            revenue: sql<number>`coalesce(sum(${purchases.amount}),0)::int`,
+            count: sql<number>`count(*)`,
+            revenue: sql<number>`coalesce(sum(${purchases.amount}),0)`,
           })
           .from(purchases)
           .where(eq(purchases.status, 'completed'))
@@ -138,13 +138,13 @@ export async function GET(request: NextRequest) {
       try {
         const urows = await db
           .select({
-            day: sql<string>`to_char(date_trunc('day', ${users.createdAt}), 'YYYY-MM-DD')`,
-            count: sql<number>`count(*)::int`,
+            day: sql<string>`date(${users.createdAt}, 'unixepoch')`,
+            count: sql<number>`count(*)`,
           })
           .from(users)
-          .where(sql`${users.createdAt} >= NOW() - INTERVAL '14 days'`)
-          .groupBy(sql`date_trunc('day', ${users.createdAt})`)
-          .orderBy(sql`date_trunc('day', ${users.createdAt})`);
+          .where(sql`${users.createdAt} >= unixepoch('now', '-14 days')`)
+          .groupBy(sql`date(${users.createdAt}, 'unixepoch')`)
+          .orderBy(sql`date(${users.createdAt}, 'unixepoch')`);
         seriesUsers = urows.map((r) => ({ day: String(r.day), count: Number(r.count) }));
       } catch {
         seriesUsers = [];
