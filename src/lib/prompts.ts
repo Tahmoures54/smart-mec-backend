@@ -248,7 +248,7 @@ function buildJsonSchema(): string {
 
 {
   "responseMode": "questions" | "diagnosis",
-  "followUpRound": 0 | 1 | 2,
+  "followUpRound": 0 | 1 | 2 | 3 | 4 | 5,
   "missingInfo": ["اطلاعات مهمی که هنوز کم است"],
   "followUpQuestions": ["سؤال دقیق ۱", "سؤال دقیق ۲"],
   "questionOptions": [
@@ -276,7 +276,8 @@ function buildJsonSchema(): string {
 }
 
 اگر responseMode=questions:
-- followUpQuestions را با حداکثر ${RULES_CONFIG.maxQuestionsPerRound} سؤال واقعی پر کن.
+- followUpQuestions باید دقیقاً شامل یک سؤال باشد.
+- followUpRound شماره سؤال جاری در کل جلسه است و باید 1 تا ${RULES_CONFIG.maxFollowUpRounds} باشد.
 - برای همان یک سؤال، دقیقاً یک مورد متناظر در questionOptions بده و 2 تا 6 گزینه کوتاه و قابل لمس ارائه کن.
 - کاربر قرار است با لمس گزینه‌ها پاسخ دهد، نه با تایپ.
 - causes را خالی [] قرار بده.
@@ -295,8 +296,9 @@ function buildJsonSchema(): string {
 const FOLLOWUP_RULES = `
 در متن کاربر ممکن است [عیب‌یابی قبلی] وجود داشته باشد. آن نتیجه و شرح قبلی را بخوان و پاسخ جدید کاربر را با آن ترکیب کن.
 اگر نتیجه قبلی responseMode=questions بوده:
-- اگر followUpRound کمتر از ${RULES_CONFIG.maxFollowUpRounds} است، فقط اطلاعات واقعاً باقی‌مانده را بپرس.
-- اگر followUpRound برابر ${RULES_CONFIG.maxFollowUpRounds} است، دیگر سؤال جدید نپرس و با اطلاعات موجود یک تحلیل محافظه‌کارانه ارائه کن.
+- شماره سؤال بعدی دقیقاً followUpRound قبلی + 1 باشد.
+- اگر followUpRound قبلی کمتر از ${RULES_CONFIG.maxFollowUpRounds} است، فقط یک سؤال جدید بپرس.
+- اگر followUpRound قبلی برابر ${RULES_CONFIG.maxFollowUpRounds} است، دیگر سؤال جدید نپرس و فقط تحلیل نهایی را ارائه کن.
 `;
 
 const AUDIO_RULES = `
