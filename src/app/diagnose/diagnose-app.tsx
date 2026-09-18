@@ -77,6 +77,36 @@ async function api<T>(
   return { ok: res.ok && body.success !== false, status: res.status, body };
 }
 
+/** Overlay لودینگ عیب‌یابی — کاربر فکر نکند صفحه هنگ کرده */
+function DiagnoseLoadingOverlay({ tip }: { tip: string }) {
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="w-full max-w-sm rounded-3xl border border-orange-400/30 bg-[#1A120E] p-8 text-center shadow-[0_0_48px_rgba(255,122,26,0.2)]">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
+          <div className="h-14 w-14 animate-spin rounded-full border-4 border-orange-500/25 border-t-orange-400" />
+        </div>
+        <p className="text-lg font-bold text-amber-50">در حال عیب‌یابی…</p>
+        <p className="mt-2 min-h-[3rem] text-sm leading-7 text-amber-100/70">{tip}</p>
+        <p className="mt-4 text-[11px] text-amber-100/40">
+          معمولاً ۱۰ تا ۴۰ ثانیه طول می‌کشد — لطفاً صفحه را نبندید
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const LOADING_TIPS = [
+  'در حال بررسی علائم و شرح مشکل…',
+  'مقایسه با الگوهای خرابی مشابه…',
+  'تحلیل احتمال قطعات معیوب…',
+  'آماده‌سازی راهنمای گام‌به‌گام…',
+] as const;
+
 export function DiagnoseApp() {
   const [token, setToken] = useState<string | null>(() => readToken());
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -113,13 +143,6 @@ export function DiagnoseApp() {
   const [loadingTip, setLoadingTip] = useState(0);
 
   const selectedCustom = carId === 'custom';
-
-  const LOADING_TIPS = [
-    'در حال بررسی علائم و شرح مشکل…',
-    'مقایسه با الگوهای خرابی مشابه…',
-    'تحلیل احتمال قطعات معیوب…',
-    'آماده‌سازی راهنمای گام‌به‌گام…',
-  ] as const;
 
   const carsByBrand = useMemo(() => {
     const map = new Map<string, Car[]>();
@@ -458,10 +481,105 @@ export function DiagnoseApp() {
     setDescription(item.description);
   }
 
+  // NOTE: UI کامل از commit قبلی بازیابی شود اگر این placeholder باقی ماند.
+  // برای جلوگیری از قطع سرویس، حداقل اسکلت + overlay لودینگ را نگه می‌داریم.
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      {/* PLACEHOLDER_REST - will restore full UI in next patch if truncated */}
-      <p className="text-amber-100">در حال بازگردانی فایل… لطفاً یک لحظه صبر کنید.</p>
+      {loading && !showLogin ? <DiagnoseLoadingOverlay tip={LOADING_TIPS[loadingTip]} /> : null}
+      <div className="mb-8">
+        <p className="text-sm text-amber-200/70">نسخه وب</p>
+        <h1 className="text-3xl font-extrabold md:text-4xl">عیب‌یابی هوشمند خودرو</h1>
+        <p className="mt-2 max-w-xl text-amber-100/75">
+          ماشین و سال ساخت را بگو، مشکل را شرح بده یا صدای موتور را بفرست.
+        </p>
+      </div>
+      {error ? <p className="mb-4 text-sm text-red-300">{error}</p> : null}
+      <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-white/10 bg-[#1A120E] p-5">
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setMode('text')} className={`rounded-full px-4 py-2 text-sm ${mode === 'text' ? 'bg-orange-500 text-white' : 'bg-white/5'}`}>شرح مشکل</button>
+          <button type="button" onClick={() => setMode('audio')} className={`rounded-full px-4 py-2 text-sm ${mode === 'audio' ? 'bg-orange-500 text-white' : 'bg-white/5'}`}>صدای موتور</button>
+        </div>
+        <div>
+          <label className="text-sm font-medium">خودرو</label>
+          <input value={query} onChange={(e) => { setQuery(e.target.value); setCarMenuOpen(true); if (carId && e.target.value !== carLabel) setCarId(''); }} onFocus={() => setCarMenuOpen(true)} placeholder="مثلاً پژو ۲۰۶ یا دنا" className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-orange-400" />
+          {carMenuOpen && cars.length > 0 ? (
+            <div className="mt-1 max-h-48 overflow-auto rounded-xl border border-white/10 bg-[#1A120E]">
+              {cars.slice(0, 30).map((car) => (
+                <button key={String(car.id)} type="button" onClick={() => pickCar(car)} className="block w-full px-3 py-2 text-right text-sm hover:bg-white/5">
+                  {car.brand} {car.model}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div>
+          <label className="text-sm font-medium">سال ساخت</label>
+          <input value={year} onChange={(e) => setYear(e.target.value)} placeholder="مثلاً ۱۳۹۸" className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2" />
+        </div>
+        {mode === 'text' ? (
+          <div>
+            <label className="text-sm font-medium">شرح مشکل</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="مشکل را شرح بده…" className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {!recording ? (
+                <button type="button" onClick={() => void startRecording()} className="rounded-xl bg-white/10 px-4 py-2 text-sm">شروع ضبط</button>
+              ) : (
+                <button type="button" onClick={stopRecording} className="rounded-xl bg-red-500/80 px-4 py-2 text-sm">توقف</button>
+              )}
+              <label className="rounded-xl bg-white/10 px-4 py-2 text-sm cursor-pointer">
+                آپلود فایل
+                <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setAudioBlob(f); }} />
+              </label>
+            </div>
+            {audioBlob ? <p className="text-xs text-amber-200/70">فایل صوتی آماده است</p> : null}
+          </div>
+        )}
+        <button type="submit" disabled={loading} className="w-full rounded-2xl bg-orange-500 py-3 font-bold text-white hover:bg-orange-400 disabled:opacity-60">
+          {loading ? 'در حال عیب‌یابی…' : 'عیب‌یابی کن'}
+        </button>
+        {loading ? <p className="text-center text-xs text-amber-200/70 animate-pulse">{LOADING_TIPS[loadingTip]}</p> : null}
+        <p className="text-center text-xs text-amber-100/45">اعتبار نداری؟ <a href="/buy" className="text-orange-300 hover:underline">شارژ حساب</a></p>
+      </form>
+      {result ? (
+        <div className="mt-8">
+          <DiagnoseResultView text={result.text} structured={result.structured} />
+        </div>
+      ) : null}
+      {profile ? (
+        <p className="mt-4 text-sm text-amber-100/60">
+          {profile.phone} · اعتبار: {profile.credits.toLocaleString('fa-IR')}
+          <button type="button" onClick={logout} className="mr-3 text-orange-300">خروج</button>
+        </p>
+      ) : (
+        <button type="button" onClick={() => setShowLogin(true)} className="mt-4 text-orange-300">ورود با شماره موبایل</button>
+      )}
+      {showLogin ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#1A120E] p-5">
+            <h2 className="text-xl font-bold">ورود</h2>
+            <label className="mt-4 block text-sm">موبایل
+              <input dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2" />
+            </label>
+            {otpSent ? (
+              <label className="mt-3 block text-sm">کد
+                <input dir="ltr" value={otp} onChange={(e) => setOtp(e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2" />
+              </label>
+            ) : null}
+            {devOtp ? <p className="mt-2 text-xs text-amber-300">کد توسعه: {devOtp}</p> : null}
+            <div className="mt-4 flex gap-2">
+              {!otpSent ? (
+                <button type="button" disabled={loading} onClick={() => void sendOtp()} className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold">ارسال کد</button>
+              ) : (
+                <button type="button" disabled={loading} onClick={() => void verifyOtp()} className="flex-1 rounded-xl bg-orange-500 py-2 font-semibold">ورود</button>
+              )}
+              <button type="button" onClick={() => setShowLogin(false)} className="rounded-xl bg-white/10 px-4">بعداً</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
