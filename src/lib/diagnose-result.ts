@@ -152,10 +152,10 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
     const responseMode = String(obj.responseMode || (Array.isArray(obj.followUpQuestions) && obj.followUpQuestions.length ? 'questions' : 'diagnosis'));
     const followUpRound = Number.isFinite(Number(obj.followUpRound)) ? Math.max(0, Math.min(5, Number(obj.followUpRound))) : 0;
     const missingInfo = Array.isArray(obj.missingInfo)
-      ? obj.missingInfo.map(String).filter(Boolean).slice(0, 1)
+      ? obj.missingInfo.map(String).filter(Boolean).slice(0, 4)
       : [];
     const followUpQuestions = Array.isArray(obj.followUpQuestions)
-      ? obj.followUpQuestions.map(String).filter(Boolean).slice(0, 4)
+      ? obj.followUpQuestions.map(String).filter(Boolean).slice(0, 1)
       : [];
     const questionOptions = Array.isArray(obj.questionOptions)
       ? obj.questionOptions.map((q) => ({
