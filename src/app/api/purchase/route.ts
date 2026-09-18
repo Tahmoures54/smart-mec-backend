@@ -8,21 +8,14 @@ import { handleError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
 import { PRODUCTS } from '@/types';
 import { logger } from '@/utils/logger';
-
-const ZIBAL_REQUEST_URL = 'https://gateway.zibal.ir/v1/request';
-const ZIBAL_TIMEOUT_MS = 15000;
-const TOMAN_TO_RIAL = 10;
-
-/** پشتیبانی از هر دو نام متغیر محیطی برای سازگاری با پنل لیارا / .env قدیمی */
-function getZibalMerchant(): string | undefined {
-  return process.env.ZIBAL_MERCHANT_ID || process.env.ZIBAL_MERCHANT || undefined;
-}
-
-interface ZibalRequestResponse {
-  result: number;
-  trackId?: number;
-  message?: string;
-}
+import {
+  allowMockPayments,
+  getZibalPaymentMode,
+  purchaseOrderId,
+  requestZibalPayment,
+  startPaymentUrl,
+  ZibalError,
+} from '@/lib/zibal';
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,78 +60,83 @@ export async function POST(request: NextRequest) {
         .where(eq(garages.id, garageId));
     }
 
-    const zibalMerchant = getZibalMerchant();
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
-
-    if (!zibalMerchant) {
-      logger.info('Creating MOCK payment (ZIBAL_MERCHANT / ZIBAL_MERCHANT_ID not set)...');
-
-      const authority =
-        'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
-
-      await db.insert(purchases).values({
+    const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const inserted = await db
+      .insert(purchases)
+      .values({
         userId: user.id,
         productId: product.id,
         amount: product.price,
         status: 'pending',
-        authority,
-        garageId: garageId,
-      });
+        garageId,
+      })
+      .returning({ id: purchases.id });
+    const purchaseId = inserted[0]?.id;
+    if (!purchaseId) {
+      return NextResponse.json(
+        { success: false, error: 'ثبت تراکنش ناموفق بود' },
+        { status: 500 }
+      );
+    }
 
-      const mockVerifyUrl = `${appUrl}/api/purchase/verify?trackId=${authority}&productId=${productId}&success=1&status=2&refid=MOCK_REF${webQuery}`;
+    const orderId = purchaseOrderId(purchaseId);
+
+    if (allowMockPayments()) {
+      logger.info('Creating MOCK payment (ZIBAL_MERCHANT not set, non-production)...');
+      const authority = 'MOCK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
+      await db
+        .update(purchases)
+        .set({ authority, updatedAt: new Date() })
+        .where(eq(purchases.id, purchaseId));
 
       return NextResponse.json({
         success: true,
-        paymentUrl: mockVerifyUrl,
+        paymentUrl: `${appUrl}/api/purchase/verify?trackId=${authority}&productId=${productId}&success=1&status=2&orderId=${orderId}${webQuery}`,
         mock: true,
+        orderId,
       });
     }
 
     const callbackUrl = `${appUrl}/api/purchase/verify?productId=${productId}${webQuery}`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);
-
-    let zibalResponse: Response;
     try {
-      zibalResponse = await fetch(ZIBAL_REQUEST_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant: zibalMerchant,
-          amount: product.price * TOMAN_TO_RIAL,
-          callbackUrl,
-          description: product.title,
-          orderId: String(user.id),
-        }),
-        signal: controller.signal,
+      const zibal = await requestZibalPayment({
+        amountToman: product.price,
+        callbackUrl,
+        description: `${product.title} — ${orderId}`,
+        orderId,
+        mobile: user.phone,
       });
-    } finally {
-      clearTimeout(timeout);
-    }
 
-    const zibalData = (await zibalResponse.json()) as ZibalRequestResponse;
-    if (zibalData.result !== 100 || !zibalData.trackId) {
-      logger.error('Zibal request failed', zibalData);
-      return NextResponse.json(
-        { success: false, error: zibalData.message || 'خطا در اتصال به درگاه' },
-        { status: 502 }
+      await db
+        .update(purchases)
+        .set({ authority: zibal.trackId, updatedAt: new Date() })
+        .where(eq(purchases.id, purchaseId));
+
+      logger.info(
+        `Zibal request ok purchase=${purchaseId} trackId=${zibal.trackId} mode=${getZibalPaymentMode()}`
       );
+
+      return NextResponse.json({
+        success: true,
+        paymentUrl: startPaymentUrl(zibal.trackId),
+        orderId,
+      });
+    } catch (error) {
+      await db
+        .update(purchases)
+        .set({ status: 'failed', updatedAt: new Date() })
+        .where(eq(purchases.id, purchaseId));
+
+      if (error instanceof ZibalError) {
+        logger.error('Zibal request failed', { result: error.result, message: error.message });
+        return NextResponse.json(
+          { success: false, error: error.message || 'خطا در اتصال به درگاه' },
+          { status: 502 }
+        );
+      }
+      throw error;
     }
-
-    await db.insert(purchases).values({
-      userId: user.id,
-      productId: product.id,
-      amount: product.price,
-      status: 'pending',
-      authority: String(zibalData.trackId),
-      garageId: garageId,
-    });
-
-    return NextResponse.json({
-      success: true,
-      paymentUrl: `https://gateway.zibal.ir/start/${zibalData.trackId}`,
-    });
   } catch (error) {
     return handleError(error);
   }
