@@ -16,10 +16,17 @@ type Product = {
   id: string;
   name: string;
   title?: string;
+  subtitle?: string;
   price: number;
+  compareAtPrice?: number;
   credits?: number;
   goldenDays?: number;
   days?: number;
+  badge?: string;
+  highlight?: boolean;
+  pricePerCredit?: number | null;
+  pricePerMonth?: number | null;
+  savePercent?: number | null;
 };
 
 async function api<T>(
@@ -42,16 +49,14 @@ function formatToman(n: number) {
   return `${n.toLocaleString('fa-IR')} تومان`;
 }
 
-const HIGHLIGHT_IDS = new Set(['credit_50', 'gold_monthly']);
-
 const SALES_POINTS = [
   {
-    t: 'هزینهٔ یک قطعهٔ اشتباه',
-    d: 'گاهی فقط یک تشخیص غلط، چند برابر قیمت کل بسته برایت آب می‌خورد.',
+    t: 'جلوی قطعهٔ اشتباه',
+    d: 'یک تشخیص غلط گاهی چند برابر قیمت کل بسته برایت آب می‌خورد.',
   },
   {
-    t: 'با آمادگی برو تعمیرگاه',
-    d: 'بدان چه بپرسی تا پیشنهادهای غیرضروری را راحت‌تر تشخیص دهی.',
+    t: 'مکانیک هوشمند همان‌جاست',
+    d: 'عیب را اینجا بفهم؛ با آمادگی و آگاهی برو تعمیرگاه.',
   },
   {
     t: 'فعال‌سازی آنی',
@@ -64,8 +69,6 @@ export function BuyApp() {
   const reason = search.get('reason') || '';
   const fromEmpty = reason === 'credits' || reason === 'empty' || reason === '402';
 
-  // برای جلوگیری از hydration mismatch، مقدار اولیه 'a' است و در effect
-  // بعد از mount با مقدار واقعی localStorage جایگزین می‌شود.
   const [buyAb, setBuyAb] = useState<'a' | 'b'>('a');
 
   const [token, setToken] = useState<string | null>(() => readWebToken());
@@ -198,7 +201,8 @@ export function BuyApp() {
     }
   }
 
-  function packSubtitle(p: Product) {
+  function packMeta(p: Product) {
+    if (p.subtitle) return p.subtitle;
     if (p.goldenDays && p.goldenDays > 0) {
       const days = p.days || p.goldenDays;
       return `اشتراک طلایی ${days} روزه`;
@@ -207,12 +211,39 @@ export function BuyApp() {
     return `${c.toLocaleString('fa-IR')} اعتبار عیب‌یابی`;
   }
 
+  function renderPrice(p: Product, accent: 'orange' | 'amber') {
+    const priceClass = accent === 'orange' ? 'text-orange-300' : 'text-amber-300';
+    return (
+      <div className="mt-3">
+        {p.compareAtPrice && p.compareAtPrice > p.price ? (
+          <p className="text-xs text-amber-100/40 line-through">{formatToman(p.compareAtPrice)}</p>
+        ) : null}
+        <p className={`text-2xl font-extrabold ${priceClass}`}>{formatToman(p.price)}</p>
+        {p.pricePerCredit ? (
+          <p className="mt-0.5 text-[11px] text-amber-100/50">
+            هر عیب‌یابی حدود {p.pricePerCredit.toLocaleString('fa-IR')} تومان
+          </p>
+        ) : null}
+        {p.pricePerMonth && !p.pricePerCredit ? (
+          <p className="mt-0.5 text-[11px] text-amber-100/50">
+            حدود {p.pricePerMonth.toLocaleString('fa-IR')} تومان در ماه
+          </p>
+        ) : null}
+        {p.savePercent ? (
+          <p className="mt-1 text-[11px] font-semibold text-emerald-400/90">
+            {p.savePercent.toLocaleString('fa-IR')}٪ به‌صرفه‌تر
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mx-auto max-w-2xl text-center">
         {fromEmpty ? (
           <p className="mb-2 text-sm font-semibold text-orange-300">
-            اعتبارت تمام شده — با یک بسته کوچک دوباره شروع کن
+            اعتبارت تمام شده — با «شروع سریع» دوباره راه بیفت
           </p>
         ) : null}
         <h1 className="text-3xl font-extrabold text-amber-50 md:text-4xl">
@@ -222,8 +253,8 @@ export function BuyApp() {
         </h1>
         <p className="mt-3 text-amber-100/75">
           {buyAb === 'a'
-            ? 'یک تشخیص غلط گاهی چند برابر قیمت کل بسته برایت آب می‌خورد. با آمادگی برو تعمیرگاه.'
-            : 'با اعتبار یا طلایی، سوال و follow-up قطع نمی‌شود — همان لحظه بعد از پرداخت فعال می‌شود.'}
+            ? 'مکانیک هوشمند همان‌جا تشخیص می‌دهد. یک بسته کوچک گاهی جلوی تعویض قطعهٔ بی‌خودی را می‌گیرد.'
+            : 'با اعتبار یا طلایی، سوال و پیگیری قطع نمی‌شود — همان لحظه بعد از پرداخت فعال می‌شود.'}
         </p>
         {profile ? (
           <p className="mt-3 text-sm text-amber-100/55">
@@ -253,9 +284,12 @@ export function BuyApp() {
       {error ? <p className="mt-6 text-center text-sm text-red-300">{error}</p> : null}
 
       <h2 className="mt-12 text-xl font-bold text-amber-100">بسته اعتبار</h2>
+      <p className="mt-1 text-sm text-amber-100/55">
+        از بستهٔ کوچک شروع کن؛ اگر زیاد سوال داری سراغ طلایی برو
+      </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {creditPacks.map((p) => {
-          const hot = HIGHLIGHT_IDS.has(p.id);
+          const hot = Boolean(p.highlight);
           return (
             <div
               key={p.id}
@@ -265,19 +299,30 @@ export function BuyApp() {
                   : 'border-white/10 bg-[#1A120E]'
               }`}
             >
-              {hot ? (
-                <span className="text-[11px] font-bold text-orange-300">پیشنهاد محبوب</span>
+              {p.badge ? (
+                <span className="text-[11px] font-bold text-orange-300">{p.badge}</span>
               ) : null}
               <h3 className="mt-1 text-lg font-bold text-amber-50">{p.name || p.title}</h3>
-              <p className="text-sm text-amber-100/55">{packSubtitle(p)}</p>
-              <p className="mt-3 text-2xl font-extrabold text-orange-300">{formatToman(p.price)}</p>
+              <p className="text-sm text-amber-100/55">{packMeta(p)}</p>
+              {p.title && p.name !== p.title ? (
+                <p className="mt-1 text-xs text-amber-100/40">{p.title}</p>
+              ) : null}
+              {renderPrice(p, 'orange')}
               <button
                 type="button"
                 disabled={!!buyingId}
                 onClick={() => void buy(p.id)}
-                className="mt-4 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-bold text-white hover:bg-orange-400 disabled:opacity-50"
+                className={`mt-4 w-full rounded-xl py-2.5 text-sm font-bold disabled:opacity-50 ${
+                  hot
+                    ? 'bg-orange-500 text-white hover:bg-orange-400'
+                    : 'bg-orange-500/90 text-white hover:bg-orange-400'
+                }`}
               >
-                {buyingId === p.id ? 'در حال انتقال به درگاه…' : 'خرید و فعال‌سازی'}
+                {buyingId === p.id
+                  ? 'در حال انتقال به درگاه…'
+                  : fromEmpty && p.id === 'credit_5'
+                    ? 'شروع دوباره با این بسته'
+                    : 'خرید و فعال‌سازی'}
               </button>
             </div>
           );
@@ -286,14 +331,24 @@ export function BuyApp() {
 
       <h2 className="mt-12 text-xl font-bold text-amber-100">اشتراک طلایی</h2>
       <p className="mt-1 text-sm text-amber-100/55">
-        اگر زیاد سوال داری یا چند خودرو داری، طلایی به‌صرفه‌تر از خرید تکی اعتبار است
+        اگر ماهانه بیشتر از ۱۵–۲۰ سوال داری، طلایی معمولاً به‌صرفه‌تر از خرید تکی است
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {goldPacks.map((p) => (
-          <div key={p.id} className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
-            <h3 className="text-lg font-bold text-amber-50">{p.name || p.title}</h3>
-            <p className="text-sm text-amber-100/55">{packSubtitle(p)}</p>
-            <p className="mt-3 text-2xl font-extrabold text-amber-300">{formatToman(p.price)}</p>
+          <div
+            key={p.id}
+            className={`rounded-2xl border p-5 ${
+              p.highlight
+                ? 'border-amber-400/50 bg-amber-500/15 shadow-[0_0_28px_rgba(251,191,36,0.12)]'
+                : 'border-amber-400/30 bg-amber-500/10'
+            }`}
+          >
+            {p.badge ? (
+              <span className="text-[11px] font-bold text-amber-300">{p.badge}</span>
+            ) : null}
+            <h3 className="mt-1 text-lg font-bold text-amber-50">{p.name || p.title}</h3>
+            <p className="text-sm text-amber-100/55">{packMeta(p)}</p>
+            {renderPrice(p, 'amber')}
             <button
               type="button"
               disabled={!!buyingId}
