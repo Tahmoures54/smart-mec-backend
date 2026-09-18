@@ -17,12 +17,13 @@ export type DiagnoseBillingResult = {
   usedFree: boolean;
 };
 
-export async function hasFreeQuota(
+/** better-sqlite3 همگام است — داخل transaction نباید async باشد */
+export function hasFreeQuota(
   userId: number,
   yearMonth: string,
   lookup: Tx['query']
-): Promise<boolean> {
-  const existing = await lookup.monthlyFreeUsage.findFirst({
+): boolean {
+  const existing = lookup.monthlyFreeUsage.findFirst({
     where: and(
       eq(monthlyFreeUsage.userId, userId),
       eq(monthlyFreeUsage.yearMonth, yearMonth)
@@ -31,11 +32,11 @@ export async function hasFreeQuota(
   return !existing || existing.freeCount < monthlyFreeLimit();
 }
 
-async function consumeGolden(tx: Tx, user: User, yearMonth: string, now: Date) {
+function consumeGolden(tx: Tx, user: User, yearMonth: string, now: Date) {
   const monthlyLimit = user.monthlyLimit ?? 200;
   const limitMessage = `سقف مجاز عیب‌یابی این ماه (${monthlyLimit} درخواست) به پایان رسیده است.`;
 
-  const incremented = await tx
+  const incremented = tx
     .update(goldenUsage)
     .set({
       count: sql`${goldenUsage.count} + 1`,
@@ -48,11 +49,12 @@ async function consumeGolden(tx: Tx, user: User, yearMonth: string, now: Date) {
         lt(goldenUsage.count, monthlyLimit)
       )
     )
-    .returning();
+    .returning()
+    .all();
 
   if (incremented.length > 0) return;
 
-  const existing = await tx.query.goldenUsage.findFirst({
+  const existing = tx.query.goldenUsage.findFirst({
     where: and(
       eq(goldenUsage.userId, user.id),
       eq(goldenUsage.yearMonth, yearMonth)
@@ -64,14 +66,16 @@ async function consumeGolden(tx: Tx, user: User, yearMonth: string, now: Date) {
   }
 
   try {
-    await tx.insert(goldenUsage).values({
-      userId: user.id,
-      yearMonth,
-      count: 1,
-      updatedAt: now,
-    });
+    tx.insert(goldenUsage)
+      .values({
+        userId: user.id,
+        yearMonth,
+        count: 1,
+        updatedAt: now,
+      })
+      .run();
   } catch {
-    const retried = await tx
+    const retried = tx
       .update(goldenUsage)
       .set({
         count: sql`${goldenUsage.count} + 1`,
@@ -84,24 +88,25 @@ async function consumeGolden(tx: Tx, user: User, yearMonth: string, now: Date) {
           lt(goldenUsage.count, monthlyLimit)
         )
       )
-      .returning();
+      .returning()
+      .all();
     if (retried.length === 0) {
       throw new BadRequestError(limitMessage);
     }
   }
 }
 
-async function consumeFreeOrCredit(
+function consumeFreeOrCredit(
   tx: Tx,
   user: User,
   yearMonth: string,
   now: Date
-): Promise<DiagnoseBillingResult> {
+): DiagnoseBillingResult {
   const freeLimit = monthlyFreeLimit();
-  const freeAvailable = await hasFreeQuota(user.id, yearMonth, tx.query);
+  const freeAvailable = hasFreeQuota(user.id, yearMonth, tx.query);
 
   if (freeAvailable) {
-    const updated = await tx
+    const updated = tx
       .update(monthlyFreeUsage)
       .set({
         freeCount: sql`${monthlyFreeUsage.freeCount} + 1`,
@@ -114,7 +119,8 @@ async function consumeFreeOrCredit(
           lt(monthlyFreeUsage.freeCount, freeLimit)
         )
       )
-      .returning();
+      .returning()
+      .all();
 
     if (updated.length > 0) {
       return {
@@ -124,7 +130,7 @@ async function consumeFreeOrCredit(
       };
     }
 
-    const existingFree = await tx.query.monthlyFreeUsage.findFirst({
+    const existingFree = tx.query.monthlyFreeUsage.findFirst({
       where: and(
         eq(monthlyFreeUsage.userId, user.id),
         eq(monthlyFreeUsage.yearMonth, yearMonth)
@@ -133,28 +139,31 @@ async function consumeFreeOrCredit(
 
     if (!existingFree) {
       try {
-        await tx.insert(monthlyFreeUsage).values({
-          userId: user.id,
-          yearMonth,
-          freeCount: 1,
-          updatedAt: now,
-        });
+        tx.insert(monthlyFreeUsage)
+          .values({
+            userId: user.id,
+            yearMonth,
+            freeCount: 1,
+            updatedAt: now,
+          })
+          .run();
         return {
           remainingFree: Math.max(0, freeLimit - 1),
           remainingCredits: null,
           usedFree: true,
         };
       } catch {
-        // unique race — fall through to credits or retry below
+        // unique race — fall through to credits
       }
     }
   }
 
-  const updateResult = await tx
+  const updateResult = tx
     .update(users)
     .set({ credits: sql`${users.credits} - 1` })
     .where(and(eq(users.id, user.id), gt(users.credits, 0)))
-    .returning();
+    .returning()
+    .all();
 
   if (updateResult.length === 0) {
     throw new InsufficientCreditsError(
@@ -169,15 +178,15 @@ async function consumeFreeOrCredit(
   };
 }
 
-export async function consumeDiagnoseQuota(
+export function consumeDiagnoseQuota(
   tx: Tx,
   user: User,
   now: Date
-): Promise<DiagnoseBillingResult> {
+): DiagnoseBillingResult {
   const currentMonth = now.toISOString().slice(0, 7);
 
   if (isGoldenActive(user, now)) {
-    await consumeGolden(tx, user, currentMonth, now);
+    consumeGolden(tx, user, currentMonth, now);
     return {
       remainingFree: null,
       remainingCredits: null,
@@ -188,7 +197,7 @@ export async function consumeDiagnoseQuota(
   return consumeFreeOrCredit(tx, user, currentMonth, now);
 }
 
-export async function saveDiagnostic(
+export function saveDiagnostic(
   tx: Tx,
   values: {
     userId: number;
@@ -197,11 +206,12 @@ export async function saveDiagnostic(
     result: string;
     audioUrl?: string | null;
   }
-): Promise<number> {
-  const inserted = await tx
+): number {
+  const inserted = tx
     .insert(diagnostics)
     .values(values)
-    .returning({ id: diagnostics.id });
+    .returning({ id: diagnostics.id })
+    .all();
 
   if (!inserted[0]?.id) {
     throw new Error('خطا در ذخیره نتیجه عیب‌یابی در دیتابیس');

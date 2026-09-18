@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10) || 20, 50);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
-    const history = await db.query.diagnostics.findMany({
+    const history = db.query.diagnostics.findMany({
       where: eq(diagnostics.userId, user.id),
       orderBy: [desc(diagnostics.createdAt)],
       limit,
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const currentMonth = now.toISOString().slice(0, 7);
 
     if (!golden) {
-      const freeAvailable = await hasFreeQuota(user.id, currentMonth, db.query);
+      const freeAvailable = hasFreeQuota(user.id, currentMonth, db.query);
       if (!freeAvailable && user.credits <= 0) {
         throw new InsufficientCreditsError(
           'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     let followUpBlock = '';
     if (previousDiagnosticId) {
-      const prev = await db.query.diagnostics.findFirst({
+      const prev = db.query.diagnostics.findFirst({
         where: eq(diagnostics.id, previousDiagnosticId),
       });
       if (!prev || prev.userId !== user.id) {
@@ -148,22 +148,25 @@ export async function POST(request: NextRequest) {
     let usedFree = false;
 
     try {
-      await db.transaction(async (tx) => {
-        const billing = await consumeDiagnoseQuota(tx, user, now);
-        remainingFree = billing.remainingFree;
-        remainingCredits = billing.remainingCredits;
-        usedFree = billing.usedFree;
-        diagnosticId = await saveDiagnostic(tx, {
+      // better-sqlite3: callback باید همگام باشد (نه async)
+      const txResult = db.transaction((tx) => {
+        const billing = consumeDiagnoseQuota(tx, user, now);
+        const id = saveDiagnostic(tx, {
           userId: user.id,
           carId: storedCarId(carId, year, customCarName),
           description,
           result: resultText,
         });
+        return { billing, id };
       });
+      remainingFree = txResult.billing.remainingFree;
+      remainingCredits = txResult.billing.remainingCredits;
+      usedFree = txResult.billing.usedFree;
+      diagnosticId = txResult.id;
     } catch (txError) {
       logger.error('Transaction failed during diagnose save', {
         userId: user.id,
-        error: txError,
+        error: txError instanceof Error ? { message: txError.message, stack: txError.stack } : txError,
       });
       throw txError;
     }
