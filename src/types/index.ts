@@ -285,7 +285,7 @@ export interface StructuredCause {
 
 export interface StructuredDiagnose {
   responseMode?: 'questions' | 'diagnosis' | string;
-  followUpRound?: 0 | 1 | 2 | number;
+  followUpRound?: 0 | 1 | 2 | 3 | 4 | 5 | number;
   missingInfo?: string[];
   followUpQuestions?: string[];
   questionOptions?: Array<{ question: string; options: string[] }>;
