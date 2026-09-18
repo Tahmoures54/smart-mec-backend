@@ -23,7 +23,7 @@ export const RULES_CONFIG = {
   maxQuestionsPerRound: 1,
   maxFollowUpRounds: 5,
   maxCauses: 3,
-  maxAudioQuestions: 3,
+  maxAudioQuestions: 1,
 } as const;
 
 /* ============================================================================
