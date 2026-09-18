@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
 
     const isAnswerToQuestion = previousWasQuestions;
     const needsHalfCredit = isAnswerToQuestion || !previousDiagnosticId;
+    const forceFinalDiagnosis = previousWasQuestions && previousFollowUpRound >= 5;
 
     if (!golden) {
       const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
 
     const { text: resultTextRaw } = await chatCompletion({
       systemPrompt: golden ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE,
-      userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی/پاسخ جدید کاربر]\n${description}\n\n[قواعد مرحله‌ای]\nاین یک درخواست اولیه است اگر previousDiagnosticId وجود ندارد. اگر previousDiagnosticId وجود دارد، این متن پاسخ کاربر به مرحله قبل است. ${previousWasQuestions ? `مرحله قبلی سؤال‌محور بوده و شماره مرحله آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس.` : ''}`,
+      userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی/پاسخ جدید کاربر]\n${description}\n\n[قواعد مرحله‌ای]\nاین یک درخواست اولیه است اگر previousDiagnosticId وجود ندارد. اگر previousDiagnosticId وجود دارد، این متن پاسخ کاربر به مرحله قبل است. ${previousWasQuestions ? `مرحله قبلی سؤال‌محور بوده و شماره سؤال آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس.` : ''}${forceFinalDiagnosis ? ' حتماً اکنون فقط responseMode=diagnosis بده و هیچ سؤال دیگری نپرس؛ سقف پنج سؤال تکمیل شده است.' : ''}`,
       userId: user.id,
     });
 
