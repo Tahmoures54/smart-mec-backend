@@ -187,6 +187,43 @@ function consumeFreeOrCredit(
   };
 }
 
+
+export function consumeQuestionQuota(
+  tx: Tx,
+  user: User,
+  yearMonth: string,
+  now: Date
+): DiagnoseBillingResult {
+  // Clarification questions cost at most half a paid credit each.
+  // The monthly free diagnosis quota remains available for the final diagnosis.
+  if (hasFreeQuota(user.id, yearMonth, tx)) {
+    return {
+      remainingFree: null,
+      remainingCredits: user.credits,
+      usedFree: false,
+    };
+  }
+
+  const updated = tx
+    .update(users)
+    .set({ credits: sql`${users.credits} - 0.5` })
+    .where(and(eq(users.id, user.id), sql`${users.credits} >= 0.5`))
+    .returning()
+    .all();
+
+  if (updated.length === 0) {
+    throw new InsufficientCreditsError(
+      'برای ادامهٔ سؤال‌ها حداقل نیم اعتبار لازم است.'
+    );
+  }
+
+  return {
+    remainingFree: 0,
+    remainingCredits: updated[0].credits,
+    usedFree: false,
+  };
+}
+
 export function consumeDiagnoseQuota(
   tx: Tx,
   user: User,
