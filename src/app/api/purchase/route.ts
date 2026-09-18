@@ -14,6 +14,7 @@ import {
   purchaseOrderId,
   requestZibalPayment,
   startPaymentUrl,
+  tomanToRial,
   ZibalError,
 } from '@/lib/zibal';
 
@@ -80,6 +81,29 @@ export async function POST(request: NextRequest) {
     }
 
     const orderId = purchaseOrderId(purchaseId);
+    const payableToman = Number(product.price);
+    const payableRial = tomanToRial(payableToman);
+    const originalPriceToman =
+      product.compareAtPrice && product.compareAtPrice > product.price
+        ? Number(product.compareAtPrice)
+        : payableToman;
+    const discountAmountToman = Math.max(0, originalPriceToman - payableToman);
+    const discountPercent =
+      originalPriceToman > 0
+        ? Math.round((discountAmountToman / originalPriceToman) * 100)
+        : 0;
+
+    logger.info('Purchase created', {
+      purchaseId,
+      userId: user.id,
+      productId,
+      originalPriceToman,
+      discountAmountToman,
+      discountPercent,
+      payableToman,
+      payableRial,
+      orderId,
+    });
 
     if (allowMockPayments()) {
       logger.info('Creating MOCK payment (ZIBAL_MERCHANT not set, non-production)...');
@@ -101,7 +125,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const zibal = await requestZibalPayment({
-        amountToman: product.price,
+        amountToman: payableToman,
         callbackUrl,
         description: `${product.title} — ${orderId}`,
         orderId,
@@ -121,6 +145,15 @@ export async function POST(request: NextRequest) {
         success: true,
         paymentUrl: startPaymentUrl(zibal.trackId),
         orderId,
+        payment: {
+          currency: 'TOMAN',
+          gatewayCurrency: 'RIAL',
+          originalPriceToman,
+          discountAmountToman,
+          discountPercent,
+          payableToman,
+          payableRial,
+        },
       });
     } catch (error) {
       await db
