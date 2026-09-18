@@ -1,5 +1,6 @@
 import { logger } from '@/utils/logger';
 import { AppError } from '@/lib/error-handler';
+import { RateLimiter } from '@/lib/rate-limiter';
 
 async function callDeepSeek(options: {
   systemPrompt: string;
@@ -97,6 +98,16 @@ export async function chatCompletion(options: {
   timeoutMs?: number;
   maxTokens?: number;
 }): Promise<{ text: string; finishReason?: string }> {
+  if (!options.userContent || options.userContent.length > 12000) {
+    throw new AppError(
+      'اطلاعات ارسالی برای تحلیل بیش از حد مجاز است.',
+      400,
+      'AI_INPUT_TOO_LARGE'
+    );
+  }
+
+  RateLimiter.check(String(options.userId), 'ai_user', 8, 10 * 60 * 1000);
+
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
   const apiEndpoint = (
     process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1'
