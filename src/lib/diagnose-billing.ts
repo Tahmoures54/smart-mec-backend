@@ -196,7 +196,7 @@ export function consumeQuestionQuota(
 ): DiagnoseBillingResult {
   // Clarification questions cost at most half a paid credit each.
   // The monthly free diagnosis quota remains available for the final diagnosis.
-  if (hasFreeQuota(user.id, yearMonth, tx)) {
+  if (isGoldenActive(user, now) || hasFreeQuota(user.id, yearMonth, tx)) {
     return {
       remainingFree: null,
       remainingCredits: user.credits,
