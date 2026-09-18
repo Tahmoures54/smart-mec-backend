@@ -14,7 +14,7 @@ import { minWithdrawal } from '@/lib/constants';
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
-    const list = await db.query.withdrawals.findMany({
+    const list = db.query.withdrawals.findMany({
       where: eq(withdrawals.userId, user.id),
       orderBy: [desc(withdrawals.createdAt)],
     });
@@ -55,8 +55,9 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('نام صاحب حساب الزامی است');
     }
 
-    const row = await db.transaction(async (tx) => {
-      const pending = await tx.query.withdrawals.findFirst({
+    // better-sqlite3: transaction باید همگام باشد
+    const row = db.transaction((tx) => {
+      const pending = tx.query.withdrawals.findFirst({
         where: and(
           eq(withdrawals.userId, user.id),
           eq(withdrawals.status, 'pending')
@@ -68,20 +69,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const deducted = await tx
+      const deducted = tx
         .update(users)
         .set({
           earnings: sql`${users.earnings} - ${amount}`,
           updatedAt: new Date(),
         })
         .where(and(eq(users.id, user.id), gte(users.earnings, amount)))
-        .returning({ earnings: users.earnings });
+        .returning({ earnings: users.earnings })
+        .all();
 
       if (deducted.length === 0) {
         throw new BadRequestError('موجودی درآمد شما کافی نیست');
       }
 
-      const inserted = await tx
+      const inserted = tx
         .insert(withdrawals)
         .values({
           userId: user.id,
@@ -90,7 +92,8 @@ export async function POST(request: NextRequest) {
           fullName,
           status: 'pending',
         })
-        .returning();
+        .returning()
+        .all();
 
       return inserted[0];
     });

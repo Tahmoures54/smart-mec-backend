@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     const currentMonth = now.toISOString().slice(0, 7);
 
     if (!golden) {
-      const freeAvailable = await hasFreeQuota(user.id, currentMonth, db.query);
+      const freeAvailable = hasFreeQuota(user.id, currentMonth, db.query);
       if (!freeAvailable && user.credits <= 0) {
         throw new InsufficientCreditsError(
           'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
@@ -101,17 +101,19 @@ export async function POST(request: NextRequest) {
     let remainingCredits: number | null = null;
     let diagnosticId: number | undefined;
 
-    await db.transaction(async (tx) => {
-      const billing = await consumeDiagnoseQuota(tx, user, now);
-      remainingFree = billing.remainingFree;
-      remainingCredits = billing.remainingCredits;
-      diagnosticId = await saveDiagnostic(tx, {
+    const txResult = db.transaction((tx) => {
+      const billing = consumeDiagnoseQuota(tx, user, now);
+      const id = saveDiagnostic(tx, {
         userId: user.id,
         carId: storedCarId(carId, year, customCarName),
         description: description.slice(0, 2000),
         result: resultText,
       });
+      return { billing, id };
     });
+    remainingFree = txResult.billing.remainingFree;
+    remainingCredits = txResult.billing.remainingCredits;
+    diagnosticId = txResult.id;
 
     logger.info('Audio diagnose successful', { userId: user.id, diagnosticId });
 
