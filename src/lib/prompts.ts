@@ -20,8 +20,8 @@ import { z } from 'zod';
 export const PROMPT_VERSION = 3;
 
 export const RULES_CONFIG = {
-  maxQuestionsPerRound: 6,
-  maxFollowUpRounds: 2,
+  maxQuestionsPerRound: 1,
+  maxFollowUpRounds: 5,
   maxCauses: 3,
   maxAudioQuestions: 3,
 } as const;
@@ -46,7 +46,7 @@ const causeSchema = z.object({
 
 export const DiagnosisResponseSchema = z.object({
   responseMode: z.enum(['questions', 'diagnosis']),
-  followUpRound: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  followUpRound: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   missingInfo: z.array(z.string()),
   followUpQuestions: z.array(z.string()).max(RULES_CONFIG.maxQuestionsPerRound),
   questionOptions: z.array(z.object({
@@ -225,7 +225,7 @@ const SHARED_RULES = `
 1) فقط فارسی در متن‌های داخل JSON.
 2) اگر شرح کاربر کوتاه، مبهم یا برای تفکیک علت‌ها ناکافی است، فوراً گزارش طولانی و فهرست خرابی‌ها تولید نکن؛ ابتدا سؤال‌های هدفمند بپرس.
 3) فقط سؤال‌هایی را بپرس که پاسخشان واقعاً می‌تواند تشخیص، فوریت یا قدم بعدی را تغییر دهد.
-4) در هر مرحله حداکثر ${RULES_CONFIG.maxQuestionsPerRound} سؤال کوتاه و مشخص بپرس. سؤال‌ها ترجیحاً درباره محل صدا/لرزش، زمان بروز، شرایط بروز، نوع علامت، تغییرات اخیر یا علائم همراه باشند.
+4) در هر درخواست فقط ${RULES_CONFIG.maxQuestionsPerRound} سؤال کوتاه و مشخص بپرس؛ سؤال‌ها را یکی‌یکی بپرس، نه چند سؤال همزمان. حداکثر ${RULES_CONFIG.maxFollowUpRounds} سؤال در کل این جلسه مجاز است. سؤال‌ها ترجیحاً درباره محل صدا/لرزش، زمان بروز، شرایط بروز، نوع علامت، تغییرات اخیر یا علائم همراه باشند.
 5) حداکثر ${RULES_CONFIG.maxFollowUpRounds} مرحله پرسش برای هر مشکل. اگر پس از این تعداد مرحله هنوز داده کافی نیست، با confidence=low یک تحلیل محافظه‌کارانه ارائه کن و کمبود اطلاعات را صریح بگو.
 6) اگر کاربر به سؤال‌های قبلی پاسخ داده، سؤال‌های تکراری نپرس و از اطلاعات قبلی استفاده کن.
 7) وقتی اطلاعات کافی شد، responseMode=diagnosis و گزارش کامل بده.
@@ -277,7 +277,7 @@ function buildJsonSchema(): string {
 
 اگر responseMode=questions:
 - followUpQuestions را با حداکثر ${RULES_CONFIG.maxQuestionsPerRound} سؤال واقعی پر کن.
-- برای هر سؤال، یک مورد متناظر در questionOptions بده و گزینه‌های کوتاه و قابل لمس ارائه کن؛ حداکثر ۶ گزینه برای هر سؤال.
+- برای همان یک سؤال، دقیقاً یک مورد متناظر در questionOptions بده و 2 تا 6 گزینه کوتاه و قابل لمس ارائه کن.
 - کاربر قرار است با لمس گزینه‌ها پاسخ دهد، نه با تایپ.
 - causes را خالی [] قرار بده.
 - mechanicQuestions را خالی [] قرار بده.
