@@ -35,8 +35,16 @@ export async function POST(request: NextRequest) {
     const { action, phone: rawPhone, code: rawCode, referralCode: rawReferral } = body;
 
     if (action === 'send') {
-      RateLimiter.check(ip, 'send_otp', 3, 5 * 60 * 1000);
       const phone = validatePhone(rawPhone);
+      RateLimiter.checkComposite(
+        [
+          { value: ip, label: 'ip' },
+          { value: phone, label: 'phone' },
+        ],
+        'send_otp',
+        3,
+        5 * 60 * 1000
+      );
 
       const code = SMSService.generateOTP();
       const expiresAt = Date.now() + 2 * 60 * 1000;
@@ -66,8 +74,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'verify') {
-      RateLimiter.check(ip, 'verify_otp', 5, 5 * 60 * 1000);
       const phone = validatePhone(rawPhone);
+      RateLimiter.checkComposite(
+        [
+          { value: ip, label: 'ip' },
+          { value: phone, label: 'phone' },
+        ],
+        'verify_otp',
+        5,
+        5 * 60 * 1000
+      );
       const code = validateOTP(rawCode);
       const inputReferral = normalizeReferralCode(rawReferral);
 
