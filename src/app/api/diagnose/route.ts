@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         { value: String(user.id), label: 'user' },
       ],
       'diagnose',
-      5,
+      12,
       10 * 60 * 1000
     );
 
@@ -102,19 +102,6 @@ export async function POST(request: NextRequest) {
     const golden = isGoldenActive(user, now);
     const currentMonth = now.toISOString().slice(0, 7);
 
-    if (!golden) {
-      const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
-      const isAnswerToQuestion = previousWasQuestions;
-      const hasHalfCredit = user.credits >= 0.5;
-      if (!freeAvailable && !isAnswerToQuestion && user.credits <= 0) {
-        throw new InsufficientCreditsError(
-          'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
-        );
-      }
-    }
-
-    const carDetails = buildCarDetails(carId, year, customCarName);
-
     let followUpBlock = '';
     let previousFollowUpRound = 0;
     let previousWasQuestions = false;
@@ -130,8 +117,24 @@ export async function POST(request: NextRequest) {
       const previousStructured = tryParseStructuredDiagnose(prev.result);
       previousFollowUpRound = Number(previousStructured?.followUpRound || 0);
       previousWasQuestions = previousStructured?.responseMode === 'questions';
-      followUpBlock = `\n\n[عیب‌یابی قبلی]\nمرحله پرسش قبلی: ${previousFollowUpRound}\nشرح: ${prev.description}\nنتیجه:\n${prev.result.slice(0, 3000)}\n`;
+      followUpBlock = `\n\n[عیب‌یابی قبلی]\nشماره سؤال قبلی: ${previousFollowUpRound}\nشرح: ${prev.description}\nنتیجه:\n${prev.result.slice(0, 3000)}\n`;
     }
+
+    const isAnswerToQuestion = previousWasQuestions;
+    const needsHalfCredit = isAnswerToQuestion || !previousDiagnosticId;
+
+    if (!golden) {
+      const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
+      if (!freeAvailable && (needsHalfCredit ? user.credits < 0.5 : user.credits <= 0)) {
+        throw new InsufficientCreditsError(
+          needsHalfCredit
+            ? 'برای ادامهٔ عیب‌یابی حداقل نیم اعتبار لازم است.'
+            : 'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
+        );
+      }
+    }
+
+    const carDetails = buildCarDetails(carId, year, customCarName);
 
     logger.info('Diagnose requested', { userId: user.id, carId, year, ip, descLen: description.length, golden });
 
