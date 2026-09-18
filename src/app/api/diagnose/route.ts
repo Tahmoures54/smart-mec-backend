@@ -58,7 +58,15 @@ export async function POST(request: NextRequest) {
   try {
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
-    RateLimiter.check(ip, 'diagnose', 5, 10 * 60 * 1000);
+    RateLimiter.checkComposite(
+      [
+        { value: ip, label: 'ip' },
+        { value: String(user.id), label: 'user' },
+      ],
+      'diagnose',
+      5,
+      10 * 60 * 1000
+    );
 
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== 'object') {
