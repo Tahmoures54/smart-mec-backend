@@ -32,7 +32,20 @@ export async function POST(request: NextRequest) {
   try {
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
-    RateLimiter.check(ip, 'diagnose_audio', 5, 10 * 60 * 1000);
+    RateLimiter.checkComposite(
+      [
+        { value: ip, label: 'ip' },
+        { value: String(user.id), label: 'user' },
+      ],
+      'diagnose_audio',
+      3,
+      10 * 60 * 1000
+    );
+
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > 10 * 1024 * 1024) {
+      throw new BadRequestError('حجم درخواست صوتی بیش از حد مجاز است (حداکثر ۱۰ مگابایت).');
+    }
 
     const form = await request.formData();
     let rawCarId = String(form.get('carId') || '');
@@ -57,7 +70,26 @@ export async function POST(request: NextRequest) {
     let audioMeta = 'فایل صوتی ارسال نشده یا قابل خواندن نبود.';
     if (audio && typeof audio === 'object' && 'size' in audio) {
       const size = Number((audio as Blob).size || 0);
+      const type = String((audio as File).type || '').toLowerCase();
       const name = (audio as File).name || 'engine_sound';
+      const allowedTypes = new Set([
+        'audio/mpeg',
+        'audio/mp3',
+        'audio/wav',
+        'audio/x-wav',
+        'audio/webm',
+        'audio/ogg',
+        'audio/mp4',
+        'audio/aac',
+        'audio/x-m4a',
+        'video/mp4',
+      ]);
+      if (size <= 0) {
+        throw new BadRequestError('فایل صوتی خالی است.');
+      }
+      if (type && !allowedTypes.has(type)) {
+        throw new BadRequestError('فرمت فایل صوتی پشتیبانی نمی‌شود.');
+      }
       audioMeta = `فایل صوتی دریافت شد (نام: ${name}، حجم تقریبی: ${Math.round(size / 1024)} کیلوبایت).`;
       if (size > 8 * 1024 * 1024) {
         throw new BadRequestError('حجم فایل صوتی بیش از حد مجاز است (حداکثر ۸ مگابایت).');
