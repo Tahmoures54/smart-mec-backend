@@ -186,6 +186,17 @@ export function structuredToMarkdown(s: StructuredDiagnose): string {
   const lines: string[] = [];
   lines.push('## وضعیت کلی');
   lines.push(URGENCY_LABEL[s.urgency] || s.urgency);
+  if (s.confidence) {
+    const confidenceFa: Record<string, string> = { high: 'بالا', medium: 'متوسط', low: 'پایین' };
+    lines.push(`اطمینان تشخیص: ${confidenceFa[s.confidence] || s.confidence}`);
+  }
+  if (typeof s.safeToDrive === 'boolean') {
+    lines.push(s.safeToDrive ? 'وضعیت رانندگی: در صورت نبود علامت جدید، قابل ادامه با احتیاط' : 'وضعیت رانندگی: رانندگی نکن تا بررسی شود');
+  }
+  if (s.evidence?.length) {
+    lines.push('شواهد اصلی:');
+    for (const item of s.evidence.slice(0, 3)) lines.push(`- ${item}`);
+  }
   if (s.statusSummary) lines.push(s.statusSummary);
   lines.push('');
   lines.push('## علل محتمل (به ترتیب احتمال)');
