@@ -23,7 +23,7 @@ function classifyTitle(title: string): SectionKind {
   const t = title.replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, '').trim();
   if (/وضعیت|فوریت/.test(t)) return 'status';
   if (/علل|محتمل/.test(t)) return 'causes';
-  if (/بپرس|سوال|مکانیک/.test(t)) return 'questions';
+  if (/چک|یادداشت|بپرس|سوال|خودت/.test(t)) return 'questions';
   if (/مراقب|هشدار|پیشنهاد/.test(t)) return 'warning';
   if (/قدم|بعدی/.test(t)) return 'next';
   if (/نکته|پایانی|سلب/.test(t)) return 'footer';
@@ -184,19 +184,22 @@ export function structuredToMarkdown(s: StructuredDiagnose): string {
     if (c.diyCheck) lines.push(`  - چک اولیه: ${c.diyCheck}`);
   }
   lines.push('');
-  lines.push('## قبل از تعمیرگاه این‌ها را بپرس');
-  for (const q of s.mechanicQuestions) lines.push(`- ${q}`);
-  lines.push('');
+  // کاربر پیش خودِ مکانیک هوشمند آمده — چک‌لیست خودش، نه «از مکانیک بپرس»
+  if (s.mechanicQuestions.length > 0) {
+    lines.push('## خودت این‌ها را چک / یادداشت کن');
+    for (const q of s.mechanicQuestions) lines.push(`- ${q}`);
+    lines.push('');
+  }
   lines.push('## ⚠️ مراقب این پیشنهادها باش');
   for (const w of s.warnings) lines.push(`- ${w}`);
   lines.push('');
   lines.push('## قدم بعدی پیشنهادی');
-  lines.push(s.nextStep || 'بازدید حضوری از تعمیرگاه معتبر.');
+  lines.push(s.nextStep || 'اگر علائم بدتر شد، فعلاً رانندگی نکن و برای تعویض قطعه به تعمیرگاه معتبر برو.');
   lines.push('');
   lines.push('## نکته پایانی');
   lines.push(
     s.footer ||
-      'این تحلیل راهنمای اولیه است؛ برای تعمیر نهایی بازدید حضوری لازم است.'
+      'تشخیص من بر اساس شرح توست؛ اگر با چک‌ها جور درنیامد، جزئیات بیشتری بنویس تا دقیق‌تر بگویم.'
   );
   return lines.join('\n');
 }
