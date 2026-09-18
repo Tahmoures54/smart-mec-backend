@@ -12,10 +12,9 @@ import {
   computeReferralCommission,
   isMockAuthority,
 } from '@/lib/payment';
+import { amountsMatchTomanAndRial, verifyZibalPayment } from '@/lib/zibal';
 import { referralPercentage } from '@/lib/constants';
 
-const ZIBAL_VERIFY_URL = 'https://gateway.zibal.ir/v1/verify';
-const ZIBAL_TIMEOUT_MS = 15000;
 
 /**
  * صفحه نتیجه پرداخت.
@@ -187,16 +186,8 @@ export async function GET(request: NextRequest) {
       if (!merchant) {
         return page('خطا', 'پیکربندی درگاه ناقص است (ZIBAL_MERCHANT).', false, fromWeb);
       }
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ZIBAL_TIMEOUT_MS);
       try {
-        const res = await fetch(ZIBAL_VERIFY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ merchant, trackId: Number(trackId) }),
-          signal: controller.signal,
-        });
-        const data = await res.json();
+        const data = await verifyZibalPayment(trackId);
         if (data.result !== 100 && data.result !== 201) {
           db.update(purchases)
             .set({ status: 'failed', updatedAt: new Date() })
@@ -209,6 +200,36 @@ export async function GET(request: NextRequest) {
           });
           return page('ناموفق', 'پرداخت تأیید نشد.', false, fromWeb);
         }
+
+        // Zibal reports the verified amount in Rials. Our database stores Toman.
+        // Never grant a product when the gateway-confirmed amount differs.
+        if (
+          data.amountRial == null ||
+          !amountsMatchTomanAndRial(Number(purchase.amount), Number(data.amountRial))
+        ) {
+          logger.error('Zibal amount mismatch', {
+            purchaseId: purchase.id,
+            expectedToman: purchase.amount,
+            gatewayAmountRial: data.amountRial,
+            trackId,
+          });
+          db.update(purchases)
+            .set({ status: 'failed', updatedAt: new Date() })
+            .where(eq(purchases.id, purchase.id))
+            .run();
+          return page('ناموفق', 'مبلغ پرداخت با سفارش مطابقت ندارد.', false, fromWeb);
+        }
+
+        // Bind the gateway transaction to our own order whenever Zibal returns it.
+        if (data.orderId && data.orderId !== purchaseOrderId(purchase.id)) {
+          logger.error('Zibal orderId mismatch', {
+            purchaseId: purchase.id,
+            expectedOrderId: purchaseOrderId(purchase.id),
+            gatewayOrderId: data.orderId,
+          });
+          return page('ناموفق', 'شناسه سفارش با تراکنش مطابقت ندارد.', false, fromWeb);
+        }
+
         finalRefNumber = String(data.refNumber || '');
       } catch (e) {
         logger.error('Zibal verify error', {
@@ -217,8 +238,6 @@ export async function GET(request: NextRequest) {
           stack: e instanceof Error ? e.stack : undefined,
         });
         return page('خطا', 'ارتباط با درگاه برقرار نشد.', false, fromWeb);
-      } finally {
-        clearTimeout(timer);
       }
     }
 
