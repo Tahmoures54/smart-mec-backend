@@ -11,6 +11,26 @@ import { handleError, BadRequestError } from '@/lib/error-handler';
 import { RateLimiter } from '@/lib/rate-limiter';
 import { minWithdrawal } from '@/lib/constants';
 
+function validIranianCard(value: string): boolean {
+  if (!/^\d{16}$/.test(value)) return false;
+  if (/^(\d)\1{15}$/.test(value)) return false;
+  let sum = 0;
+  for (let i = 0; i < 16; i += 1) {
+    let n = Number(value[i]);
+    if (i % 2 === 0) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+  }
+  return sum % 10 === 0;
+}
+
+function maskBankAccount(value: string): string {
+  if (value.startsWith('IR') && value.length === 26) return 'IR********************' + value.slice(-4);
+  return '**** **** **** ' + value.slice(-4);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
@@ -20,7 +40,8 @@ export async function GET(request: NextRequest) {
       .where(eq(withdrawals.userId, user.id))
       .orderBy(desc(withdrawals.createdAt))
       .all();
-    return NextResponse.json({ success: true, data: list });
+    const safeList = list.map((item) => ({ ...item, cardNumber: item.cardNumber ? maskBankAccount(item.cardNumber) : null }));
+    return NextResponse.json({ success: true, data: safeList });
   } catch (error) {
     return handleError(error);
   }
@@ -40,14 +61,15 @@ export async function POST(request: NextRequest) {
       .trim();
     const fullName = String(body.fullName || '').trim();
     const min = minWithdrawal();
+    const max = Number(process.env.MAX_WITHDRAWAL_TOMAN || '500000000');
 
-    if (!Number.isInteger(amount) || amount < min) {
+    if (!Number.isInteger(amount) || amount < min || amount > max) {
       throw new BadRequestError(
-        `حداقل مبلغ برداشت ${min.toLocaleString('fa-IR')} تومان است`
+        'مبلغ برداشت باید بین ' + min.toLocaleString('fa-IR') + ' تا ' + max.toLocaleString('fa-IR') + ' تومان باشد'
       );
     }
 
-    if (!/^\d{16}$/.test(cardNumber) && !/^IR\d{24}$/i.test(cardNumber)) {
+    if (!validIranianCard(cardNumber) && !/^IR\d{24}$/i.test(cardNumber)) {
       throw new BadRequestError(
         'شماره کارت ۱۶ رقمی یا شبا (IR + ۲۴ رقم) وارد کنید'
       );
