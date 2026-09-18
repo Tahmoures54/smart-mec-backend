@@ -9,7 +9,6 @@ export async function GET() {
   let latencyMs: number | undefined;
 
   try {
-    // The application uses SQLite (DATABASE_PATH), not PostgreSQL/DATABASE_URL.
     latencyMs = await pingDb();
     dbOk = true;
   } catch (error) {
@@ -31,7 +30,7 @@ export async function GET() {
       payment: {
         provider: 'zibal',
         mode: paymentMode,
-        configured: paymentMode !== 'unset',
+        configured: paymentMode === 'live' || paymentMode === 'sandbox',
       },
     },
   };
