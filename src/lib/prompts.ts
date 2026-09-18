@@ -117,6 +117,10 @@ export function validateDiagnosisInvariants(
       problems.push('mechanicQuestions باید در حالت questions خالی باشد');
     if (res.followUpQuestions.length === 0)
       problems.push('followUpQuestions در حالت questions نباید خالی باشد');
+    if (res.questionOptions.length !== res.followUpQuestions.length)
+      problems.push('questionOptions باید برای همه followUpQuestions گزینه داشته باشد');
+    if (res.questionOptions.some((q) => q.options.length < 2))
+      problems.push('هر questionOptions باید حداقل دو گزینه داشته باشد');
   }
 
   if (res.responseMode === 'diagnosis') {
@@ -189,6 +193,7 @@ export function buildSafeFallbackResponse(reason: string): DiagnosisResponse {
     followUpRound: 0,
     missingInfo: [],
     followUpQuestions: [],
+    questionOptions: [],
     urgency: 'yellow',
     confidence: 'low',
     safeToDrive: null,
@@ -234,7 +239,7 @@ const SHARED_RULES = `
 15) در responseMode=questions برای هر سؤال یک questionOptions متناظر بده: گزینه‌ها کوتاه، قابل لمس، تا حد ممکن mutually exclusive و حداکثر ۶ گزینه باشند. گزینه «مطمئن نیستم» را وقتی لازم است اضافه کن. کاربر نباید مجبور به تایپ پاسخ باشد.
 16) mechanicQuestions در پاسخ نهایی فقط چک‌لیست مفید برای کاربر در تعمیرگاه است؛ در مرحله پرسش، سؤال‌های کاربر در followUpQuestions و questionOptions قرار می‌گیرند.
 17) تعداد questionOptions باید با سؤال‌های followUpQuestions هماهنگ باشد و برای همه سؤال‌های مرحله گزینه ارائه شود.
-16) پاسخ را فشرده نگه دار و از تکرار پرهیز کن.
+18) پاسخ را فشرده نگه دار و از تکرار پرهیز کن.
 `;
 
 function buildJsonSchema(): string {
