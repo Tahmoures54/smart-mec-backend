@@ -288,6 +288,7 @@ export interface StructuredDiagnose {
   followUpRound?: 0 | 1 | 2 | number;
   missingInfo?: string[];
   followUpQuestions?: string[];
+  questionOptions?: Array<{ question: string; options: string[] }>;
   urgency: 'green' | 'yellow' | 'red' | string;
   confidence?: 'high' | 'medium' | 'low' | string;
   safeToDrive?: boolean | null;
