@@ -149,9 +149,24 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
           diyCheck: c?.diyCheck ? String(c.diyCheck) : null,
         }))
       : [];
+    const urgency = ['green', 'yellow', 'red'].includes(String(obj.urgency))
+      ? String(obj.urgency)
+      : 'yellow';
+    const confidence = ['high', 'medium', 'low'].includes(String(obj.confidence))
+      ? String(obj.confidence)
+      : 'low';
+    const evidence = Array.isArray(obj.evidence)
+      ? obj.evidence.map(String).filter(Boolean).slice(0, 3)
+      : [];
+    const safeToDrive =
+      typeof obj.safeToDrive === 'boolean' ? obj.safeToDrive : null;
+
     return {
-      urgency: String(obj.urgency || 'yellow'),
-      statusSummary: String(obj.statusSummary || ''),
+      urgency,
+      confidence,
+      safeToDrive,
+      evidence,
+      statusSummary: String(obj.statusSummary || '').slice(0, 1200),
       causes,
       mechanicQuestions: Array.isArray(obj.mechanicQuestions)
         ? obj.mechanicQuestions.map(String).filter(Boolean).slice(0, 8)
