@@ -8,6 +8,7 @@ import { db, ensureDbReady } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { UnauthorizedError, ForbiddenError } from './error-handler';
+import { RateLimiter } from './rate-limiter';
 import { JWTPayload, User } from '@/types';
 
 const getJwtSecretKey = () => {
@@ -82,6 +83,9 @@ export function isAdminPhone(phone: string): boolean {
 
 export async function requireAdmin(req: NextRequest): Promise<User> {
   await ensureDbReady();
+
+  const ip = RateLimiter.getIP(req);
+  RateLimiter.check(ip, 'admin_auth', 10, 10 * 60 * 1000);
 
   const token = getTokenFromRequest(req);
   const systemToken = process.env.ADMIN_SYSTEM_TOKEN;
