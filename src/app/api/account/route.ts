@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { db, ensureDbReady } from '@/db';
 import { users, otps } from '@/db/schema';
 import { eq, and, desc, gt, lt, sql } from 'drizzle-orm';
@@ -12,6 +13,10 @@ import { RateLimiter } from '@/lib/rate-limiter';
 import { validatePhone, validateOTP } from '@/lib/validation';
 import { handleError } from '@/lib/error-handler';
 import { logger } from '@/utils/logger';
+
+function hashOtp(code: string): string {
+  return createHash('sha256').update(code).digest('hex');
+}
 
 function generateReferralCode(userId: number): string {
   const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest) {
         logger.warn('OTP cleanup skipped', cleanupError);
       }
 
-      await db.insert(otps).values({ phone, code, expiresAt });
+      await db.insert(otps).values({ phone, code: hashOtp(code), expiresAt });
 
       const sent = await SMSService.sendOTP(phone, code);
       if (!sent) {
@@ -106,7 +111,7 @@ export async function POST(request: NextRequest) {
         const validOtp = await db.query.otps.findFirst({
           where: and(
             eq(otps.phone, phone),
-            eq(otps.code, code),
+            eq(otps.code, hashOtp(code)),
             eq(otps.isUsed, false),
             gt(otps.expiresAt, Date.now())
           ),
