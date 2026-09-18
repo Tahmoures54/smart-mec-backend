@@ -20,7 +20,7 @@ import { z } from 'zod';
 export const PROMPT_VERSION = 3;
 
 export const RULES_CONFIG = {
-  maxQuestionsPerRound: 4,
+  maxQuestionsPerRound: 6,
   maxFollowUpRounds: 2,
   maxCauses: 3,
   maxAudioQuestions: 3,
@@ -49,6 +49,10 @@ export const DiagnosisResponseSchema = z.object({
   followUpRound: z.union([z.literal(0), z.literal(1), z.literal(2)]),
   missingInfo: z.array(z.string()),
   followUpQuestions: z.array(z.string()).max(RULES_CONFIG.maxQuestionsPerRound),
+  questionOptions: z.array(z.object({
+    question: z.string().min(1),
+    options: z.array(z.string().min(1)).min(2).max(6),
+  })).max(RULES_CONFIG.maxQuestionsPerRound),
   urgency: z.enum(['green', 'yellow', 'red']),
   confidence: z.enum(['high', 'medium', 'low']),
   safeToDrive: z.boolean().nullable(),
@@ -227,7 +231,9 @@ const SHARED_RULES = `
 12) safeToDrive فقط وقتی true باشد که هیچ نشانهٔ مهمی از خطر فوری نباشد؛ در ابهام جدی null بده؛ وقتی urgency=red است هرگز true نده.
 13) evidence فقط نشانه‌هایی باشد که کاربر واقعاً گفته یا از داده صوتی/فنی ارائه‌شده به‌دست آمده؛ چیزی اختراع نکن.
 14) حداکثر ${RULES_CONFIG.maxCauses} علت در پاسخ نهایی و به ترتیب احتمال؛ why کوتاه باشد.
-15) mechanicQuestions در پاسخ نهایی فقط چک‌لیست مفید برای کاربر در تعمیرگاه است؛ در مرحله پرسش، سؤال‌های کاربر در followUpQuestions قرار می‌گیرند.
+15) در responseMode=questions برای هر سؤال یک questionOptions متناظر بده: گزینه‌ها کوتاه، قابل لمس، تا حد ممکن mutually exclusive و حداکثر ۶ گزینه باشند. گزینه «مطمئن نیستم» را وقتی لازم است اضافه کن. کاربر نباید مجبور به تایپ پاسخ باشد.
+16) mechanicQuestions در پاسخ نهایی فقط چک‌لیست مفید برای کاربر در تعمیرگاه است؛ در مرحله پرسش، سؤال‌های کاربر در followUpQuestions و questionOptions قرار می‌گیرند.
+17) تعداد questionOptions باید با سؤال‌های followUpQuestions هماهنگ باشد و برای همه سؤال‌های مرحله گزینه ارائه شود.
 16) پاسخ را فشرده نگه دار و از تکرار پرهیز کن.
 `;
 
@@ -240,6 +246,9 @@ function buildJsonSchema(): string {
   "followUpRound": 0 | 1 | 2,
   "missingInfo": ["اطلاعات مهمی که هنوز کم است"],
   "followUpQuestions": ["سؤال دقیق ۱", "سؤال دقیق ۲"],
+  "questionOptions": [
+    { "question": "متن همان سؤال", "options": ["گزینه ۱", "گزینه ۲", "مطمئن نیستم"] }
+  ],
   "urgency": "green" | "yellow" | "red",
   "confidence": "high" | "medium" | "low",
   "safeToDrive": true | false | null,
@@ -263,6 +272,8 @@ function buildJsonSchema(): string {
 
 اگر responseMode=questions:
 - followUpQuestions را با حداکثر ${RULES_CONFIG.maxQuestionsPerRound} سؤال واقعی پر کن.
+- برای هر سؤال، یک مورد متناظر در questionOptions بده و گزینه‌های کوتاه و قابل لمس ارائه کن؛ حداکثر ۶ گزینه برای هر سؤال.
+- کاربر قرار است با لمس گزینه‌ها پاسخ دهد، نه با تایپ.
 - causes را خالی [] قرار بده.
 - mechanicQuestions را خالی [] قرار بده.
 - statusSummary فقط یک جمله کوتاه دربارهٔ اینکه چرا اطلاعات بیشتری لازم است باشد.
@@ -270,7 +281,7 @@ function buildJsonSchema(): string {
 - هزینه و تبلیغ را در این مرحله نیاور.
 
 اگر responseMode=diagnosis:
-- followUpQuestions و missingInfo را خالی [] قرار بده.
+- followUpQuestions، questionOptions و missingInfo را خالی [] قرار بده.
 - گزارش کامل اما فشرده تولید کن.
 - اگر این نتیجه به‌خاطر قانون ۱۰ (خطر فوری) زودتر از موعد صادر شده، این را صریح در warnings بگو.
 `;
