@@ -12,7 +12,7 @@ import {
   computeReferralCommission,
   isMockAuthority,
 } from '@/lib/payment';
-import { amountsMatchTomanAndRial, verifyZibalPayment } from '@/lib/zibal';
+import { amountsMatchTomanAndRial, purchaseOrderId, verifyZibalPayment } from '@/lib/zibal';
 import { referralPercentage } from '@/lib/constants';
 
 
