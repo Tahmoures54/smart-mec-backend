@@ -141,7 +141,6 @@ export function DiagnoseApp() {
   const [followUp, setFollowUp] = useState('');
   const [loadingTip, setLoadingTip] = useState(0);
   const resultRef = useRef<HTMLDivElement>(null);
-  const [resultPulse, setResultPulse] = useState(0);
 
   const selectedCustom = carId === 'custom';
 
@@ -227,10 +226,12 @@ export function DiagnoseApp() {
 
   useEffect(() => {
     if (!result) return;
-    setResultPulse((n) => n + 1);
     const t = window.setTimeout(() => {
       const el = resultRef.current;
       if (!el) return;
+      el.classList.remove('diagnose-result-arrive');
+      void el.offsetWidth;
+      el.classList.add('diagnose-result-arrive');
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
     return () => window.clearTimeout(t);
@@ -555,7 +556,6 @@ export function DiagnoseApp() {
         <div
           ref={resultRef}
           id="diagnose-result"
-          key={resultPulse}
           className="mt-8 scroll-mt-24 diagnose-result-arrive"
         >
           <DiagnoseResultView text={result.text} structured={result.structured} />
