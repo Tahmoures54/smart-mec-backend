@@ -17,26 +17,64 @@ import { referralPercentage } from '@/lib/constants';
 const ZIBAL_VERIFY_URL = 'https://gateway.zibal.ir/v1/verify';
 const ZIBAL_TIMEOUT_MS = 15000;
 
+/**
+ * صفحه نتیجه پرداخت.
+ * - وب: مستقیم به خانه / عیب‌یابی
+ * - اپ: اول deep link، اگر باز نشد بعد از ۲ ثانیه به وب برمی‌گردد
+ */
 function page(title: string, message: string, ok: boolean, fromWeb = false) {
-  const backHref = fromWeb ? '/diagnose' : ok ? 'smartmec://success' : 'smartmec://failed';
-  const backLabel = fromWeb ? 'بازگشت به عیب‌یابی' : 'بازگشت به اپلیکیشن';
+  const webSuccess = '/?paid=1';
+  const webFail = '/buy?paid=0';
+  const webHref = ok ? webSuccess : webFail;
+  const appDeep = ok ? 'smartmec://success' : 'smartmec://failed';
+
+  const backHref = fromWeb ? webHref : appDeep;
+  const backLabel = fromWeb
+    ? ok
+      ? 'بازگشت به صفحه اصلی'
+      : 'بازگشت به خرید'
+    : 'بازگشت به اپلیکیشن';
+
   const autoJs = fromWeb
-    ? ''
-    : `<script>setTimeout(function(){try{location.replace(${JSON.stringify(
-        ok ? 'smartmec://success' : 'smartmec://failed'
-      )});}catch(e){}},400);</script>`;
+    ? `<script>setTimeout(function(){try{location.replace(${JSON.stringify(
+        webHref
+      )});}catch(e){location.href=${JSON.stringify(webHref)};}},600);</script>`
+    : `<script>
+(function(){
+  var web=${JSON.stringify(webHref)};
+  var app=${JSON.stringify(appDeep)};
+  try{location.href=app;}catch(e){}
+  setTimeout(function(){try{location.replace(web);}catch(e){location.href=web;}},1800);
+})();
+</script>`;
+
   const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtml(
     title
   )}</title>
-  <meta http-equiv="refresh" content="${fromWeb ? '2' : '1'};url=${backHref}" />
+  <meta http-equiv="refresh" content="${fromWeb ? '1' : '3'};url=${escapeHtml(webHref)}" />
   ${autoJs}
   <style>body{font-family:Tahoma,sans-serif;background:#140C08;color:#f5e6d3;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px;text-align:center}
   .card{max-width:420px;background:#1A120E;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:28px}
-  .ok{color:#66bb6a}.bad{color:#e57373}a{display:inline-block;margin-top:18px;padding:12px 20px;border-radius:12px;background:#ff9800;color:#111;text-decoration:none;font-weight:700}</style></head>
+  .ok{color:#66bb6a}.bad{color:#e57373}
+  a{display:inline-block;margin:8px 6px 0;padding:12px 20px;border-radius:12px;background:#ff9800;color:#111;text-decoration:none;font-weight:700}
+  a.secondary{background:transparent;border:1px solid rgba(255,255,255,.2);color:#f5e6d3}</style></head>
   <body><div class="card"><h1 class="${ok ? 'ok' : 'bad'}">${escapeHtml(
     title
-  )}</h1><p>${message}</p><a href="${backHref}">${backLabel}</a></div></body></html>`;
-  return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  )}</h1><p>${message}</p>
+  <p style="font-size:13px;opacity:.7;margin-top:12px">در حال بازگشت…</p>
+  <a href="${escapeHtml(webHref)}">${fromWeb ? backLabel : 'ادامه در سایت'}</a>
+  ${
+    !fromWeb
+      ? `<a class="secondary" href="${escapeHtml(appDeep)}">${backLabel}</a>`
+      : ''
+  }
+  </div></body></html>`;
+  return new NextResponse(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  });
 }
 
 function getUserById(tx: any, userId: number) {
@@ -89,7 +127,9 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const trackId = url.searchParams.get('trackId') || url.searchParams.get('authority') || '';
     let productId = (url.searchParams.get('productId') || '') as ProductId;
-    const fromWeb = url.searchParams.get('from') === 'web';
+    // زیبال گاهی query را نگه می‌دارد؛ اگر نبود، رفتار وب‌پسند (برگشت به سایت)
+    const fromParam = url.searchParams.get('from');
+    const fromWeb = fromParam === 'web' || fromParam !== 'app';
     const zibalSuccess = url.searchParams.get('success');
 
     if (zibalSuccess === '0') {
@@ -166,7 +206,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // better-sqlite3: callback باید همگام باشد
     const claimed = db.transaction((tx) => {
       const rows = tx
         .update(purchases)
