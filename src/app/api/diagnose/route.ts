@@ -15,7 +15,7 @@ import {
   looksLikeCustomCarLabel,
 } from '@/lib/validation';
 import { isGoldenActive } from '@/lib/user-status';
-import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagnose-billing';
+import { hasFreeQuota, consumeDiagnoseQuota, consumeQuestionQuota, saveDiagnostic } from '@/lib/diagnose-billing';
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
 import { SYSTEM_PROMPT_FREE, SYSTEM_PROMPT_PREMIUM } from '@/lib/prompts';
@@ -104,7 +104,9 @@ export async function POST(request: NextRequest) {
 
     if (!golden) {
       const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
-      if (!freeAvailable && user.credits <= 0) {
+      const isAnswerToQuestion = previousWasQuestions;
+      const hasHalfCredit = user.credits >= 0.5;
+      if (!freeAvailable && !isAnswerToQuestion && user.credits <= 0) {
         throw new InsufficientCreditsError(
           'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
         );
@@ -170,11 +172,11 @@ export async function POST(request: NextRequest) {
 
     try {
       const txResult = db.transaction((tx) => {
-        // Clarification rounds are part of the same diagnosis session.
-        // Do not consume a paid/free diagnosis merely for asking questions.
+        // Each clarification question costs at most 0.5 paid credit.
+        // The final diagnosis consumes one normal diagnosis quota/credit.
         const billing =
           structured?.responseMode === 'questions'
-            ? { remainingFree: null, remainingCredits: user.credits, usedFree: false }
+            ? consumeQuestionQuota(tx, user, currentMonth, now)
             : consumeDiagnoseQuota(tx, user, now);
         const id = saveDiagnostic(tx, {
           userId: user.id,
