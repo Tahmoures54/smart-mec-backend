@@ -41,9 +41,9 @@ export async function GET() {
     meta: {
       count: data.length,
       psychology: {
-        entry: 'credit_5',
-        popular: 'credit_20',
-        bestValue: 'credit_50',
+        entry: 'credit_10',
+        popular: 'credit_35',
+        bestValue: 'credit_90',
         smartSuggest: 'gold_monthly',
       },
     },
