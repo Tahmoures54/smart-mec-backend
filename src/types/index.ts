@@ -68,14 +68,11 @@ export interface Car {
 
 // ─── Products ───
 export type ProductId =
-  | 'credit_5'
   | 'credit_10'
-  | 'credit_20'
-  | 'credit_50'
-  | 'credit_100'
+  | 'credit_35'
+  | 'credit_90'
   | 'gold_monthly'
   | 'gold_quarterly'
-  | 'gold_yearly'
   | 'blue_tick'
   | 'garage_silver_30'
   | 'garage_gold_30';
@@ -93,6 +90,8 @@ export interface Product {
   goldenDays: number;
   monthlyLimit: number;
   days: number;
+  dailyCap?: number;
+  periodCap?: number;
   /** برچسب روان‌شناسی: محبوب / به‌صرفه / شروع */
   badge?: string;
   /** کارت برجسته در UI */
@@ -112,118 +111,81 @@ export interface Product {
  * - سه‌ماهه/سالانه: تخفیف آشکار نسبت به ماهانه (تعهد بلندمدت)
  */
 export const PRODUCTS: Record<ProductId, Product> = {
-  credit_5: {
-    id: 'credit_5',
-    name: 'شروع سریع',
-    title: '۵ عیب‌یابی',
-    subtitle: 'برای یک مشکل فوری — بدون تعهد',
-    price: 49000,
-    compareAtPrice: 65000,
-    credits: 5,
-    goldenDays: 0,
-    monthlyLimit: 0,
-    days: 0,
-    badge: 'شروع آسان',
-    sortOrder: 10,
-  },
   credit_10: {
     id: 'credit_10',
-    name: 'بسته کاربردی',
+    name: 'بسته شروع',
     title: '۱۰ عیب‌یابی',
-    subtitle: 'چند مشکل یا پیگیری همان خودرو',
-    price: 89000,
-    compareAtPrice: 120000,
+    subtitle: 'قیمت پایه برای شروع',
+    price: 19990,
+    compareAtPrice: 19990,
     credits: 10,
     goldenDays: 0,
     monthlyLimit: 0,
     days: 0,
+    sortOrder: 10,
+  },
+  credit_35: {
+    id: 'credit_35',
+    name: 'بسته کاربردی',
+    title: '۳۵ عیب‌یابی',
+    subtitle: 'تخفیف حجمی برای استفاده بیشتر',
+    price: 59000,
+    compareAtPrice: 69965,
+    credits: 35,
+    goldenDays: 0,
+    monthlyLimit: 0,
+    days: 0,
+    badge: 'محبوب',
+    highlight: true,
     sortOrder: 20,
   },
-  credit_20: {
-    id: 'credit_20',
-    name: 'انتخاب اکثر راننده‌ها',
-    title: '۲۰ عیب‌یابی',
-    subtitle: 'تعادل قیمت و تعداد — مناسب اکثر افراد',
-    price: 149000,
-    compareAtPrice: 200000,
-    credits: 20,
+  credit_90: {
+    id: 'credit_90',
+    name: 'بسته پرمصرف',
+    title: '۹۰ عیب‌یابی',
+    subtitle: 'کمترین قیمت هر عیب‌یابی در بسته‌های اعتباری',
+    price: 129000,
+    compareAtPrice: 179910,
+    credits: 90,
     goldenDays: 0,
     monthlyLimit: 0,
     days: 0,
-    badge: 'محبوب‌ترین',
+    badge: 'به‌صرفه',
     highlight: true,
     sortOrder: 30,
-  },
-  credit_50: {
-    id: 'credit_50',
-    name: 'به‌صرفه‌ترین واحد',
-    title: '۵۰ عیب‌یابی',
-    subtitle: 'کمترین قیمت هر عیب‌یابی — خانواده / چند خودرو',
-    price: 299000,
-    compareAtPrice: 400000,
-    credits: 50,
-    goldenDays: 0,
-    monthlyLimit: 0,
-    days: 0,
-    badge: 'بهترین ارزش',
-    highlight: true,
-    sortOrder: 40,
-  },
-  credit_100: {
-    id: 'credit_100',
-    name: 'ویژه پرمصرف',
-    title: '۱۰۰ عیب‌یابی',
-    subtitle: 'برای کسانی که مدام سوال دارند',
-    price: 499000,
-    compareAtPrice: 700000,
-    credits: 100,
-    goldenDays: 0,
-    monthlyLimit: 0,
-    days: 0,
-    sortOrder: 50,
   },
   gold_monthly: {
     id: 'gold_monthly',
     name: 'طلایی ماهانه',
-    title: '۳۰ روز دسترسی طلایی',
-    subtitle: 'تا ۱۰۰ عیب‌یابی در ماه — سوال قطع نمی‌شود',
-    price: 179000,
-    compareAtPrice: 199000,
+    title: '۳۰ روز طلایی',
+    subtitle: 'تا ۱۰ عیب‌یابی در روز، حداکثر ۱۵۰ عیب‌یابی در دوره',
+    price: 149000,
+    compareAtPrice: 149000,
     credits: 0,
     goldenDays: 30,
-    monthlyLimit: 100,
+    monthlyLimit: 150,
     days: 30,
+    dailyCap: 10,
+    periodCap: 150,
     badge: 'پیشنهاد هوشمند',
     highlight: true,
-    sortOrder: 60,
+    sortOrder: 40,
   },
   gold_quarterly: {
     id: 'gold_quarterly',
     name: 'طلایی سه‌ماهه',
     title: '۹۰ روز طلایی',
-    subtitle: 'حدود ۲۵٪ ارزان‌تر از سه ماه جداگانه',
-    price: 449000,
-    compareAtPrice: 537000,
+    subtitle: 'تا ۱۵ عیب‌یابی در روز، حداکثر ۵۰۰ عیب‌یابی در دوره',
+    price: 399000,
+    compareAtPrice: 447000,
     credits: 0,
     goldenDays: 90,
-    monthlyLimit: 100,
+    monthlyLimit: 500,
     days: 90,
+    dailyCap: 15,
+    periodCap: 500,
     badge: 'صرفه‌جویی',
-    sortOrder: 70,
-  },
-  gold_yearly: {
-    id: 'gold_yearly',
-    name: 'طلایی سالانه',
-    title: '۳۶۵ روز طلایی',
-    subtitle: 'کمترین هزینه ماهانه — برای همراه همیشگی',
-    price: 1290000,
-    compareAtPrice: 2148000,
-    credits: 0,
-    goldenDays: 365,
-    monthlyLimit: 100,
-    days: 365,
-    badge: 'حداکثر تخفیف',
-    sortOrder: 80,
+    sortOrder: 50,
   },
   blue_tick: {
     id: 'blue_tick',
@@ -235,7 +197,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     goldenDays: 0,
     monthlyLimit: 0,
     days: 0,
-    sortOrder: 90,
+    sortOrder: 60,
   },
   garage_silver_30: {
     id: 'garage_silver_30',
@@ -247,7 +209,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     goldenDays: 0,
     monthlyLimit: 0,
     days: 30,
-    sortOrder: 100,
+    sortOrder: 70,
   },
   garage_gold_30: {
     id: 'garage_gold_30',
@@ -260,7 +222,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     monthlyLimit: 0,
     days: 30,
     badge: 'ویژه تعمیرگاه',
-    sortOrder: 110,
+    sortOrder: 80,
   },
 };
 
