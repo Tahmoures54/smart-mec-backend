@@ -19,7 +19,8 @@ function enrich(product: Product) {
 
   return {
     ...product,
-    currency: 'IRT',
+    currency: 'TOMAN',
+    gatewayCurrency: 'RIAL',
     pricePerCredit: perCredit,
     pricePerMonth: perMonth,
     hasDiscount,
