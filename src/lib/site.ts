@@ -4,7 +4,7 @@ export const SITE = {
   tagline: 'گنجینه دانش خودرویی ایران',
   subtitle: 'عیب را دقیق بشناس، هزینه را کنترل کن',
   description:
-    'عیب‌یابی خودرو با هوش مصنوعی در نسخه وب یا اپ اندروید؛ از روی شرح مشکل یا صدای موتور — تا عیب را بهتر بشناسی و هزینه را کنترل کنی.',
+    'عیب‌یابی اولیه خودرو با کمک هوش مصنوعی در نسخه وب یا اپ اندروید؛ مشکل را شرح بده یا صدای موتور را بفرست تا سرنخ‌های مفیدتری برای بررسی بگیری.',
   supportEmail: 'support@smart-mec.ir',
   packageId: 'ir.smartmec.app',
   githubApp: 'https://github.com/Tahmoures54/smart-mechanic-flutter',
