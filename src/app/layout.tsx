@@ -20,6 +20,7 @@ export const metadata: Metadata = {
     template: `%s | ${SITE.nameFa}`,
   },
   description: SITE.description,
+  keywords: ['عیب یابی خودرو', 'عیب‌یابی ماشین', 'مکانیک هوشمند', 'صدای موتور', 'مشکل خودرو', 'تعمیرگاه', 'راهنمای تعمیر خودرو'],
   applicationName: SITE.nameFa,
   icons: {
     icon: '/branding/logo.svg',
