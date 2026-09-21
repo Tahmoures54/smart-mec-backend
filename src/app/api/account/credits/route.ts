@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { users, monthlyFreeUsage } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
-import { getUserFromRequest } from '@/lib/auth';
+import { getUserFromRequest, isAdminPhone } from '@/lib/auth';
 import { handleError, BadRequestError } from '@/lib/error-handler';
 import { logger } from '@/utils/logger';
 import {
@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       data: {
         id: user.id,
         phone: user.phone,
+        isAdmin: isAdminPhone(user.phone),
         credits: user.credits,
         isGolden: golden,
         isGoldenActive: golden,
