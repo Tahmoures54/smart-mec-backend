@@ -1,9 +1,39 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { SITE } from '@/lib/site';
 import { StatusBadge } from './status-badge';
+import { readWebToken } from '@/lib/web-auth';
 
 export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const token = readWebToken();
+    if (!token) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch('/api/account/credits', {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const body = await response.json();
+        return body?.success ? body.data : null;
+      })
+      .then((profile) => setIsAdmin(profile?.isAdmin === true))
+      .catch(() => setIsAdmin(false));
+
+    return () => controller.abort();
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#140C08]/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
@@ -25,21 +55,16 @@ export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-amber-100/80 md:flex">
-          <Link href="/diagnose" className="hover:text-white">
-            عیب‌یابی
-          </Link>
-          <Link href="/buy" className="hover:text-white">
-            شارژ اعتبار
-          </Link>
-          <Link href="/garage" className="hover:text-white">
-            ثبت تعمیرگاه
-          </Link>
-          <Link href="/#features" className="hover:text-white">
-            امکانات
-          </Link>
-          <Link href="/#download" className="hover:text-white">
-            دانلود اپ
-          </Link>
+          <Link href="/diagnose" className="hover:text-white">عیب‌یابی</Link>
+          <Link href="/buy" className="hover:text-white">شارژ اعتبار</Link>
+          <Link href="/garage" className="hover:text-white">ثبت تعمیرگاه</Link>
+          <Link href="/#features" className="hover:text-white">امکانات</Link>
+          <Link href="/#download" className="hover:text-white">دانلود اپ</Link>
+          {isAdmin ? (
+            <Link href="/admin" className="font-semibold text-orange-300 hover:text-white">
+              پنل مدیریت
+            </Link>
+          ) : null}
           {showStatus ? <StatusBadge /> : null}
         </nav>
 
