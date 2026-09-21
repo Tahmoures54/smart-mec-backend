@@ -12,7 +12,7 @@ export default function AdminPage() {
     if (typeof window === 'undefined') return '';
     return localStorage.getItem('admin_token') || '';
   });
-  const [phone, setPhone] = useState('09160684552');
+  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [tab, setTab] = useState<Tab>('dashboard');
