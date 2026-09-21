@@ -27,5 +27,6 @@ jobs:
           liara deploy \
             --app="smart-mec" \
             --platform=docker \
+            --build-location="germany" \
             --api-token="$TOKEN" \
             --no-app-logs
