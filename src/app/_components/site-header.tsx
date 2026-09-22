@@ -12,10 +12,8 @@ export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
 
   useEffect(() => {
     const token = readWebToken();
-    if (!token) {
-      setIsAdmin(false);
-      return;
-    }
+    // isAdmin already starts as false — no synchronous setState needed
+    if (!token) return;
 
     const controller = new AbortController();
     fetch('/api/account/credits', {
@@ -28,8 +26,16 @@ export function SiteHeader({ showStatus = true }: { showStatus?: boolean }) {
         const body = await response.json();
         return body?.success ? body.data : null;
       })
-      .then((profile) => setIsAdmin(profile?.isAdmin === true))
-      .catch(() => setIsAdmin(false));
+      .then((profile) => {
+        if (!controller.signal.aborted) {
+          setIsAdmin(profile?.isAdmin === true);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setIsAdmin(false);
+        }
+      });
 
     return () => controller.abort();
   }, []);
