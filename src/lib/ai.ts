@@ -28,8 +28,10 @@ async function callDeepSeek(options: {
           { role: 'system', content: options.systemPrompt },
           { role: 'user', content: options.userContent },
         ],
-        temperature: 0.4,
+        temperature: 0.3,
         max_tokens: options.maxTokens,
+        // پاسخ کوتاه‌تر و پایدارتر → latency کمتر
+        top_p: 0.9,
         user: `user_${options.userId}`,
       }),
       signal: controller.signal,
@@ -123,10 +125,11 @@ export async function chatCompletion(options: {
     );
   }
 
+  // پیش‌فرض‌های بهینه‌شده برای latency (قابل override با env)
   const timeoutMs =
-    options.timeoutMs ?? parseInt(process.env.AI_TIMEOUT_MS || '75000', 10);
+    options.timeoutMs ?? parseInt(process.env.AI_TIMEOUT_MS || '45000', 10);
   const maxTokens =
-    options.maxTokens ?? parseInt(process.env.AI_MAX_TOKENS || '6000', 10);
+    options.maxTokens ?? parseInt(process.env.AI_MAX_TOKENS || '1800', 10);
 
   const base = {
     systemPrompt: options.systemPrompt,
@@ -156,8 +159,8 @@ export async function chatCompletion(options: {
       try {
         return await callDeepSeek({
           ...base,
-          timeoutMs: Math.min(timeoutMs, 55000),
-          maxTokens: Math.min(maxTokens, 4500),
+          timeoutMs: Math.min(timeoutMs, 35000),
+          maxTokens: Math.min(maxTokens, 1400),
         });
       } catch (retryErr: unknown) {
         if (retryErr instanceof AppError) throw retryErr;

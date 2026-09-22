@@ -17,7 +17,7 @@ import { z } from 'zod';
  *    تغییر را اینجا بده، نه داخل متن فارسی پراکنده.
  * ========================================================================= */
 
-export const PROMPT_VERSION = 4;
+export const PROMPT_VERSION = 5;
 
 export const RULES_CONFIG = {
   /** حداکثر تعداد سؤال در هر دور — یکجا نمایش داده می‌شوند تا کاربر خسته نشود. */
@@ -97,6 +97,11 @@ const DANGER_KEYWORDS = [
 export function containsDangerSignal(text: string): boolean {
   const normalized = text.toLowerCase();
   return DANGER_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+
+/** تشخیص درخواست اپ موبایل (سیاست پاسخ مستقیم). */
+export function isMobileDirectDiagnosisRequest(description: string): boolean {
+  return /\[دستور اپلیکیشن:/.test(description) || /هیچ سؤالی نپرس/.test(description);
 }
 
 /* ============================================================================
@@ -284,6 +289,49 @@ function buildJsonSchema(): string {
 `;
 }
 
+/** پرامپت سبک مخصوص اپ — فقط diagnosis، بدون اسکما/قوانین سؤال. */
+const MOBILE_DIAGNOSIS_PROMPT = `
+تو «مکانیک هوشمند» هستی. فقط فارسی. لحن صمیمی و کاربردی.
+
+الزام:
+- همیشه responseMode="diagnosis". هیچ سؤالی نپرس.
+- با دادهٔ موجود ۲ تا ۳ علت محتمل بده (چرا + چک ساده).
+- اگر اطلاعات کم است confidence=low و کمبود را در warnings/nextStep بنویس.
+- علائم خطر (دود غلیظ، بوی سوختگی شدید، صدای برخورد فلز، ترمز نگرفتن، فرمان قفل) → urgency=red، safeToDrive=false، رانندگی نکند.
+- قیمت قطعی نده؛ costBand: low|medium|high.
+- evidence فقط از گفتهٔ کاربر؛ چیزی اختراع نکن.
+- پاسخ فشرده؛ whyها حداکثر یک جمله.
+
+فقط JSON معتبر، بدون markdown:
+{
+  "responseMode": "diagnosis",
+  "followUpRound": 0,
+  "missingInfo": [],
+  "followUpQuestions": [],
+  "questionOptions": [],
+  "urgency": "green" | "yellow" | "red",
+  "confidence": "high" | "medium" | "low",
+  "safeToDrive": true | false | null,
+  "evidence": ["..."],
+  "statusSummary": "یک جمله",
+  "causes": [
+    {
+      "title": "...",
+      "probability": "high" | "medium" | "low",
+      "why": "...",
+      "costBand": "low" | "medium" | "high",
+      "costEstimate": null,
+      "diyCheck": "..." یا null
+    }
+  ],
+  "mechanicQuestions": ["چک مفید"],
+  "warnings": [],
+  "nextStep": "اقدام بعدی",
+  "footer": "جمله کوتاه تشویق به ادامه گفتگو"
+}
+[schemaVersion: ${PROMPT_VERSION}-mobile]
+`;
+
 const FOLLOWUP_RULES = `
 در متن کاربر ممکن است [عیب‌یابی قبلی] وجود داشته باشد. آن نتیجه و شرح قبلی را بخوان و پاسخ جدید کاربر را با آن ترکیب کن.
 برای اپ موبایل، حتی اگر نتیجه قبلی responseMode=questions بوده، سؤال جدید تولید نکن. پاسخ جدید باید همیشه diagnosis باشد و از تکرار متن/علت‌های قبلی تا حد امکان جلوگیری کند.
@@ -296,15 +344,19 @@ const AUDIO_RULES = `
 اگر ویژگی صوتی مشخصی در دسترس نبود، این را صادقانه در evidence/statusSummary بگو؛ چیزی از خودت اختراع نکن.
 `;
 
-export type PromptTier = 'free' | 'premium' | 'audio';
+export type PromptTier = 'free' | 'premium' | 'audio' | 'mobile';
 
 const TIER_FOOTER_HINT: Record<PromptTier, string> = {
   free: 'در footer می‌توانی فقط در پاسخ نهایی یک اشاره کوتاه و غیرمزاحم به اشتراک طلایی بدهی.',
   premium: 'در footer پاسخ نهایی بنویس که کاربر می‌تواند همین‌جا سؤال پیگیری بپرسد.',
   audio: 'در footer می‌توانی فقط در پاسخ نهایی یک اشاره کوتاه و غیرمزاحم به اشتراک طلایی بدهی.',
+  mobile: 'در footer یک جمله کوتاه کاربر را به ادامه گفتگو تشویق کن.',
 };
 
 export function getSystemPrompt(tier: PromptTier): string {
+  if (tier === 'mobile') {
+    return MOBILE_DIAGNOSIS_PROMPT;
+  }
   const parts = [
     SHARED_RULES,
     FOLLOWUP_RULES,
@@ -320,3 +372,5 @@ export function getSystemPrompt(tier: PromptTier): string {
 export const SYSTEM_PROMPT_FREE = getSystemPrompt('free');
 export const SYSTEM_PROMPT_PREMIUM = getSystemPrompt('premium');
 export const SYSTEM_PROMPT_AUDIO = getSystemPrompt('audio');
+/** پرامپت سبک اپ موبایل — همیشه diagnosis، کوتاه‌تر و سریع‌تر. */
+export const SYSTEM_PROMPT_MOBILE = getSystemPrompt('mobile');

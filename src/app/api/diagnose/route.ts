@@ -18,7 +18,12 @@ import { isGoldenActive } from '@/lib/user-status';
 import { hasFreeQuota, consumeDiagnoseQuota, consumeQuestionQuota, saveDiagnostic } from '@/lib/diagnose-billing';
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
-import { SYSTEM_PROMPT_FREE, SYSTEM_PROMPT_PREMIUM } from '@/lib/prompts';
+import {
+  SYSTEM_PROMPT_FREE,
+  SYSTEM_PROMPT_PREMIUM,
+  SYSTEM_PROMPT_MOBILE,
+  isMobileDirectDiagnosisRequest,
+} from '@/lib/prompts';
 import { structuredToMarkdown, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
 import {
   formatGaragesForChat,
@@ -27,6 +32,20 @@ import {
 import type { User } from '@/types';
 
 export const maxDuration = 90;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,6 +120,7 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const golden = isGoldenActive(user, now);
     const currentMonth = now.toISOString().slice(0, 7);
+    const mobileDirect = isMobileDirectDiagnosisRequest(description);
 
     let followUpBlock = '';
     let previousFollowUpRound = 0;
@@ -117,12 +137,15 @@ export async function POST(request: NextRequest) {
       const previousStructured = tryParseStructuredDiagnose(prev.result);
       previousFollowUpRound = Number(previousStructured?.followUpRound || 0);
       previousWasQuestions = previousStructured?.responseMode === 'questions';
-      followUpBlock = `\n\n[عیب‌یابی قبلی]\nشماره سؤال قبلی: ${previousFollowUpRound}\nشرح: ${prev.description}\nنتیجه:\n${prev.result.slice(0, 3000)}\n`;
+      // کانتکست قبلی کوتاه‌تر = توکن ورودی کمتر = سرعت بیشتر
+      const prevResultSnippet = prev.result.slice(0, mobileDirect ? 900 : 1800);
+      followUpBlock = `\n\n[عیب‌یابی قبلی]\nشرح: ${prev.description.slice(0, 400)}\nنتیجه:\n${prevResultSnippet}\n`;
     }
 
     const isAnswerToQuestion = previousWasQuestions;
     const needsHalfCredit = isAnswerToQuestion || !previousDiagnosticId;
-    const forceFinalDiagnosis = previousWasQuestions && previousFollowUpRound >= 5;
+    const forceFinalDiagnosis =
+      mobileDirect || (previousWasQuestions && previousFollowUpRound >= 5);
 
     if (!golden) {
       const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
@@ -137,12 +160,40 @@ export async function POST(request: NextRequest) {
 
     const carDetails = buildCarDetails(carId, year, customCarName);
 
-    logger.info('Diagnose requested', { userId: user.id, carId, year, ip, descLen: description.length, golden });
+    const systemPrompt = mobileDirect
+      ? SYSTEM_PROMPT_MOBILE
+      : golden
+        ? SYSTEM_PROMPT_PREMIUM
+        : SYSTEM_PROMPT_FREE;
 
-    const { text: resultTextRaw } = await chatCompletion({
-      systemPrompt: golden ? SYSTEM_PROMPT_PREMIUM : SYSTEM_PROMPT_FREE,
-      userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی/پاسخ جدید کاربر]\n${description}\n\n[قواعد مرحله‌ای]\nاین یک درخواست اولیه است اگر previousDiagnosticId وجود ندارد. اگر previousDiagnosticId وجود دارد، این متن پاسخ کاربر به مرحله قبل است. ${previousWasQuestions ? `مرحله قبلی سؤال‌محور بوده و شماره سؤال آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس.` : ''}${forceFinalDiagnosis ? ' حتماً اکنون فقط responseMode=diagnosis بده و هیچ سؤال دیگری نپرس؛ سقف پنج سؤال تکمیل شده است.' : ''}`,
+    const stageRules = mobileDirect
+      ? 'همیشه responseMode=diagnosis بده. هیچ سؤالی نپرس. پاسخ فشرده باشد.'
+      : `این یک درخواست اولیه است اگر previousDiagnosticId وجود ندارد. اگر previousDiagnosticId وجود دارد، این متن پاسخ کاربر به مرحله قبل است. ${previousWasQuestions ? `مرحله قبلی سؤال‌محور بوده و شماره سؤال آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس.` : ''}${forceFinalDiagnosis ? ' حتماً اکنون فقط responseMode=diagnosis بده و هیچ سؤال دیگری نپرس.' : ''}`;
+
+    logger.info('Diagnose requested', {
       userId: user.id,
+      carId,
+      year,
+      ip,
+      descLen: description.length,
+      golden,
+      mobileDirect,
+      promptTier: mobileDirect ? 'mobile' : golden ? 'premium' : 'free',
+    });
+
+    const aiStarted = Date.now();
+    const { text: resultTextRaw } = await chatCompletion({
+      systemPrompt,
+      userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی/پاسخ جدید کاربر]\n${description}\n\n[قواعد]\n${stageRules}`,
+      userId: user.id,
+      // مسیر موبایل: سقف توکن و timeout سخت‌گیرانه‌تر
+      maxTokens: mobileDirect ? 1400 : undefined,
+      timeoutMs: mobileDirect ? 40000 : undefined,
+    });
+    logger.info('Diagnose AI done', {
+      userId: user.id,
+      ms: Date.now() - aiStarted,
+      rawLen: resultTextRaw.length,
     });
 
     const structured = tryParseStructuredDiagnose(resultTextRaw);
@@ -157,13 +208,19 @@ export async function POST(request: NextRequest) {
       if (structured?.responseMode === 'questions') {
         // Do not distract a user who is answering clarification questions with garage promotion.
       } else {
-      const promo = await getChatApprovedGaragesNearby({
-        lat: Number.isFinite(userLat) ? userLat : null,
-        lng: Number.isFinite(userLng) ? userLng : null,
-        city: cityHint || null,
-        limit: 3,
-      });
-      resultText = resultText + formatGaragesForChat(promo);
+        // بودجهٔ زمانی کوتاه تا بعد از LLM کاربر معطل تبلیغ نشود
+        const promo = await withTimeout(
+          getChatApprovedGaragesNearby({
+            lat: Number.isFinite(userLat) ? userLat : null,
+            lng: Number.isFinite(userLng) ? userLng : null,
+            city: cityHint || null,
+            limit: 3,
+          }),
+          2500
+        );
+        if (promo) {
+          resultText = resultText + formatGaragesForChat(promo);
+        }
       }
     } catch (e) {
       logger.warn('chat garage promo append failed', e);
@@ -176,10 +233,9 @@ export async function POST(request: NextRequest) {
 
     try {
       const txResult = db.transaction((tx) => {
-        // Each clarification question costs at most 0.5 paid credit.
-        // The final diagnosis consumes one normal diagnosis quota/credit.
+        // اپ موبایل همیشه diagnosis است؛ مسیر questions فقط برای کلاینت‌های قدیمی
         const billing =
-          structured?.responseMode === 'questions'
+          !mobileDirect && structured?.responseMode === 'questions'
             ? consumeQuestionQuota(tx, user, currentMonth, now)
             : consumeDiagnoseQuota(tx, user, now);
         const id = saveDiagnostic(tx, {
@@ -210,6 +266,7 @@ export async function POST(request: NextRequest) {
       diagnosticId,
       usedFree,
       remainingFreeQuestions: golden ? null : remainingFree,
+      totalMs: Date.now() - aiStarted,
     });
 
     return NextResponse.json({
