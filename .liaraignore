@@ -1,9 +1,25 @@
 node_modules
 .next
 .git
+.github
 coverage
 .env
 .env.*
 *.log
 .vercel
 tsconfig.tsbuildinfo
+
+# 21MB+ APK — serve via NEXT_PUBLIC_APK_URL or Liara disk, not image build
+public/downloads
+**/*.apk
+
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+vitest.config.*
+.vscode
+.idea
+*.sqlite
+*.sqlite-*
+*.db
+backups

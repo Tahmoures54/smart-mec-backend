@@ -9,3 +9,24 @@ test-results
 .env
 .env.*
 !.env.example
+
+# heavy / not needed at runtime in image
+public/downloads
+**/*.apk
+
+# tests & tooling
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+vitest.config.*
+eslint.config.*
+.vscode
+.idea
+*.md
+!README.md
+
+# local db / backups
+*.sqlite
+*.sqlite-*
+*.db
+backups

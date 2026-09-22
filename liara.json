@@ -2,6 +2,9 @@
   "platform": "docker",
   "app": "smart-mec",
   "port": 3000,
-  "build": { "dockerfile": "Dockerfile", "location": "germany" },
+  "build": {
+    "dockerfile": "Dockerfile",
+    "location": "germany"
+  },
   "disks": [{ "name": "my-disk", "mountTo": "/app/db" }]
 }
