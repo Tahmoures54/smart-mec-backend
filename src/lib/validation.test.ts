@@ -62,7 +62,12 @@ describe('validateCarId / description / products', () => {
   });
 
   it('accepts catalog product ids only', () => {
-    expect(validateProductId('credit_5')).toBe('credit_5');
+    // کاتالوگ فعلی: credit_10 | credit_35 | credit_90 | gold_* | ...
+    expect(validateProductId('credit_10')).toBe('credit_10');
+    expect(validateProductId('gold_monthly')).toBe('gold_monthly');
+    // alias قدیمی اپ
+    expect(validateProductId('golden_30')).toBe('gold_monthly');
+    expect(() => validateProductId('credit_5')).toThrow(ValidationError);
     expect(() => validateProductId('free_gold')).toThrow(ValidationError);
   });
 
