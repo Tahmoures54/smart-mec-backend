@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, ensureDbReady } from '@/db';
 import { getUserFromRequest } from '@/lib/auth';
 import {
   validateCarId,
@@ -30,6 +30,7 @@ export const maxDuration = 90;
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbReady();
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
     RateLimiter.checkComposite(
@@ -123,6 +124,8 @@ export async function POST(request: NextRequest) {
       systemPrompt: SYSTEM_PROMPT_AUDIO,
       userContent: `[مشخصات خودرو]\n${carDetails}\n\n[اطلاعات صوتی / شرح]\n${description}`,
       userId: user.id,
+      timeoutMs: 30000,
+      maxTokens: 1000,
     });
     const structured = tryParseStructuredDiagnose(resultTextRaw);
     const resultText = structured
