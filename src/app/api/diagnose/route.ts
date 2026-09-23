@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq, desc } from 'drizzle-orm';
-import { db } from '@/db';
+import { db, ensureDbReady } from '@/db';
 import { diagnostics } from '@/db/schema';
 import { getUserFromRequest } from '@/lib/auth';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -49,6 +49,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbReady();
     const user = (await getUserFromRequest(request)) as User;
     const { searchParams } = request.nextUrl;
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10) || 20, 50);
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbReady();
     const user = (await getUserFromRequest(request)) as User;
     const ip = RateLimiter.getIP(request);
     RateLimiter.checkComposite(
@@ -188,7 +190,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       // مسیر موبایل: سقف توکن و timeout سخت‌گیرانه‌تر
       maxTokens: mobileDirect ? 1400 : undefined,
-      timeoutMs: mobileDirect ? 40000 : undefined,
+      timeoutMs: mobileDirect ? 30000 : undefined,
     });
     logger.info('Diagnose AI done', {
       userId: user.id,
