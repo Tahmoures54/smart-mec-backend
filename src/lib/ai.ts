@@ -29,6 +29,9 @@ async function callDeepSeek(options: {
           { role: 'system', content: options.systemPrompt },
           { role: 'user', content: options.userContent },
         ],
+        // برای عیب‌یابی موبایل، reasoning لازم نیست؛ حالت thinking پیش‌فرض V4.1-Flash روشن است.
+        // خاموش‌کردن آن latency را به‌طور محسوسی کم می‌کند.
+        thinking: { type: 'disabled' },
         temperature: 0.3,
         max_tokens: options.maxTokens,
         // پاسخ کوتاه‌تر و پایدارتر → latency کمتر
@@ -155,13 +158,16 @@ export async function chatCompletion(options: {
       abort: isAbort,
     });
 
-    if (isAbort || /fetch|network|ECONNRESET|ETIMEDOUT/i.test(e.message || '')) {
+    // Timeout را دوباره تکرار نکن؛ وگرنه یک درخواست موبایل می‌تواند دو برابر
+    // زمان انتظار طول بکشد و از timeout کلاینت عبور کند.
+    const isTransientNetwork = /fetch|network|ECONNRESET|ETIMEDOUT/i.test(e.message || '');
+    if (!isAbort && isTransientNetwork) {
       logger.info('AI retry once', { userId: options.userId });
       try {
         return await callDeepSeek({
           ...base,
-          timeoutMs: Math.min(timeoutMs, 35000),
-          maxTokens: Math.min(maxTokens, 1400),
+          timeoutMs: Math.min(timeoutMs, 15000),
+          maxTokens: Math.min(maxTokens, 1200),
         });
       } catch (retryErr: unknown) {
         if (retryErr instanceof AppError) throw retryErr;
