@@ -24,6 +24,7 @@ async function callDeepSeek(options: {
       },
       body: JSON.stringify({
         model: options.model,
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: options.systemPrompt },
           { role: 'user', content: options.userContent },
@@ -112,9 +113,9 @@ export async function chatCompletion(options: {
 
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
   const apiEndpoint = (
-    process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1'
+    process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com'
   ).replace(/\/$/, '');
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
 
   if (!apiKey) {
     logger.error('DEEPSEEK_API_KEY is missing in environment');
@@ -127,9 +128,9 @@ export async function chatCompletion(options: {
 
   // پیش‌فرض‌های بهینه‌شده برای latency (قابل override با env)
   const timeoutMs =
-    options.timeoutMs ?? parseInt(process.env.AI_TIMEOUT_MS || '45000', 10);
+    options.timeoutMs ?? parseInt(process.env.AI_TIMEOUT_MS || '30000', 10);
   const maxTokens =
-    options.maxTokens ?? parseInt(process.env.AI_MAX_TOKENS || '1800', 10);
+    options.maxTokens ?? parseInt(process.env.AI_MAX_TOKENS || '1200', 10);
 
   const base = {
     systemPrompt: options.systemPrompt,
