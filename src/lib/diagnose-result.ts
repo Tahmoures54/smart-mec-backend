@@ -4,6 +4,12 @@
 
 import type { StructuredCause, StructuredDiagnose } from '@/types';
 
+/** Max questions kept when parsing (matches RULES_CONFIG.maxQuestionsPerRound). */
+const MAX_FOLLOW_UP_QUESTIONS = 3;
+
+/** Marker so we can strip the embedded JSON when showing history/snippets. */
+export const STRUCTURED_STORAGE_MARKER = '\n\n<!--smart-mec-structured-->\n';
+
 export type SectionKind =
   | 'status'
   | 'causes'
@@ -31,7 +37,7 @@ function classifyTitle(title: string): SectionKind {
 }
 
 export function parseDiagnoseSections(markdown: string): DiagnoseSection[] {
-  const text = (markdown || '').replace(/\r\n/g, '\n').trim();
+  const text = stripStoredStructured(markdown || '').replace(/\r\n/g, '\n').trim();
   if (!text) return [];
 
   const lines = text.split('\n');
@@ -90,7 +96,7 @@ export function extractMechanicQuestions(body: string): string[] {
 }
 
 export function extractCostHints(markdown: string): string[] {
-  const text = markdown || '';
+  const text = stripStoredStructured(markdown || '');
   const hints: string[] = [];
   const patterns = [
     /تخمینی[^\n.]{0,80}/g,
@@ -127,16 +133,54 @@ const COST_FA: Record<string, string> = {
   high: 'سنگین',
 };
 
+/**
+ * Persist display markdown + machine-readable structured JSON so follow-up
+ * requests can recover responseMode / followUpRound after reload from DB.
+ * API responses should keep using the plain markdown; only the DB row is packed.
+ */
+export function packStoredResult(
+  markdown: string,
+  structured: StructuredDiagnose | null | undefined
+): string {
+  if (!structured) return markdown;
+  try {
+    return `${markdown}${STRUCTURED_STORAGE_MARKER}${JSON.stringify(structured)}`;
+  } catch {
+    return markdown;
+  }
+}
+
+/** Remove the trailing structured payload (for UI / AI snippet). */
+export function stripStoredStructured(raw: string): string {
+  if (!raw) return '';
+  const markerIdx = raw.indexOf('<!--smart-mec-structured-->');
+  if (markerIdx >= 0) return raw.slice(0, markerIdx).trimEnd();
+  return raw;
+}
+
 export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | null {
   if (!raw) return null;
   let text = raw.trim();
   const fence = /^```(?:json)?\s*([\s\S]*?)```$/i.exec(text);
   if (fence) text = fence[1].trim();
+
+  // Prefer the explicit storage marker payload when present (after markdown).
+  const markerIdx = text.indexOf('<!--smart-mec-structured-->');
+  if (markerIdx >= 0) {
+    const after = text.slice(markerIdx + '<!--smart-mec-structured-->'.length).trim();
+    const parsed = parseStructuredObject(after);
+    if (parsed) return parsed;
+  }
+
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
+  return parseStructuredObject(text.slice(start, end + 1));
+}
+
+function parseStructuredObject(jsonText: string): StructuredDiagnose | null {
   try {
-    const obj = JSON.parse(text.slice(start, end + 1)) as Partial<StructuredDiagnose>;
+    const obj = JSON.parse(jsonText) as Partial<StructuredDiagnose>;
     if (!obj || typeof obj !== 'object') return null;
     if (!obj.statusSummary && !Array.isArray(obj.causes)) return null;
     const causes: StructuredCause[] = Array.isArray(obj.causes)
@@ -149,19 +193,31 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
           diyCheck: c?.diyCheck ? String(c.diyCheck) : null,
         }))
       : [];
-    const responseMode = String(obj.responseMode || (Array.isArray(obj.followUpQuestions) && obj.followUpQuestions.length ? 'questions' : 'diagnosis'));
-    const followUpRound = Number.isFinite(Number(obj.followUpRound)) ? Math.max(0, Math.min(5, Number(obj.followUpRound))) : 0;
+    const responseMode = String(
+      obj.responseMode ||
+        (Array.isArray(obj.followUpQuestions) && obj.followUpQuestions.length
+          ? 'questions'
+          : 'diagnosis')
+    );
+    const followUpRound = Number.isFinite(Number(obj.followUpRound))
+      ? Math.max(0, Math.min(5, Number(obj.followUpRound)))
+      : 0;
     const missingInfo = Array.isArray(obj.missingInfo)
       ? obj.missingInfo.map(String).filter(Boolean).slice(0, 4)
       : [];
     const followUpQuestions = Array.isArray(obj.followUpQuestions)
-      ? obj.followUpQuestions.map(String).filter(Boolean).slice(0, 1)
+      ? obj.followUpQuestions.map(String).filter(Boolean).slice(0, MAX_FOLLOW_UP_QUESTIONS)
       : [];
     const questionOptions = Array.isArray(obj.questionOptions)
-      ? obj.questionOptions.map((q) => ({
-          question: String(q?.question || ''),
-          options: Array.isArray(q?.options) ? q.options.map(String).filter(Boolean).slice(0, 6) : [],
-        })).filter((q) => q.question && q.options.length >= 2).slice(0, 1)
+      ? obj.questionOptions
+          .map((q) => ({
+            question: String(q?.question || ''),
+            options: Array.isArray(q?.options)
+              ? q.options.map(String).filter(Boolean).slice(0, 6)
+              : [],
+          }))
+          .filter((q) => q.question && q.options.length >= 2)
+          .slice(0, MAX_FOLLOW_UP_QUESTIONS)
       : [];
     const urgency = ['green', 'yellow', 'red'].includes(String(obj.urgency))
       ? String(obj.urgency)
@@ -207,24 +263,35 @@ export function structuredToMarkdown(s: StructuredDiagnose): string {
     lines.push('## چند سؤال کوتاه برای دقیق‌تر شدن بررسی');
     if (s.statusSummary) lines.push(s.statusSummary);
     if (s.followUpQuestions?.length) {
-      s.followUpQuestions.slice(0, 6).forEach((q, i) => lines.push(`${i + 1}. ${q}`));
+      s.followUpQuestions.slice(0, MAX_FOLLOW_UP_QUESTIONS).forEach((q, i) =>
+        lines.push(`${i + 1}. ${q}`)
+      );
     }
     if (s.questionOptions?.length) {
       lines.push('برای هر سؤال یکی از گزینه‌های پیشنهادی را انتخاب کن:');
-      for (const q of s.questionOptions.slice(0, 6)) lines.push(`- ${q.question}: ${q.options.join(' | ')}`);
+      for (const q of s.questionOptions.slice(0, MAX_FOLLOW_UP_QUESTIONS))
+        lines.push(`- ${q.question}: ${q.options.join(' | ')}`);
     }
     lines.push('');
     lines.push(s.nextStep || 'به همین سؤال‌ها پاسخ بده تا بررسی را دقیق‌تر ادامه بدهم.');
-    return lines.join('\\n');
+    return lines.join('\n');
   }
   lines.push('## وضعیت کلی');
   lines.push(URGENCY_LABEL[s.urgency] || s.urgency);
   if (s.confidence) {
-    const confidenceFa: Record<string, string> = { high: 'بالا', medium: 'متوسط', low: 'پایین' };
+    const confidenceFa: Record<string, string> = {
+      high: 'بالا',
+      medium: 'متوسط',
+      low: 'پایین',
+    };
     lines.push(`اطمینان تشخیص: ${confidenceFa[s.confidence] || s.confidence}`);
   }
   if (typeof s.safeToDrive === 'boolean') {
-    lines.push(s.safeToDrive ? 'وضعیت رانندگی: در صورت نبود علامت جدید، قابل ادامه با احتیاط' : 'وضعیت رانندگی: رانندگی نکن تا بررسی شود');
+    lines.push(
+      s.safeToDrive
+        ? 'وضعیت رانندگی: در صورت نبود علامت جدید، قابل ادامه با احتیاط'
+        : 'وضعیت رانندگی: رانندگی نکن تا بررسی شود'
+    );
   }
   if (s.evidence?.length) {
     lines.push('شواهد اصلی:');
@@ -253,7 +320,10 @@ export function structuredToMarkdown(s: StructuredDiagnose): string {
   for (const w of s.warnings) lines.push(`- ${w}`);
   lines.push('');
   lines.push('## قدم بعدی پیشنهادی');
-  lines.push(s.nextStep || 'اگر علائم بدتر شد، فعلاً رانندگی نکن و برای تعویض قطعه به تعمیرگاه معتبر برو.');
+  lines.push(
+    s.nextStep ||
+      'اگر علائم بدتر شد، فعلاً رانندگی نکن و برای تعویض قطعه به تعمیرگاه معتبر برو.'
+  );
   lines.push('');
   lines.push('## نکته پایانی');
   lines.push(

@@ -23,8 +23,14 @@ import {
   SYSTEM_PROMPT_PREMIUM,
   SYSTEM_PROMPT_MOBILE,
   isMobileDirectDiagnosisRequest,
+  RULES_CONFIG,
 } from '@/lib/prompts';
-import { structuredToMarkdown, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
+import {
+  structuredToMarkdown,
+  tryParseStructuredDiagnose,
+  packStoredResult,
+  stripStoredStructured,
+} from '@/lib/diagnose-result';
 import {
   formatGaragesForChat,
   getChatApprovedGaragesNearby,
@@ -64,9 +70,15 @@ export async function GET(request: NextRequest) {
       .offset(offset)
       .all();
 
+    // Do not leak the embedded structured JSON trailer to clients.
+    const data = history.map((row) => ({
+      ...row,
+      result: stripStoredStructured(row.result),
+    }));
+
     return NextResponse.json({
       success: true,
-      data: history,
+      data,
       pagination: { limit, offset },
     });
   } catch (error) {
@@ -127,6 +139,7 @@ export async function POST(request: NextRequest) {
     let followUpBlock = '';
     let previousFollowUpRound = 0;
     let previousWasQuestions = false;
+    let previousWasDiagnosis = false;
     if (previousDiagnosticId) {
       const prev = db
         .select()
@@ -139,15 +152,22 @@ export async function POST(request: NextRequest) {
       const previousStructured = tryParseStructuredDiagnose(prev.result);
       previousFollowUpRound = Number(previousStructured?.followUpRound || 0);
       previousWasQuestions = previousStructured?.responseMode === 'questions';
+      previousWasDiagnosis = previousStructured?.responseMode === 'diagnosis';
       // کانتکست قبلی کوتاه‌تر = توکن ورودی کمتر = سرعت بیشتر
-      const prevResultSnippet = prev.result.slice(0, mobileDirect ? 900 : 1800);
-      followUpBlock = `\n\n[عیب‌یابی قبلی]\nشرح: ${prev.description.slice(0, 400)}\nنتیجه:\n${prevResultSnippet}\n`;
+      const prevMarkdown = stripStoredStructured(prev.result);
+      const prevResultSnippet = prevMarkdown.slice(0, mobileDirect ? 900 : 1800);
+      const modeHint = previousStructured
+        ? `حالت قبلی: ${previousStructured.responseMode}، دور پرسش: ${previousFollowUpRound}`
+        : 'حالت قبلی: نامشخص';
+      followUpBlock = `\n\n[عیب‌یابی قبلی]\n${modeHint}\nشرح: ${prev.description.slice(0, 400)}\nنتیجه:\n${prevResultSnippet}\n`;
     }
 
     const isAnswerToQuestion = previousWasQuestions;
     const needsHalfCredit = isAnswerToQuestion || !previousDiagnosticId;
+    // Align with RULES_CONFIG.maxFollowUpRounds (2); keep a small buffer for legacy rounds.
     const forceFinalDiagnosis =
-      mobileDirect || (previousWasQuestions && previousFollowUpRound >= 5);
+      mobileDirect ||
+      (previousWasQuestions && previousFollowUpRound >= RULES_CONFIG.maxFollowUpRounds);
 
     if (!golden) {
       const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
@@ -170,7 +190,22 @@ export async function POST(request: NextRequest) {
 
     const stageRules = mobileDirect
       ? 'همیشه responseMode=diagnosis بده. هیچ سؤالی نپرس. پاسخ فشرده باشد.'
-      : `این یک درخواست اولیه است اگر previousDiagnosticId وجود ندارد. اگر previousDiagnosticId وجود دارد، این متن پاسخ کاربر به مرحله قبل است. ${previousWasQuestions ? `مرحله قبلی سؤال‌محور بوده و شماره سؤال آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس.` : ''}${forceFinalDiagnosis ? ' حتماً اکنون فقط responseMode=diagnosis بده و هیچ سؤال دیگری نپرس.' : ''}`;
+      : [
+          previousDiagnosticId
+            ? 'این متن پاسخ/سؤال جدید کاربر نسبت به عیب‌یابی قبلی است (previousDiagnosticId موجود است).'
+            : 'این یک درخواست اولیه است (previousDiagnosticId وجود ندارد).',
+          previousWasQuestions
+            ? `مرحله قبلی سؤال‌محور بوده و شماره دور پرسش آن ${previousFollowUpRound} است؛ سؤال تکراری نپرس و از پاسخ‌های کاربر استفاده کن.`
+            : '',
+          previousWasDiagnosis
+            ? 'مرحله قبلی تشخیص نهایی بوده. اگر کاربر فقط درباره هزینه، فوریت، قدم بعدی یا یک بخش خاص می‌پرسد، همان بخش را جواب بده و کل گزارش تشخیص را از نو تکرار نکن. responseMode=diagnosis بده اما causes/status را فقط در صورت نیاز واقعی به‌روز کن.'
+            : '',
+          forceFinalDiagnosis
+            ? 'حتماً اکنون فقط responseMode=diagnosis بده و هیچ سؤال دیگری نپرس.'
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
 
     logger.info('Diagnose requested', {
       userId: user.id,
@@ -180,6 +215,9 @@ export async function POST(request: NextRequest) {
       descLen: description.length,
       golden,
       mobileDirect,
+      previousDiagnosticId: previousDiagnosticId ?? null,
+      previousWasQuestions,
+      previousFollowUpRound,
       promptTier: mobileDirect ? 'mobile' : golden ? 'premium' : 'free',
     });
 
@@ -233,6 +271,9 @@ export async function POST(request: NextRequest) {
     let diagnosticId: number | undefined;
     let usedFree = false;
 
+    // Persist markdown for humans + embedded structured JSON for follow-up parsing.
+    const storedResult = packStoredResult(resultText, structured);
+
     try {
       const txResult = db.transaction((tx) => {
         // اپ موبایل همیشه diagnosis است؛ مسیر questions فقط برای کلاینت‌های قدیمی
@@ -244,7 +285,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           carId: storedCarId(carId, year, customCarName),
           description,
-          result: resultText,
+          result: storedResult,
         });
         return { billing, id };
       });

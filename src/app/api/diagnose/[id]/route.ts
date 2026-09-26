@@ -4,6 +4,7 @@ import { diagnostics } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { getUserFromRequest, isAdminPhone } from '@/lib/auth';
 import { handleError, BadRequestError, NotFoundError } from '@/lib/error-handler';
+import { stripStoredStructured, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
 
 export async function GET(
   request: NextRequest,
@@ -29,7 +30,17 @@ export async function GET(
       throw new NotFoundError('عیب‌یابی یافت نشد');
     }
 
-    return NextResponse.json({ success: true, data: row });
+    const structured = tryParseStructuredDiagnose(row.result);
+    const cleanResult = stripStoredStructured(row.result);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...row,
+        result: cleanResult,
+        structured: structured ?? null,
+      },
+    });
   } catch (error) {
     return handleError(error);
   }

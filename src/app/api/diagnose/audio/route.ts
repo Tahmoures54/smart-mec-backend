@@ -24,7 +24,11 @@ import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagno
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
 import { SYSTEM_PROMPT_AUDIO } from '@/lib/prompts';
-import { structuredToMarkdown, tryParseStructuredDiagnose } from '@/lib/diagnose-result';
+import {
+  structuredToMarkdown,
+  tryParseStructuredDiagnose,
+  packStoredResult,
+} from '@/lib/diagnose-result';
 
 export const maxDuration = 90;
 
@@ -132,13 +136,15 @@ export async function POST(request: NextRequest) {
       ? structuredToMarkdown(structured)
       : resultTextRaw;
 
+    const storedResult = packStoredResult(resultText, structured);
+
     const txResult = db.transaction((tx) => {
       const billing = consumeDiagnoseQuota(tx, user, now);
       const id = saveDiagnostic(tx, {
         userId: user.id,
         carId: storedCarId(carId, year, customCarName),
         description: description.slice(0, 2000),
-        result: resultText,
+        result: storedResult,
       });
       return { billing, id };
     });
