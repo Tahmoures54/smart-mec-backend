@@ -11,33 +11,40 @@ async function callDeepSeek(options: {
   apiKey: string;
   apiEndpoint: string;
   model: string;
+  thinkingEnabled: boolean;
+  reasoningEffort: 'low' | 'high' | 'max';
 }): Promise<{ text: string; finishReason?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
 
   try {
+    // Thinking mode does not support temperature / top_p / presence_penalty / frequency_penalty.
+    const body: Record<string, unknown> = {
+      model: options.model,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: options.systemPrompt },
+        { role: 'user', content: options.userContent },
+      ],
+      thinking: { type: options.thinkingEnabled ? 'enabled' : 'disabled' },
+      max_tokens: options.maxTokens,
+      user: `user_${options.userId}`,
+    };
+
+    if (options.thinkingEnabled) {
+      body.reasoning_effort = options.reasoningEffort;
+    } else {
+      body.temperature = 0.3;
+      body.top_p = 0.9;
+    }
+
     const response = await fetch(`${options.apiEndpoint}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${options.apiKey}`,
       },
-      body: JSON.stringify({
-        model: options.model,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: options.systemPrompt },
-          { role: 'user', content: options.userContent },
-        ],
-        // برای عیب‌یابی موبایل، reasoning لازم نیست؛ حالت thinking پیش‌فرض V4.1-Flash روشن است.
-        // خاموش‌کردن آن latency را به‌طور محسوسی کم می‌کند.
-        thinking: { type: 'disabled' },
-        temperature: 0.3,
-        max_tokens: options.maxTokens,
-        // پاسخ کوتاه‌تر و پایدارتر → latency کمتر
-        top_p: 0.9,
-        user: `user_${options.userId}`,
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
@@ -55,6 +62,7 @@ async function callDeepSeek(options: {
         userId: options.userId,
         endpoint: options.apiEndpoint,
         model: options.model,
+        thinking: options.thinkingEnabled,
       });
       throw new AppError(
         'هوش مصنوعی در حال حاضر پاسخگو نیست. لطفاً چند دقیقه دیگر تلاش کنید.',
@@ -66,12 +74,15 @@ async function callDeepSeek(options: {
     const data = await response.json();
     const choice = data.choices?.[0];
     const finishReason = choice?.finish_reason as string | undefined;
-    let text = choice?.message?.content as string | undefined;
+    const message = choice?.message;
+    // Final answer is in content; reasoning_content is CoT (not returned to the client).
+    let text = message?.content as string | undefined;
 
     if (!text) {
       logger.error('AI empty content', {
         userId: options.userId,
         dataKeys: Object.keys(data || {}),
+        hasReasoning: Boolean(message?.reasoning_content),
       });
       throw new AppError(
         'پاسخ نامعتبر از سرویس هوش مصنوعی دریافت شد.',
@@ -85,6 +96,7 @@ async function callDeepSeek(options: {
         userId: options.userId,
         finishReason,
         maxTokens: options.maxTokens,
+        thinking: options.thinkingEnabled,
       });
       if (!text.trim().endsWith('}')) {
         text += '\n}';
@@ -129,11 +141,27 @@ export async function chatCompletion(options: {
     );
   }
 
-  // پیش‌فرض‌های بهینه‌شده برای latency (قابل override با env)
+  // Thinking on by default; can disable with AI_THINKING=false
+  const thinkingEnabled = process.env.AI_THINKING !== 'false';
+  const reasoningEffortRaw = (process.env.AI_REASONING_EFFORT || 'high').toLowerCase();
+  const reasoningEffort: 'low' | 'high' | 'max' =
+    reasoningEffortRaw === 'low' || reasoningEffortRaw === 'max'
+      ? reasoningEffortRaw
+      : 'high';
+
+  // Thinking consumes completion tokens for CoT — defaults are higher than non-thinking.
   const timeoutMs =
-    options.timeoutMs ?? parseInt(process.env.AI_TIMEOUT_MS || '30000', 10);
+    options.timeoutMs ??
+    parseInt(
+      process.env.AI_TIMEOUT_MS || (thinkingEnabled ? '90000' : '30000'),
+      10
+    );
   const maxTokens =
-    options.maxTokens ?? parseInt(process.env.AI_MAX_TOKENS || '1200', 10);
+    options.maxTokens ??
+    parseInt(
+      process.env.AI_MAX_TOKENS || (thinkingEnabled ? '4096' : '1200'),
+      10
+    );
 
   const base = {
     systemPrompt: options.systemPrompt,
@@ -144,6 +172,8 @@ export async function chatCompletion(options: {
     apiKey,
     apiEndpoint,
     model,
+    thinkingEnabled,
+    reasoningEffort,
   };
 
   try {
@@ -156,6 +186,7 @@ export async function chatCompletion(options: {
       error: e.message,
       userId: options.userId,
       abort: isAbort,
+      thinking: thinkingEnabled,
     });
 
     // Timeout را دوباره تکرار نکن؛ وگرنه یک درخواست موبایل می‌تواند دو برابر
@@ -166,8 +197,8 @@ export async function chatCompletion(options: {
       try {
         return await callDeepSeek({
           ...base,
-          timeoutMs: Math.min(timeoutMs, 15000),
-          maxTokens: Math.min(maxTokens, 1200),
+          timeoutMs: Math.min(timeoutMs, thinkingEnabled ? 60000 : 15000),
+          maxTokens: Math.min(maxTokens, thinkingEnabled ? 4096 : 1200),
         });
       } catch (retryErr: unknown) {
         if (retryErr instanceof AppError) throw retryErr;
