@@ -158,6 +158,65 @@ export function stripStoredStructured(raw: string): string {
   return raw;
 }
 
+/**
+ * Legacy rows stored only markdown (no JSON trailer). Infer questions mode from
+ * the familiar heading so follow-ups still set previousWasQuestions correctly.
+ */
+function inferStructuredFromMarkdown(markdown: string): StructuredDiagnose | null {
+  const text = stripStoredStructured(markdown).trim();
+  if (!text) return null;
+
+  const isQuestions =
+    /##\s*چند سؤال کوتاه/.test(text) ||
+    /برای دقیق‌تر شدن بررسی/.test(text) ||
+    /questionOptions/.test(text);
+
+  if (isQuestions) {
+    const questions: string[] = [];
+    for (const line of text.split('\n')) {
+      const m = /^\s*\d+[.)]\s+(.+)$/.exec(line.trim());
+      if (m && m[1].length >= 3) questions.push(m[1].trim());
+    }
+    return {
+      responseMode: 'questions',
+      followUpRound: 1,
+      missingInfo: [],
+      followUpQuestions: questions.slice(0, MAX_FOLLOW_UP_QUESTIONS),
+      questionOptions: [],
+      urgency: 'yellow',
+      confidence: 'low',
+      safeToDrive: null,
+      evidence: [],
+      statusSummary: 'مرحله سؤال (از تاریخچه قدیمی بازیابی شد)',
+      causes: [],
+      mechanicQuestions: [],
+      warnings: [],
+      nextStep: 'به سؤال‌ها پاسخ بده تا بررسی ادامه پیدا کند.',
+    };
+  }
+
+  if (/##\s*وضعیت کلی/.test(text) || /##\s*علل محتمل/.test(text)) {
+    return {
+      responseMode: 'diagnosis',
+      followUpRound: 0,
+      missingInfo: [],
+      followUpQuestions: [],
+      questionOptions: [],
+      urgency: 'yellow',
+      confidence: 'medium',
+      safeToDrive: null,
+      evidence: [],
+      statusSummary: 'تشخیص قبلی (از تاریخچه قدیمی بازیابی شد)',
+      causes: [],
+      mechanicQuestions: [],
+      warnings: [],
+      nextStep: '',
+    };
+  }
+
+  return null;
+}
+
 export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | null {
   if (!raw) return null;
   let text = raw.trim();
@@ -174,8 +233,13 @@ export function tryParseStructuredDiagnose(raw: string): StructuredDiagnose | nu
 
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) return null;
-  return parseStructuredObject(text.slice(start, end + 1));
+  if (start >= 0 && end > start) {
+    const parsed = parseStructuredObject(text.slice(start, end + 1));
+    if (parsed) return parsed;
+  }
+
+  // Legacy markdown-only rows (before packStoredResult).
+  return inferStructuredFromMarkdown(text);
 }
 
 function parseStructuredObject(jsonText: string): StructuredDiagnose | null {
@@ -310,7 +374,6 @@ export function structuredToMarkdown(s: StructuredDiagnose): string {
     if (c.diyCheck) lines.push(`  - چک اولیه: ${c.diyCheck}`);
   }
   lines.push('');
-  // کاربر پیش خودِ مکانیک هوشمند آمده — چک‌لیست خودش، نه «از مکانیک بپرس»
   if (s.mechanicQuestions.length > 0) {
     lines.push('## خودت این‌ها را چک / یادداشت کن');
     for (const q of s.mechanicQuestions) lines.push(`- ${q}`);

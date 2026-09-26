@@ -79,10 +79,11 @@ export async function GET(request: NextRequest) {
 
       let seriesRevenue: { day: string; amount: number; count: number }[] = [];
       try {
+        // SQLite-safe CAST (avoid Postgres-only ::int)
         const prows = await db
           .select({
             day: sql<string>`date(${purchases.createdAt}, 'unixepoch')`,
-            amount: sql<number>`coalesce(sum(case when ${purchases.status} = 'completed' then ${purchases.amount} else 0 end),0)::int`,
+            amount: sql<number>`CAST(coalesce(sum(case when ${purchases.status} = 'completed' then ${purchases.amount} else 0 end), 0) AS INTEGER)`,
             count: sql<number>`sum(case when ${purchases.status} = 'completed' then 1 else 0 end)`,
           })
           .from(purchases)

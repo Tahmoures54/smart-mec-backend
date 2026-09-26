@@ -102,13 +102,6 @@ export interface Product {
 
 /**
  * قیمت‌ها به تومان.
- *
- * منطق روان‌شناسی:
- * - ورود ارزان (credit_5): کاهش اصطکاک اولین خرید
- * - محبوب (credit_20): نقطهٔ طلایی — نه خیلی کم، نه خیلی گران
- * - به‌صرفه (credit_50): بیشترین صرفه‌جویی واحد → لنگر برای پرمصرف‌ها
- * - طلایی ماهانه: ارزان‌تر از چند بستهٔ متوسط اعتبار برای کاربر پرتکرار
- * - سه‌ماهه/سالانه: تخفیف آشکار نسبت به ماهانه (تعهد بلندمدت)
  */
 export const PRODUCTS: Record<ProductId, Product> = {
   credit_10: {
@@ -277,7 +270,13 @@ export interface DiagnoseResult {
 }
 
 // ─── Purchase ───
-export type PurchaseStatus = 'pending' | 'paid' | 'failed' | 'canceled';
+/** Runtime status written by verify route is `completed`. `paid` kept as legacy alias. */
+export type PurchaseStatus =
+  | 'pending'
+  | 'completed'
+  | 'paid'
+  | 'failed'
+  | 'canceled';
 
 export interface Purchase {
   id: number;
