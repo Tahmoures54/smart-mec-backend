@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { db, ensureDbReady } from '@/db';
 import { diagnostics } from '@/db/schema';
 import { getUserFromRequest } from '@/lib/auth';
@@ -131,6 +131,38 @@ export async function POST(request: NextRequest) {
       payload.previousDiagnosticId ?? payload.followUpId,
       'previousDiagnosticId'
     );
+    const rawRequestId = payload.requestId ?? payload.idempotencyKey;
+    const requestId =
+      rawRequestId == null || String(rawRequestId).trim().isEmpty
+        ? undefined
+        : String(rawRequestId).trim();
+    if (requestId && (requestId.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(requestId))) {
+      throw new BadRequestError('شناسه درخواست نامعتبر است');
+    }
+
+    // If the client retries after a timeout, return the already-created diagnosis
+    // instead of running AI and charging the user again.
+    if (requestId) {
+      const existing = db
+        .select()
+        .from(diagnostics)
+        .where(and(eq(diagnostics.userId, user.id), eq(diagnostics.requestId, requestId)))
+        .get();
+      if (existing) {
+        const existingStructured = tryParseStructuredDiagnose(existing.result);
+        return NextResponse.json({
+          success: true,
+          data: {
+            result: stripStoredStructured(existing.result),
+            structured: existingStructured ?? null,
+          },
+          diagnosticId: existing.id,
+          remainingCredits: null,
+          remainingFreeQuestions: null,
+          idempotentReplay: true,
+        });
+      }
+    }
 
     const now = new Date();
     const golden = isGoldenActive(user, now);
@@ -215,6 +247,7 @@ export async function POST(request: NextRequest) {
       golden,
       mobileDirect,
       previousDiagnosticId: previousDiagnosticId ?? null,
+      requestId: requestId ?? null,
       previousWasQuestions,
       previousFollowUpRound,
       promptTier: mobileDirect ? 'mobile' : golden ? 'premium' : 'free',
@@ -275,19 +308,42 @@ export async function POST(request: NextRequest) {
     try {
       const txResult = db.transaction((tx) => {
         // هر نوبت موفق = ۱ اعتبار کامل (اولیه، سؤال، پیگیری، سؤال مجدد)
+        if (requestId) {
+          const existing = tx
+            .select()
+            .from(diagnostics)
+            .where(and(eq(diagnostics.userId, user.id), eq(diagnostics.requestId, requestId)))
+            .get();
+          if (existing) {
+            return {
+              billing: null,
+              id: existing.id,
+              replay: existing,
+            };
+          }
+        }
+
         const billing = consumeDiagnoseQuota(tx, user, now);
         const id = saveDiagnostic(tx, {
           userId: user.id,
           carId: storedCarId(carId, year, customCarName),
           description,
           result: storedResult,
+          requestId,
         });
-        return { billing, id };
+        return { billing, id, replay: null };
       });
-      remainingFree = txResult.billing.remainingFree;
-      remainingCredits = txResult.billing.remainingCredits;
-      usedFree = txResult.billing.usedFree;
-      diagnosticId = txResult.id;
+      if (txResult.replay) {
+        remainingFree = null;
+        remainingCredits = null;
+        usedFree = false;
+        diagnosticId = txResult.id;
+      } else {
+        remainingFree = txResult.billing!.remainingFree;
+        remainingCredits = txResult.billing!.remainingCredits;
+        usedFree = txResult.billing!.usedFree;
+        diagnosticId = txResult.id;
+      }
     } catch (txError) {
       logger.error('Transaction failed during diagnose save', {
         userId: user.id,
@@ -313,6 +369,7 @@ export async function POST(request: NextRequest) {
       diagnosticId,
       remainingCredits: !golden ? remainingCredits : null,
       remainingFreeQuestions: !golden ? remainingFree : null,
+      idempotentReplay: Boolean(txResult.replay),
     });
   } catch (error) {
     return handleError(error);
