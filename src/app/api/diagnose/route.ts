@@ -334,6 +334,7 @@ export async function POST(request: NextRequest) {
         return { billing, id, replay: null };
       });
       if (txResult.replay) {
+        idempotentReplay = true;
         remainingFree = null;
         remainingCredits = null;
         usedFree = false;
@@ -369,7 +370,7 @@ export async function POST(request: NextRequest) {
       diagnosticId,
       remainingCredits: !golden ? remainingCredits : null,
       remainingFreeQuestions: !golden ? remainingFree : null,
-      idempotentReplay: Boolean(txResult.replay),
+      idempotentReplay,
     });
   } catch (error) {
     return handleError(error);
