@@ -37,7 +37,8 @@ import {
 } from '@/lib/chat-garages';
 import type { User } from '@/types';
 
-export const maxDuration = 90;
+// Thinking mode can take longer; keep headroom above AI_TIMEOUT_MS default (90s).
+export const maxDuration = 120;
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -222,13 +223,12 @@ export async function POST(request: NextRequest) {
     });
 
     const aiStarted = Date.now();
+    // Use global AI defaults (thinking-aware). Do not clamp mobile to 30s/1400 tokens
+    // or CoT will exhaust the budget before JSON completes.
     const { text: resultTextRaw } = await chatCompletion({
       systemPrompt,
       userContent: `[مشخصات خودرو]\n${carDetails}${followUpBlock}\n\n[شرح خرابی/پاسخ جدید کاربر]\n${description}\n\n[قواعد]\n${stageRules}`,
       userId: user.id,
-      // مسیر موبایل: سقف توکن و timeout سخت‌گیرانه‌تر
-      maxTokens: mobileDirect ? 1400 : undefined,
-      timeoutMs: mobileDirect ? 30000 : undefined,
     });
     logger.info('Diagnose AI done', {
       userId: user.id,

@@ -30,7 +30,8 @@ import {
   packStoredResult,
 } from '@/lib/diagnose-result';
 
-export const maxDuration = 90;
+// Thinking mode can take longer; keep headroom above AI_TIMEOUT_MS default (90s).
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   try {
@@ -124,12 +125,11 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join('\n\n');
 
+    // Use thinking-aware defaults from chatCompletion (no hard 30s clamp).
     const { text: resultTextRaw } = await chatCompletion({
       systemPrompt: SYSTEM_PROMPT_AUDIO,
       userContent: `[مشخصات خودرو]\n${carDetails}\n\n[اطلاعات صوتی / شرح]\n${description}`,
       userId: user.id,
-      timeoutMs: 30000,
-      maxTokens: 1000,
     });
     const structured = tryParseStructuredDiagnose(resultTextRaw);
     const resultText = structured
