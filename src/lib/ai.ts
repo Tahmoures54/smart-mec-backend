@@ -63,6 +63,7 @@ async function callDeepSeek(options: {
         endpoint: options.apiEndpoint,
         model: options.model,
         thinking: options.thinkingEnabled,
+        maxTokens: options.maxTokens,
       });
       throw new AppError(
         'هوش مصنوعی در حال حاضر پاسخگو نیست. لطفاً چند دقیقه دیگر تلاش کنید.',
@@ -76,13 +77,16 @@ async function callDeepSeek(options: {
     const finishReason = choice?.finish_reason as string | undefined;
     const message = choice?.message;
     // Final answer is in content; reasoning_content is CoT (not returned to the client).
-    let text = message?.content as string | undefined;
+    let text = (message?.content as string | undefined) || '';
 
-    if (!text) {
+    if (!text.trim()) {
       logger.error('AI empty content', {
         userId: options.userId,
         dataKeys: Object.keys(data || {}),
         hasReasoning: Boolean(message?.reasoning_content),
+        finishReason,
+        maxTokens: options.maxTokens,
+        usage: data?.usage,
       });
       throw new AppError(
         'پاسخ نامعتبر از سرویس هوش مصنوعی دریافت شد.',
@@ -97,6 +101,8 @@ async function callDeepSeek(options: {
         finishReason,
         maxTokens: options.maxTokens,
         thinking: options.thinkingEnabled,
+        rawLen: text.length,
+        usage: data?.usage,
       });
       if (!text.trim().endsWith('}')) {
         text += '\n}';
@@ -107,6 +113,24 @@ async function callDeepSeek(options: {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+function resolveMaxTokens(thinkingEnabled: boolean, override?: number): number {
+  const fromEnv = parseInt(process.env.AI_MAX_TOKENS || '', 10);
+  const requested =
+    override ??
+    (Number.isFinite(fromEnv) && fromEnv > 0
+      ? fromEnv
+      : thinkingEnabled
+        ? 6144
+        : 1200);
+
+  // Thinking (CoT) shares the same max_tokens budget as the final JSON.
+  // A low env like 1800 causes finish_reason=length and often empty content.
+  if (thinkingEnabled) {
+    return Math.max(requested, 6144);
+  }
+  return Math.max(requested, 400);
 }
 
 export async function chatCompletion(options: {
@@ -149,19 +173,13 @@ export async function chatCompletion(options: {
       ? reasoningEffortRaw
       : 'high';
 
-  // Thinking consumes completion tokens for CoT — defaults are higher than non-thinking.
   const timeoutMs =
     options.timeoutMs ??
     parseInt(
       process.env.AI_TIMEOUT_MS || (thinkingEnabled ? '90000' : '30000'),
       10
     );
-  const maxTokens =
-    options.maxTokens ??
-    parseInt(
-      process.env.AI_MAX_TOKENS || (thinkingEnabled ? '4096' : '1200'),
-      10
-    );
+  const maxTokens = resolveMaxTokens(thinkingEnabled, options.maxTokens);
 
   const base = {
     systemPrompt: options.systemPrompt,
@@ -176,9 +194,43 @@ export async function chatCompletion(options: {
     reasoningEffort,
   };
 
+  logger.info('AI request config', {
+    userId: options.userId,
+    model,
+    thinking: thinkingEnabled,
+    reasoningEffort,
+    maxTokens,
+    timeoutMs,
+  });
+
   try {
     return await callDeepSeek(base);
   } catch (err: unknown) {
+    // Empty final answer after heavy CoT: one automatic retry with a larger budget.
+    if (
+      err instanceof AppError &&
+      err.code === 'AI_EMPTY_RESPONSE' &&
+      thinkingEnabled
+    ) {
+      const retryTokens = Math.max(maxTokens * 2, 8192);
+      logger.warn('AI empty content — retry with higher max_tokens', {
+        userId: options.userId,
+        maxTokens,
+        retryTokens,
+      });
+      try {
+        return await callDeepSeek({
+          ...base,
+          maxTokens: retryTokens,
+          reasoningEffort: reasoningEffort === 'max' ? 'high' : reasoningEffort,
+          timeoutMs: Math.max(timeoutMs, 90000),
+        });
+      } catch (retryEmpty: unknown) {
+        if (retryEmpty instanceof AppError) throw retryEmpty;
+        throw err;
+      }
+    }
+
     if (err instanceof AppError) throw err;
     const e = err as { name?: string; message?: string };
     const isAbort = e.name === 'AbortError';
@@ -189,16 +241,16 @@ export async function chatCompletion(options: {
       thinking: thinkingEnabled,
     });
 
-    // Timeout را دوباره تکرار نکن؛ وگرنه یک درخواست موبایل می‌تواند دو برابر
-    // زمان انتظار طول بکشد و از timeout کلاینت عبور کند.
-    const isTransientNetwork = /fetch|network|ECONNRESET|ETIMEDOUT/i.test(e.message || '');
+    const isTransientNetwork = /fetch|network|ECONNRESET|ETIMEDOUT/i.test(
+      e.message || ''
+    );
     if (!isAbort && isTransientNetwork) {
       logger.info('AI retry once', { userId: options.userId });
       try {
         return await callDeepSeek({
           ...base,
           timeoutMs: Math.min(timeoutMs, thinkingEnabled ? 60000 : 15000),
-          maxTokens: Math.min(maxTokens, thinkingEnabled ? 4096 : 1200),
+          maxTokens: Math.min(maxTokens, thinkingEnabled ? 8192 : 1200),
         });
       } catch (retryErr: unknown) {
         if (retryErr instanceof AppError) throw retryErr;
