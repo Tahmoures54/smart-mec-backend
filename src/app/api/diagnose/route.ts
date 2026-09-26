@@ -301,6 +301,7 @@ export async function POST(request: NextRequest) {
     let remainingCredits: number | null = null;
     let diagnosticId: number | undefined;
     let usedFree = false;
+    let idempotentReplay = false;
 
     // Persist markdown for humans + embedded structured JSON for follow-up parsing.
     const storedResult = packStoredResult(resultText, structured);
