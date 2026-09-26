@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     );
     const rawRequestId = payload.requestId ?? payload.idempotencyKey;
     const requestId =
-      rawRequestId == null || String(rawRequestId).trim().isEmpty
+      rawRequestId == null || String(rawRequestId).trim().length === 0
         ? undefined
         : String(rawRequestId).trim();
     if (requestId && (requestId.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(requestId))) {
