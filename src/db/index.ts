@@ -167,7 +167,6 @@ async function ensureTables() {
       CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps (phone);
       CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps (expires_at);
       CREATE INDEX IF NOT EXISTS idx_diagnostics_user_id ON diagnostics (user_id);
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_diagnostics_request_id ON diagnostics (request_id);
       CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases (user_id);
       CREATE INDEX IF NOT EXISTS idx_purchases_authority ON purchases (authority);
       CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases (status);
