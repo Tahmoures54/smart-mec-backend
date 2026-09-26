@@ -91,6 +91,7 @@ async function ensureTables() {
         car_id TEXT NOT NULL,
         description TEXT NOT NULL,
         result TEXT NOT NULL,
+        request_id TEXT,
         year INTEGER,
         created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
@@ -166,6 +167,7 @@ async function ensureTables() {
       CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps (phone);
       CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps (expires_at);
       CREATE INDEX IF NOT EXISTS idx_diagnostics_user_id ON diagnostics (user_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_diagnostics_request_id ON diagnostics (request_id);
       CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases (user_id);
       CREATE INDEX IF NOT EXISTS idx_purchases_authority ON purchases (authority);
       CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases (status);
@@ -197,6 +199,8 @@ async function ensureTables() {
     addColumn('users', 'marketing_opt_in', 'INTEGER DEFAULT 0 NOT NULL');
     addColumn('users', 'recovery_sms_at', 'INTEGER');
     addColumn('diagnostics', 'year', 'INTEGER');
+    addColumn('diagnostics', 'request_id', 'TEXT');
+    client.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_diagnostics_request_id ON diagnostics (request_id);');
     addColumn('purchases', 'garage_id', 'INTEGER');
     addColumn('garages', 'subscription_tier', "TEXT DEFAULT 'free' NOT NULL");
     addColumn('garages', 'subscription_expires_at', 'TEXT');
