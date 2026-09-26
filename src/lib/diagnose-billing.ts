@@ -228,6 +228,7 @@ export function saveDiagnostic(
     carId: string;
     description: string;
     result: string;
+    requestId?: string | null;
     audioUrl?: string | null;
   }
 ): number {
