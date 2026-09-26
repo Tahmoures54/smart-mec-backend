@@ -103,6 +103,8 @@ export const diagnostics = sqliteTable(
     carId: text('car_id').notNull(),
     description: text('description').notNull(),
     result: text('result').notNull(),
+    /** Client-generated idempotency key; prevents duplicate billing after retries/timeouts. */
+    requestId: text('request_id'),
     year: integer('year'),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .default(sql`(unixepoch())`)
@@ -110,6 +112,7 @@ export const diagnostics = sqliteTable(
   },
   (t) => ({
     userIdx: index('idx_diagnostics_user_id').on(t.userId),
+    requestIdIdx: uniqueIndex('idx_diagnostics_request_id').on(t.requestId),
   })
 );
 
