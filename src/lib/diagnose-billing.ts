@@ -187,43 +187,11 @@ function consumeFreeOrCredit(
   };
 }
 
-
-export function consumeQuestionQuota(
-  tx: Tx,
-  user: User,
-  yearMonth: string,
-  now: Date
-): DiagnoseBillingResult {
-  // Clarification questions cost at most half a paid credit each.
-  // The monthly free diagnosis quota remains available for the final diagnosis.
-  if (isGoldenActive(user, now) || hasFreeQuota(user.id, yearMonth, tx)) {
-    return {
-      remainingFree: null,
-      remainingCredits: user.credits,
-      usedFree: false,
-    };
-  }
-
-  const updated = tx
-    .update(users)
-    .set({ credits: sql`${users.credits} - 0.5` })
-    .where(and(eq(users.id, user.id), sql`${users.credits} >= 0.5`))
-    .returning()
-    .all();
-
-  if (updated.length === 0) {
-    throw new InsufficientCreditsError(
-      'برای ادامهٔ سؤال‌ها حداقل نیم اعتبار لازم است.'
-    );
-  }
-
-  return {
-    remainingFree: 0,
-    remainingCredits: updated[0].credits,
-    usedFree: false,
-  };
-}
-
+/**
+ * هر نوبت عیب‌یابی / سؤال پیگیری / پاسخ به سؤال = ۱ اعتبار کامل
+ * (یا سهمیه رایگان ماهانه / شمارنده طلایی).
+ * نیم‌اعتبار حذف شد چون ستون credits از نوع INTEGER است.
+ */
 export function consumeDiagnoseQuota(
   tx: Tx,
   user: User,
@@ -241,6 +209,16 @@ export function consumeDiagnoseQuota(
   }
 
   return consumeFreeOrCredit(tx, user, currentMonth, now);
+}
+
+/** @deprecated Use consumeDiagnoseQuota — kept as alias for older imports. */
+export function consumeQuestionQuota(
+  tx: Tx,
+  user: User,
+  _yearMonth: string,
+  now: Date
+): DiagnoseBillingResult {
+  return consumeDiagnoseQuota(tx, user, now);
 }
 
 export function saveDiagnostic(

@@ -15,7 +15,7 @@ import {
   looksLikeCustomCarLabel,
 } from '@/lib/validation';
 import { isGoldenActive } from '@/lib/user-status';
-import { hasFreeQuota, consumeDiagnoseQuota, consumeQuestionQuota, saveDiagnostic } from '@/lib/diagnose-billing';
+import { hasFreeQuota, consumeDiagnoseQuota, saveDiagnostic } from '@/lib/diagnose-billing';
 import { buildCarDetails, storedCarId } from '@/lib/car-details';
 import { chatCompletion } from '@/lib/ai';
 import {
@@ -163,19 +163,17 @@ export async function POST(request: NextRequest) {
       followUpBlock = `\n\n[عیب‌یابی قبلی]\n${modeHint}\nشرح: ${prev.description.slice(0, 400)}\nنتیجه:\n${prevResultSnippet}\n`;
     }
 
-    const isAnswerToQuestion = previousWasQuestions;
-    const needsHalfCredit = isAnswerToQuestion || !previousDiagnosticId;
-    // Align with RULES_CONFIG.maxFollowUpRounds (2); keep a small buffer for legacy rounds.
+    // هر نوبت (اولیه، سؤال سیستم، پاسخ کاربر، سؤال مجدد) = ۱ اعتبار / سهمیه
     const forceFinalDiagnosis =
       mobileDirect ||
       (previousWasQuestions && previousFollowUpRound >= RULES_CONFIG.maxFollowUpRounds);
 
     if (!golden) {
       const freeAvailable = hasFreeQuota(user.id, currentMonth, db);
-      if (!freeAvailable && (needsHalfCredit ? user.credits < 0.5 : user.credits <= 0)) {
+      if (!freeAvailable && user.credits < 1) {
         throw new InsufficientCreditsError(
-          needsHalfCredit
-            ? 'برای ادامهٔ عیب‌یابی حداقل نیم اعتبار لازم است.'
+          previousDiagnosticId
+            ? 'برای ادامهٔ گفتگو یا سؤال مجدد حداقل ۱ اعتبار لازم است.'
             : 'اعتبار شما برای عیب‌یابی کافی نیست. لطفاً حساب خود را شارژ کنید.'
         );
       }
@@ -276,11 +274,8 @@ export async function POST(request: NextRequest) {
 
     try {
       const txResult = db.transaction((tx) => {
-        // اپ موبایل همیشه diagnosis است؛ مسیر questions فقط برای کلاینت‌های قدیمی
-        const billing =
-          !mobileDirect && structured?.responseMode === 'questions'
-            ? consumeQuestionQuota(tx, user, currentMonth, now)
-            : consumeDiagnoseQuota(tx, user, now);
+        // هر نوبت موفق = ۱ اعتبار کامل (اولیه، سؤال، پیگیری، سؤال مجدد)
+        const billing = consumeDiagnoseQuota(tx, user, now);
         const id = saveDiagnostic(tx, {
           userId: user.id,
           carId: storedCarId(carId, year, customCarName),
